@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "scrap",
+      "name": "废铁",
+      "kind": "currency",
+      "unit": "块",
+      "tier": 0,
+      "desc": "从旧世界残骸里回收的金属块。这里是货币，也是原料。"
+    },
+    {
+      "id": "wire",
+      "name": "导线",
+      "kind": "component",
+      "unit": "根",
+      "tier": 1,
+      "desc": "剥掉绝缘皮的铜线。把电从一端送到另一端。"
+    },
+    {
+      "id": "switch",
+      "name": "开关",
+      "kind": "component",
+      "unit": "个",
+      "tier": 1,
+      "desc": "手动接通或断开电路。闭合为 1，断开为 0。"
+    },
+    {
+      "id": "bulb",
+      "name": "灯泡",
+      "kind": "component",
+      "unit": "只",
+      "tier": 1,
+      "desc": "最原始的显示器：有电就亮，没电就灭。"
+    },
+    {
+      "id": "gate_not",
+      "name": "非门芯片",
+      "kind": "component",
+      "unit": "片",
+      "tier": 2,
+      "desc": "输入取反：0 变 1，1 变 0。"
+    },
+    {
+      "id": "gate_and",
+      "name": "与门芯片",
+      "kind": "component",
+      "unit": "片",
+      "tier": 2,
+      "desc": "两个输入都为 1 时输出才为 1。"
+    },
+    {
+      "id": "gate_or",
+      "name": "或门芯片",
+      "kind": "component",
+      "unit": "片",
+      "tier": 2,
+      "desc": "任一输入为 1 时输出即为 1。"
+    },
+    {
+      "id": "gate_xor",
+      "name": "异或门芯片",
+      "kind": "component",
+      "unit": "片",
+      "tier": 3,
+      "desc": "两个输入不同时输出 1。半加器的“和”就靠它。"
+    }
+  ]
+}

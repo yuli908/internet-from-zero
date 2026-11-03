@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "voltage",
+      "kind": "knowledge",
+      "title": "电平",
+      "layer": 1,
+      "prereq": [],
+      "xp_award": 15,
+      "scrap_award": 10,
+      "summary": "电压高于阈值记为 1，低于阈值记为 0。",
+      "detail": "真实电路里没有抽象的数字 0 和 1，只有电压。工程上用阈值把连续电压切成两个区间：高电平（约等于电源电压）与低电平（接近 0V）。阈值附近是禁区，噪声落进去会导致逻辑出错，这就是为什么电路要留噪声裕量。"
+    },
+    {
+      "id": "binary",
+      "kind": "knowledge",
+      "title": "二进制",
+      "layer": 2,
+      "prereq": ["voltage"],
+      "xp_award": 20,
+      "scrap_award": 10,
+      "summary": "每一位只有 0/1，进位基数为 2。",
+      "detail": "n 位二进制可以表示 2^n 个不同状态。8 位 = 256 个状态，这就是早期字节的来历。选择二进制不是数学限制，而是物理与工程折中：两个稳定状态最容易区分，布尔代数可以直接映射到开关电路。"
+    },
+    {
+      "id": "boolean",
+      "kind": "knowledge",
+      "title": "布尔代数",
+      "layer": 2,
+      "prereq": ["voltage"],
+      "xp_award": 20,
+      "scrap_award": 10,
+      "summary": "与、或、非三种基本运算可以组合出一切逻辑。",
+      "detail": "布尔代数把真/假当作可运算的值。与（AND）、或（OR）、非（NOT）是完备的：用它们能组合出任意的逻辑函数。把布尔表达式做成电路，就是数字逻辑设计的起点。"
+    },
+    {
+      "id": "logic_gates",
+      "kind": "knowledge",
+      "title": "逻辑门",
+      "layer": 3,
+      "prereq": ["boolean"],
+      "xp_award": 25,
+      "scrap_award": 12,
+      "summary": "门电路是布尔运算的物理实现。",
+      "detail": "与门、或门、非门由晶体管组合而成。异或门（XOR）可以由与/或/非组合得到，它的真值表恰好是“两个输入不同则为 1”。门电路的输出只取决于当前输入，这类电路叫组合逻辑。"
+    },
+    {
+      "id": "signal",
+      "kind": "knowledge",
+      "title": "信号与延迟",
+      "layer": 3,
+      "prereq": ["binary", "logic_gates"],
+      "xp_award": 25,
+      "scrap_award": 12,
+      "summary": "电平随时间变化就是信号，传播需要时间。",
+      "detail": "门电路不是瞬时完成的：电荷给电容充放电需要时间，输出相对输入存在传播延迟。时钟把所有操作切成固定节拍，让整个系统在确定的时刻采样，这就是同步数字系统的基础。"
+    },
+    {
+      "id": "half_adder",
+      "kind": "knowledge",
+      "title": "半加器",
+      "layer": 4,
+      "prereq": ["logic_gates", "signal"],
+      "xp_award": 40,
+      "scrap_award": 20,
+      "summary": "两个门电路就能实现一位二进制加法。",
+      "detail": "半加器把两个 1 位输入相加：和 = A XOR B，进位 = A AND B。它是所有加法器、ALU 乃至 CPU 的最小种子。把这一个电路级联起来，就得到能处理多位数的行波进位加法器。"
+    },
+    {
+      "id": "bargain",
+      "kind": "skill",
+      "title": "以物易物",
+      "layer": 2,
+      "prereq": ["binary"],
+      "xp_cost": 25,
+      "effects": { "price_discount": 0.1 },
+      "summary": "所有元件采购价降低 10%。",
+      "detail": "在废墟里，议价能力就是生产力。解锁后商店所有买入价格下降 10%。"
+    },
+    {
+      "id": "demorgan",
+      "kind": "skill",
+      "title": "德摩根定律",
+      "layer": 3,
+      "prereq": ["boolean", "logic_gates"],
+      "xp_cost": 30,
+      "effects": { "unlock_recipe": "demorgan_and" },
+      "summary": "解锁配方：用或门 + 非门做出与门。",
+      "detail": "¬(A ∧ B) = ¬A ∨ ¬B。把或门输出取反，就能在只有或门和非门的时候造出与门。解锁该技能后，合成台开放“德摩根与门”配方。"
+    }
+  ]
+}

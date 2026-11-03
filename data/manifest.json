@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "files": [
+    "res://data/items/items.json",
+    "res://data/economy/prices.json",
+    "res://data/economy/recipes.json",
+    "res://data/skilltree.json",
+    "res://data/tutorial.json",
+    "res://data/chapters/ch01_levels.json",
+    "res://data/labs/ch01_labs.json"
+  ]
+}

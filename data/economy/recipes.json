@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "bundle_wire",
+      "name": "拉制导线",
+      "desc": "把废铁拉成三根可用的导线。",
+      "inputs": { "scrap": 3 },
+      "outputs": { "wire": 3 },
+      "unlock_skill": null
+    },
+    {
+      "id": "make_switch",
+      "name": "自制开关",
+      "desc": "两根导线加一块废铁，做出一个手动开关。",
+      "inputs": { "wire": 2, "scrap": 1 },
+      "outputs": { "switch": 1 },
+      "unlock_skill": null
+    },
+    {
+      "id": "demorgan_and",
+      "name": "德摩根与门",
+      "desc": "用或门加非门反相，等价于一个与门。这是布尔代数的第一次实战。",
+      "inputs": { "gate_or": 1, "gate_not": 1 },
+      "outputs": { "gate_and": 1 },
+      "unlock_skill": "demorgan"
+    }
+  ]
+}

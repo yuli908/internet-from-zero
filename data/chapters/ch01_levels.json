@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "id": "ch01",
+  "order": 1,
+  "title": "第一章 · 从电平到半加器",
+  "subtitle": "点亮第一盏灯，然后造出一台会做加法的机器。",
+  "start_scrap": 20,
+  "next_chapter": "ch02",
+  "labs": [
+    {
+      "id": "level",
+      "title": "电平实验室",
+      "subtitle": "0 与 1 的物理来源",
+      "objective": "obj_level",
+      "knowledge": "voltage",
+      "requires": null,
+      "data_key": "level"
+    },
+    {
+      "id": "binary",
+      "title": "二进制工作台",
+      "subtitle": "用 8 根开关表示世界",
+      "objective": "obj_binary",
+      "knowledge": "binary",
+      "requires": "level",
+      "data_key": "binary"
+    },
+    {
+      "id": "boolean",
+      "title": "布尔实验室",
+      "subtitle": "与、或、非",
+      "objective": "obj_boolean",
+      "knowledge": "boolean",
+      "requires": "binary",
+      "data_key": "boolean"
+    },
+    {
+      "id": "gate",
+      "title": "门电路解谜",
+      "subtitle": "让电路按你的意愿输出",
+      "objective": "obj_gate",
+      "knowledge": "logic_gates",
+      "requires": "boolean",
+      "data_key": "gate"
+    },
+    {
+      "id": "signal",
+      "title": "信号示波器",
+      "subtitle": "时间轴上的电平",
+      "objective": "obj_signal",
+      "knowledge": "signal",
+      "requires": "gate",
+      "data_key": "signal"
+    },
+    {
+      "id": "half_adder",
+      "title": "半加器工坊",
+      "subtitle": "两个门，一位加法",
+      "objective": "obj_half_adder",
+      "knowledge": "half_adder",
+      "requires": "signal",
+      "data_key": "half_adder"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_level",
+      "title": "观察高/低电平",
+      "desc": "把电压推过阈值点亮灯泡，再降回阈值以下熄灭。",
+      "lab": "level",
+      "knowledge": "voltage"
+    },
+    {
+      "id": "obj_binary",
+      "title": "掌握二进制换算",
+      "desc": "完成拨码开关任务、两道十进制转二进制，并回答“为什么不是三进制”。",
+      "lab": "binary",
+      "knowledge": "binary"
+    },
+    {
+      "id": "obj_boolean",
+      "title": "填对与/或/非真值表",
+      "desc": "分别验证 AND、OR、NOT 的完整真值表。",
+      "lab": "boolean",
+      "knowledge": "boolean"
+    },
+    {
+      "id": "obj_gate",
+      "title": "解出三个门电路谜题",
+      "desc": "选择正确的门，让四个输入组合的输出全部符合目标。",
+      "lab": "gate",
+      "knowledge": "logic_gates"
+    },
+    {
+      "id": "obj_signal",
+      "title": "看见信号的延迟",
+      "desc": "推进时钟，观察输出波形相对输入滞后固定拍数。",
+      "lab": "signal",
+      "knowledge": "signal"
+    },
+    {
+      "id": "obj_half_adder",
+      "title": "搭出半加器",
+      "desc": "用 XOR 得到和、AND 得到进位，通过 4 行真值表验证。",
+      "lab": "half_adder",
+      "knowledge": "half_adder"
+    }
+  ],
+  "complete_reward": { "scrap": 25, "xp": 50 }
+}

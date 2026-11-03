@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "currency": "scrap",
+  "buy": {
+    "wire": 2,
+    "switch": 3,
+    "bulb": 4,
+    "gate_not": 5,
+    "gate_and": 6,
+    "gate_or": 6,
+    "gate_xor": 8
+  },
+  "sell": {
+    "wire": 1,
+    "switch": 1,
+    "bulb": 2,
+    "gate_not": 2,
+    "gate_and": 3,
+    "gate_or": 3,
+    "gate_xor": 4
+  }
+}

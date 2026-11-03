@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "t_welcome",
+      "title": "从零开始",
+      "text": "文明断电了。你手里只有废铁、导线和一点电学常识。目标：在这个世界里，把互联网重新造出来。先从不值一提的“电平”开始。",
+      "trigger": "game_start"
+    },
+    {
+      "id": "t_first_lab",
+      "title": "第一课",
+      "text": "打开“工作台”的电平实验室。拖动电压滑块：高电平代表 1，低电平代表 0。这不是比喻，这是物理事实。",
+      "trigger": "lab_opened:level"
+    },
+    {
+      "id": "t_shop",
+      "title": "补给",
+      "text": "商店里的元件用废铁结算。每完成一个目标会发放废铁；芯片会越来越贵，别把废铁花光。",
+      "trigger": "shop_opened"
+    },
+    {
+      "id": "t_knowledge",
+      "title": "知识树",
+      "text": "完成实验会自动点亮知识树节点，并解锁后续实验室。知识是有前置条件的，跳不过去。",
+      "trigger": "knowledge_unlocked:voltage"
+    },
+    {
+      "id": "t_save",
+      "title": "存档",
+      "text": "按顶栏“保存”写入存档。存档带版本号与校验和，损坏时会自动回退到备份。",
+      "trigger": "game_saved"
+    },
+    {
+      "id": "t_done",
+      "title": "第一章结束",
+      "text": "你已经从电平走到了半加器。下一章会把半加器级联成多位加法器，再装进 ALU。",
+      "trigger": "chapter_completed:ch01"
+    }
+  ]
+}
