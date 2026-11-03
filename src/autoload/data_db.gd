@@ -1,0 +1,170 @@
+extends Node
+
+## 数据层：启动时加载并校验所有 JSON 配置。UI 不得硬编码章节/物品/配方。
+
+var ready_ok := false
+var errors: Array = []
+var catalog: Catalog
+var skill_graph: KnowledgeGraph
+var skills: KnowledgeGraph
+var chapter: ChapterRuntime
+var labs: Dictionary = {}
+var labs_doc: Dictionary = {}
+var tutorial_doc: Dictionary = {}
+var sim_doc: Dictionary = {}
+var manifest: Dictionary = {}
+var data_version := 0
+var loaded_files := 0
+
+func _ready() -> void:
+	load_all()
+
+func load_all() -> void:
+	errors.clear()
+	loaded_files = 0
+	manifest = _json("res://data/manifest.json")
+	var files: Array = manifest.get("files", [])
+	for f in files:
+		var doc := _json(str(f))
+		if doc.is_empty():
+			errors.append("无法加载或解析 %s" % str(f))
+		else:
+			loaded_files += 1
+	catalog = Catalog.from_data(_json("res://data/items/items.json"), _json("res://data/economy/prices.json"), _json("res://data/economy/recipes.json"))
+	var skill_doc := _json("res://data/skilltree.json")
+	skill_graph = KnowledgeGraph.from_doc(skill_doc)
+	skills = skill_graph
+	var chapter_doc := _json("res://data/chapters/ch01_levels.json")
+	chapter = ChapterRuntime.from_doc(chapter_doc)
+	labs_doc = _json("res://data/labs/ch01_labs.json")
+	labs = labs_doc.get("labs", {})
+	tutorial_doc = _json("res://data/tutorial.json")
+	sim_doc = _json("res://data/sim/delays.json")
+	SimDelays.configure(sim_doc)
+	data_version = int(chapter_doc.get("version", 0)) if not chapter_doc.is_empty() else 0
+	_validate()
+	ready_ok = errors.is_empty()
+	if not ready_ok:
+		for e in errors:
+			printerr("[DATA] ", e)
+
+func _json(path: String) -> Dictionary:
+	var text := FileAccess.get_file_as_string(path)
+	if text.is_empty():
+		return {}
+	var parsed: Variant = JSON.parse_string(text)
+	if parsed is Dictionary:
+		return parsed
+	return {}
+
+func lab_data(data_key: String) -> Dictionary:
+	return labs.get(data_key, {})
+
+func gate_cases(lab_id: String) -> Array:
+	var lab := chapter.lab(lab_id)
+	var cfg := lab_data(str(lab.get("data_key", "")))
+	return cfg.get("gate_cases", [])
+
+func skill_nodes() -> Dictionary:
+	return skill_graph.nodes
+
+func chapter_id() -> String:
+	return chapter.id()
+
+func validate() -> Array:
+	errors.clear()
+	_validate()
+	ready_ok = errors.is_empty()
+	return errors
+
+func _validate() -> void:
+	for file_err in chapter.dsl_errors():
+		errors.append(file_err)
+	for id in catalog.buy_prices.keys():
+		if not catalog.has_item(str(id)):
+			errors.append("价格表引用了不存在的物品 %s" % str(id))
+	for id in catalog.sell_prices.keys():
+		if not catalog.has_item(str(id)):
+			errors.append("回收表引用了不存在的物品 %s" % str(id))
+	for recipe_id in catalog.recipe_order:
+		var recipe := catalog.recipe(str(recipe_id))
+		var ins: Dictionary = recipe.get("inputs", {})
+		var keys: Dictionary = recipe.get("key_items", {})
+		var outs: Dictionary = recipe.get("outputs", {})
+		var out_single := str(recipe.get("output", ""))
+		for k in ins.keys():
+			if not catalog.has_item(str(k)):
+				errors.append("配方 %s 的输入 %s 不存在" % [str(recipe_id), str(k)])
+		for k in keys.keys():
+			if not catalog.has_item(str(k)):
+				errors.append("配方 %s 的关键件 %s 不存在" % [str(recipe_id), str(k)])
+		for k in outs.keys():
+			if not catalog.has_item(str(k)):
+				errors.append("配方 %s 的输出 %s 不存在" % [str(recipe_id), str(k)])
+		if not out_single.is_empty() and not catalog.has_item(out_single):
+			errors.append("配方 %s 的输出物品 %s 不存在" % [str(recipe_id), out_single])
+		var skill := str(recipe.get("requires_skill", recipe.get("unlock_skill", ""))) if recipe.get("requires_skill", recipe.get("unlock_skill")) != null else ""
+		if not skill.is_empty() and not skill_graph.has_node(skill):
+			errors.append("配方 %s 依赖不存在的技能 %s" % [str(recipe_id), skill])
+	var gate_ids := {}
+	for lab_id in chapter.lab_order:
+		var lab := chapter.lab(str(lab_id))
+		var key := str(lab.get("data_key", ""))
+		if not labs.has(key):
+			errors.append("实验 %s 缺少实验数据段 %s" % [str(lab_id), key])
+			continue
+		if not skill_graph.has_node(str(lab.get("knowledge", ""))):
+			errors.append("实验 %s 指向不存在的知识节点" % str(lab_id))
+		for card in lab.get("knowledge_cards", []):
+			if not skill_graph.has_node(str(card)):
+				errors.append("实验 %s 的知识卡 %s 不存在" % [str(lab_id), str(card)])
+		if not skill_graph.has_node(str(lab.get("skill_node", ""))):
+			errors.append("实验 %s 的技能节点 %s 不存在" % [str(lab_id), str(lab.get("skill_node", ""))])
+		if not str(lab.get("milestone", "")).is_empty() and not skill_graph.has_node(str(lab.get("milestone", ""))):
+			errors.append("实验 %s 的里程碑 %s 不存在" % [str(lab_id), str(lab.get("milestone", ""))])
+		var cases: Array = lab_data(key).get("gate_cases", [])
+		if cases.is_empty():
+			errors.append("实验 %s 没有 gate 用例" % str(lab_id))
+		var case_ids := {}
+		for raw in cases:
+			var c: Dictionary = raw
+			gate_ids[str(c.get("id", ""))] = true
+			case_ids[str(c.get("id", ""))] = true
+			if str(c.get("id", "")).is_empty() or str(c.get("title", "")).is_empty():
+				errors.append("实验 %s 的 gate 用例缺少 id/title" % str(lab_id))
+		for gid in lab.get("gate_ids", []):
+			if not case_ids.has(str(gid)):
+				errors.append("实验 %s 的 gate_ids 引用了未定义的用例 %s" % [str(lab_id), str(gid)])
+	for node_id in skill_graph.order:
+		for p in skill_graph.prereqs(str(node_id)):
+			if not skill_graph.has_node(str(p)):
+				errors.append("技能 %s 的前置 %s 不存在" % [str(node_id), str(p)])
+		var req: Dictionary = skill_graph.node(str(node_id)).get("requires", {})
+		_validate_conditions(str(node_id), req.get("all", []), gate_ids)
+		_validate_conditions(str(node_id), req.get("any", []), gate_ids)
+	if sim_doc.is_empty():
+		errors.append("缺少 data/sim/delays.json")
+	else:
+		var gates_table: Dictionary = sim_doc.get("gate_delay", {})
+		for g in ["buf", "not", "and", "or", "xor", "nand", "nor", "xnor"]:
+			if not gates_table.has(g):
+				errors.append("延迟表缺少门类型 %s" % g)
+	for step in tutorial_doc.get("steps", []):
+		var s: Dictionary = step
+		if str(s.get("trigger", "")).is_empty():
+			errors.append("引导步骤 %s 缺少触发事件" % str(s.get("id", "?")))
+	for id in chapter.start_items().keys():
+		if not catalog.has_item(str(id)):
+			errors.append("开局物品 %s 不存在" % str(id))
+
+func _validate_conditions(node_id: String, conds: Array, gate_ids: Dictionary) -> void:
+	for raw in conds:
+		if not (raw is Dictionary):
+			continue
+		var c: Dictionary = raw
+		var typ := str(c.get("type", ""))
+		var cid := str(c.get("id", ""))
+		if typ == "node" and not skill_graph.has_node(cid):
+			errors.append("节点 %s 的条件引用了不存在的节点 %s" % [node_id, cid])
+		elif typ == "gate" and not gate_ids.has(cid):
+			errors.append("节点 %s 的条件引用了未定义的 gate %s" % [node_id, cid])

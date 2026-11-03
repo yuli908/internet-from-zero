@@ -10,6 +10,17 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+EventBus="*res://src/autoload/event_bus.gd"
+DataDB="*res://src/autoload/data_db.gd"
+GameState="*res://src/autoload/game_state.gd"
+SaveManager="*res://src/autoload/save_manager.gd"
+Knowledge="*res://src/autoload/knowledge.gd"
+ChapterFlow="*res://src/autoload/chapter_flow.gd"
+Economy="*res://src/autoload/economy.gd"
+Tutorial="*res://src/autoload/tutorial.gd"
+
 [display]
 
 window/size/viewport_width=1440
