@@ -1,29 +1,1168 @@
 {
-  "version": 1,
+  "version": 2,
+  "source": "docs/design/04-content-catalog.md",
   "recipes": [
     {
+      "id": "craft_M01",
+      "name": "自制 电池 / 电源模块",
+      "output": "M01",
+      "output_qty": 1,
+      "cash": 8,
+      "ops": 2,
+      "inputs": {
+        "M00": 2
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×2"
+    },
+    {
+      "id": "craft_M02",
+      "name": "自制 线缆（1 段）",
+      "output": "M02",
+      "output_qty": 1,
+      "cash": 4,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M03",
+      "name": "自制 电阻",
+      "output": "M03",
+      "output_qty": 1,
+      "cash": 7,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M04",
+      "name": "自制 电容",
+      "output": "M04",
+      "output_qty": 1,
+      "cash": 8,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M05",
+      "name": "自制 二极管",
+      "output": "M05",
+      "output_qty": 1,
+      "cash": 10,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M06",
+      "name": "自制 三极管 (BJT)",
+      "output": "M06",
+      "output_qty": 1,
+      "cash": 13,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M07",
+      "name": "自制 MOSFET 对（N+P）",
+      "output": "M07",
+      "output_qty": 1,
+      "cash": 14,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M08",
+      "name": "自制 继电器",
+      "output": "M08",
+      "output_qty": 1,
+      "cash": 11,
+      "ops": 2,
+      "inputs": {
+        "M00": 2
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×2"
+    },
+    {
+      "id": "craft_M09",
+      "name": "自制 指示灯 / LED",
+      "output": "M09",
+      "output_qty": 1,
+      "cash": 6,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M10",
+      "name": "自制 开关",
+      "output": "M10",
+      "output_qty": 1,
+      "cash": 4,
+      "ops": 1,
+      "inputs": {
+        "M00": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×1"
+    },
+    {
+      "id": "craft_M11",
+      "name": "自制 时钟源 / 晶振",
+      "output": "M11",
+      "output_qty": 1,
+      "cash": 17,
+      "ops": 2,
+      "inputs": {
+        "M00": 2
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×2"
+    },
+    {
+      "id": "craft_M12",
+      "name": "自制 排线 / 总线（8 位）",
+      "output": "M12",
+      "output_qty": 1,
+      "cash": 11,
+      "ops": 2,
+      "inputs": {
+        "M02": 2
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M02×2"
+    },
+    {
+      "id": "craft_M13",
+      "name": "自制 空白 PCB",
+      "output": "M13",
+      "output_qty": 1,
+      "cash": 21,
+      "ops": 3,
+      "inputs": {
+        "M00": 3
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M00×3"
+    },
+    {
+      "id": "craft_M14",
+      "name": "自制 稳压器",
+      "output": "M14",
+      "output_qty": 1,
+      "cash": 14,
+      "ops": 2,
+      "inputs": {
+        "M06": 1,
+        "M05": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "M06×1 + M05×1"
+    },
+    {
+      "id": "craft_G01",
+      "name": "自制 非门 NOT",
+      "output": "G01",
+      "output_qty": 1,
+      "cash": 21,
+      "ops": 1,
+      "inputs": {},
+      "key_items": {
+        "M07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M07×1"
+    },
+    {
+      "id": "craft_G02",
+      "name": "自制 与门 AND",
+      "output": "G02",
+      "output_qty": 1,
+      "cash": 32,
+      "ops": 1,
+      "inputs": {},
+      "key_items": {
+        "M07": 1,
+        "M03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M07×1 + M03×1"
+    },
+    {
+      "id": "craft_G03",
+      "name": "自制 或门 OR",
+      "output": "G03",
+      "output_qty": 1,
+      "cash": 32,
+      "ops": 1,
+      "inputs": {},
+      "key_items": {
+        "M07": 1,
+        "M03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M07×1 + M03×1"
+    },
+    {
+      "id": "craft_G04",
+      "name": "自制 异或门 XOR",
+      "output": "G04",
+      "output_qty": 1,
+      "cash": 42,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G02": 1,
+        "G03": 1,
+        "G01": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G02×1 + G03×1 + G01×2"
+    },
+    {
+      "id": "craft_G05",
+      "name": "自制 三态缓冲",
+      "output": "G05",
+      "output_qty": 1,
+      "cash": 39,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "M07": 2,
+        "M03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M07×2 + M03×1"
+    },
+    {
+      "id": "craft_G06",
+      "name": "自制 与非门 NAND",
+      "output": "G06",
+      "output_qty": 1,
+      "cash": 28,
+      "ops": 1,
+      "inputs": {},
+      "key_items": {
+        "M07": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "M07×2"
+    },
+    {
+      "id": "craft_G07",
+      "name": "自制 缓冲 / 延时",
+      "output": "G07",
+      "output_qty": 1,
+      "cash": 18,
+      "ops": 1,
+      "inputs": {},
+      "key_items": {
+        "M06": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M06×1"
+    },
+    {
+      "id": "craft_G08",
+      "name": "自制 2–4 译码器",
+      "output": "G08",
+      "output_qty": 1,
+      "cash": 49,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G06": 3,
+        "G01": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G06×3 + G01×1"
+    },
+    {
+      "id": "craft_G09",
+      "name": "自制 4–2 编码器",
+      "output": "G09",
+      "output_qty": 1,
+      "cash": 49,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G06": 3
+      },
+      "requires_skill": null,
+      "source_recipe": "G06×3"
+    },
+    {
+      "id": "craft_G10",
+      "name": "自制 2 选 1 多路选择",
+      "output": "G10",
+      "output_qty": 1,
+      "cash": 77,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G06": 3
+      },
+      "requires_skill": null,
+      "source_recipe": "G06×3"
+    },
+    {
+      "id": "craft_G11",
+      "name": "自制 8 选 1 多路选择",
+      "output": "G11",
+      "output_qty": 1,
+      "cash": 224,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G10": 4,
+        "G08": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G10×4 + G08×1"
+    },
+    {
+      "id": "craft_G12",
+      "name": "自制 半加器",
+      "output": "G12",
+      "output_qty": 1,
+      "cash": 56,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G04": 1,
+        "G02": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G04×1 + G02×1"
+    },
+    {
+      "id": "craft_G13",
+      "name": "自制 全加器",
+      "output": "G13",
+      "output_qty": 1,
+      "cash": 105,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G12": 1,
+        "G02": 1,
+        "G03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G12×1 + G02×1 + G03×1"
+    },
+    {
+      "id": "craft_G14",
+      "name": "自制 D 锁存器",
+      "output": "G14",
+      "output_qty": 1,
+      "cash": 70,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G06": 2,
+        "G02": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G06×2 + G02×2"
+    },
+    {
+      "id": "craft_G15",
+      "name": "自制 D 触发器",
+      "output": "G15",
+      "output_qty": 1,
+      "cash": 91,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "G14": 1,
+        "G01": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G14×1 + G01×2"
+    },
+    {
+      "id": "craft_G16",
+      "name": "自制 8 位寄存器",
+      "output": "G16",
+      "output_qty": 1,
+      "cash": 182,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G15": 8,
+        "M12": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G15×8 + M12×1"
+    },
+    {
+      "id": "craft_G17",
+      "name": "自制 移位寄存器",
+      "output": "G17",
+      "output_qty": 1,
+      "cash": 196,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G15": 8
+      },
+      "requires_skill": null,
+      "source_recipe": "G15×8"
+    },
+    {
+      "id": "craft_G18",
+      "name": "自制 4 位计数器",
+      "output": "G18",
+      "output_qty": 1,
+      "cash": 140,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G15": 4,
+        "G02": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G15×4 + G02×2"
+    },
+    {
+      "id": "craft_G19",
+      "name": "自制 4 位比较器",
+      "output": "G19",
+      "output_qty": 1,
+      "cash": 119,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G04": 4,
+        "G02": 4,
+        "G03": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G04×4 + G02×4 + G03×2"
+    },
+    {
+      "id": "craft_G20",
+      "name": "自制 时钟分频器",
+      "output": "G20",
+      "output_qty": 1,
+      "cash": 154,
+      "ops": 3,
+      "inputs": {},
+      "key_items": {
+        "G18": 1,
+        "G01": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G18×1 + G01×1"
+    },
+    {
+      "id": "craft_S01",
+      "name": "自制 ALU-8",
+      "output": "S01",
+      "output_qty": 1,
+      "cash": 420,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G13": 8,
+        "G11": 1,
+        "G01": 8
+      },
+      "requires_skill": null,
+      "source_recipe": "G13×8 + G11×1 + G01×8"
+    },
+    {
+      "id": "craft_S02",
+      "name": "自制 寄存器堆（8×8）",
+      "output": "S02",
+      "output_qty": 1,
+      "cash": 315,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G16": 8,
+        "G08": 2,
+        "G10": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G16×8 + G08×2 + G10×2"
+    },
+    {
+      "id": "craft_S03",
+      "name": "自制 主存 256 B",
+      "output": "S03",
+      "output_qty": 1,
+      "cash": 630,
+      "ops": 5,
+      "inputs": {},
+      "key_items": {
+        "G15": 8,
+        "G08": 4,
+        "G10": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G15×8 + G08×4 + G10×1"
+    },
+    {
+      "id": "craft_S04",
+      "name": "自制 主存 1 KB",
+      "output": "S04",
+      "output_qty": 1,
+      "cash": 1120,
+      "ops": 5,
+      "inputs": {},
+      "key_items": {
+        "S03": 4,
+        "G08": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "S03×4 + G08×2"
+    },
+    {
+      "id": "craft_S05",
+      "name": "自制 控制单元",
+      "output": "S05",
+      "output_qty": 1,
+      "cash": 490,
+      "ops": 5,
+      "inputs": {},
+      "key_items": {
+        "G08": 1,
+        "G06": 6,
+        "G10": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G08×1 + G06×6 + G10×2"
+    },
+    {
+      "id": "craft_S06",
+      "name": "自制 IO 接口",
+      "output": "S06",
+      "output_qty": 1,
+      "cash": 350,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G08": 1,
+        "G09": 1,
+        "G16": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G08×1 + G09×1 + G16×1"
+    },
+    {
+      "id": "craft_S07",
+      "name": "自制 总线控制器",
+      "output": "S07",
+      "output_qty": 1,
+      "cash": 280,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G05": 8,
+        "G08": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G05×8 + G08×1"
+    },
+    {
+      "id": "craft_S08",
+      "name": "自制 外部存储（磁带）",
+      "output": "S08",
+      "output_qty": 1,
+      "cash": 560,
+      "ops": 5,
+      "inputs": {},
+      "key_items": {
+        "G18": 1,
+        "G16": 2,
+        "M13": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G18×1 + G16×2 + M13×1"
+    },
+    {
+      "id": "craft_H01",
+      "name": "自制 CPU-MUD8",
+      "output": "H01",
+      "output_qty": 1,
+      "cash": 1750,
+      "ops": 8,
+      "inputs": {},
+      "key_items": {
+        "S01": 1,
+        "S02": 1,
+        "S03": 1,
+        "S05": 1,
+        "S06": 1,
+        "S07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "S01×1 + S02×1 + S03×1 + S05×1 + S06×1 + S07×1"
+    },
+    {
+      "id": "craft_H02",
+      "name": "自制 CPU-MUD16（升级）",
+      "output": "H02",
+      "output_qty": 1,
+      "cash": 2940,
+      "ops": 8,
+      "inputs": {},
+      "key_items": {
+        "H01": 1,
+        "S04": 2,
+        "S07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H01×1 + S04×2 + S07×1"
+    },
+    {
+      "id": "craft_H03",
+      "name": "自制 显示器（字符 16×4）",
+      "output": "H03",
+      "output_qty": 1,
+      "cash": 840,
+      "ops": 6,
+      "inputs": {},
+      "key_items": {
+        "S06": 1,
+        "S03": 1,
+        "M12": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "S06×1 + S03×1 + M12×1"
+    },
+    {
+      "id": "craft_H04",
+      "name": "自制 扬声器",
+      "output": "H04",
+      "output_qty": 1,
+      "cash": 280,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "G20": 1,
+        "M06": 1,
+        "M03": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "G20×1 + M06×1 + M03×2"
+    },
+    {
+      "id": "craft_H05",
+      "name": "自制 键盘",
+      "output": "H05",
+      "output_qty": 1,
+      "cash": 420,
+      "ops": 6,
+      "inputs": {},
+      "key_items": {
+        "G09": 1,
+        "S06": 1,
+        "M10": 16
+      },
+      "requires_skill": null,
+      "source_recipe": "G09×1 + S06×1 + M10×16"
+    },
+    {
+      "id": "craft_H06",
+      "name": "自制 磁带驱动器",
+      "output": "H06",
+      "output_qty": 1,
+      "cash": 630,
+      "ops": 6,
+      "inputs": {},
+      "key_items": {
+        "S08": 1,
+        "G20": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "S08×1 + G20×1"
+    },
+    {
+      "id": "craft_H07",
+      "name": "自制 网卡 NIC",
+      "output": "H07",
+      "output_qty": 1,
+      "cash": 560,
+      "ops": 6,
+      "inputs": {},
+      "key_items": {
+        "G17": 2,
+        "G20": 1,
+        "S06": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "G17×2 + G20×1 + S06×1"
+    },
+    {
+      "id": "craft_H08",
+      "name": "自制 交换机（4 口）",
+      "output": "H08",
+      "output_qty": 1,
+      "cash": 1050,
+      "ops": 7,
+      "inputs": {},
+      "key_items": {
+        "H07": 3,
+        "G10": 2,
+        "S03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H07×3 + G10×2 + S03×1"
+    },
+    {
+      "id": "craft_H09",
+      "name": "自制 路由器",
+      "output": "H09",
+      "output_qty": 1,
+      "cash": 1890,
+      "ops": 8,
+      "inputs": {},
+      "key_items": {
+        "H07": 2,
+        "H01": 1,
+        "S05": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H07×2 + H01×1 + S05×1"
+    },
+    {
+      "id": "craft_H10",
+      "name": "自制 服务器机箱",
+      "output": "H10",
+      "output_qty": 1,
+      "cash": 3220,
+      "ops": 8,
+      "inputs": {},
+      "key_items": {
+        "H02": 1,
+        "H07": 1,
+        "S04": 1,
+        "H12": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H02×1 + H07×1 + S04×1 + H12×1"
+    },
+    {
+      "id": "craft_H11",
+      "name": "自制 机柜 / 机房",
+      "output": "H11",
+      "output_qty": 1,
+      "cash": 4200,
+      "ops": 8,
+      "inputs": {},
+      "key_items": {
+        "H10": 2,
+        "H08": 1,
+        "H12": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "H10×2 + H08×1 + H12×2"
+    },
+    {
+      "id": "craft_H12",
+      "name": "自制 UPS 电源",
+      "output": "H12",
+      "output_qty": 1,
+      "cash": 350,
+      "ops": 6,
+      "inputs": {},
+      "key_items": {
+        "M14": 2,
+        "M01": 2,
+        "M13": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M14×2 + M01×2 + M13×1"
+    },
+    {
+      "id": "craft_W01",
+      "name": "自制 蓝牙模块",
+      "output": "W01",
+      "output_qty": 1,
+      "cash": 490,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "H07": 1,
+        "M11": 1,
+        "M07": 4
+      },
+      "requires_skill": null,
+      "source_recipe": "H07×1 + M11×1 + M07×4"
+    },
+    {
+      "id": "craft_W02",
+      "name": "自制 传感器（温/光）",
+      "output": "W02",
+      "output_qty": 1,
+      "cash": 210,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "M05": 1,
+        "M03": 2,
+        "G19": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M05×1 + M03×2 + G19×1"
+    },
+    {
+      "id": "craft_W03",
+      "name": "自制 遥控器",
+      "output": "W03",
+      "output_qty": 1,
+      "cash": 245,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "W01": 1,
+        "M10": 3,
+        "M07": 2
+      },
+      "requires_skill": null,
+      "source_recipe": "W01×1 + M10×3 + M07×2"
+    },
+    {
+      "id": "craft_W04",
+      "name": "自制 单片机 MCU",
+      "output": "W04",
+      "output_qty": 1,
+      "cash": 770,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "H01": 1,
+        "S06": 1,
+        "M11": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H01×1 + S06×1 + M11×1"
+    },
+    {
+      "id": "craft_W05",
+      "name": "自制 单板电脑（树莓派类）",
+      "output": "W05",
+      "output_qty": 1,
+      "cash": 1890,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "H01": 1,
+        "S04": 1,
+        "H07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "H01×1 + S04×1 + H07×1"
+    },
+    {
+      "id": "craft_W06",
+      "name": "自制 基站设备",
+      "output": "W06",
+      "output_qty": 1,
+      "cash": 3500,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "W01": 4,
+        "H02": 1,
+        "H07": 1,
+        "H12": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "W01×4 + H02×1 + H07×1 + H12×1"
+    },
+    {
+      "id": "craft_W07",
+      "name": "自制 天线",
+      "output": "W07",
+      "output_qty": 1,
+      "cash": 175,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "M02": 2,
+        "M13": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "M02×2 + M13×1"
+    },
+    {
+      "id": "craft_W08",
+      "name": "自制 无线终端（手机）",
+      "output": "W08",
+      "output_qty": 1,
+      "cash": 2240,
+      "ops": 4,
+      "inputs": {},
+      "key_items": {
+        "W04": 1,
+        "H03": 1,
+        "W01": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "W04×1 + H03×1 + W01×1"
+    },
+    {
+      "id": "craft_P03",
+      "name": "自制 C 编译器（子集）",
+      "output": "P03",
+      "output_qty": 1,
+      "cash": 1050,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P01": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P01×1"
+    },
+    {
+      "id": "craft_P04",
+      "name": "自制 JVM（选修）",
+      "output": "P04",
+      "output_qty": 1,
+      "cash": 1540,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1"
+    },
+    {
+      "id": "craft_P05",
+      "name": "自制 Python 解释器（选修）",
+      "output": "P05",
+      "output_qty": 1,
+      "cash": 1260,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1"
+    },
+    {
+      "id": "craft_P06",
+      "name": "自制 最小操作系统",
+      "output": "P06",
+      "output_qty": 1,
+      "cash": 1400,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1,
+        "S06": 1,
+        "S07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1 + S06×1 + S07×1"
+    },
+    {
+      "id": "craft_P07",
+      "name": "自制 TCP/IP 协议栈",
+      "output": "P07",
+      "output_qty": 1,
+      "cash": 840,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1,
+        "H07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1 + H07×1"
+    },
+    {
+      "id": "craft_P08",
+      "name": "自制 服务端骨架",
+      "output": "P08",
+      "output_qty": 1,
+      "cash": 1120,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P07": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P07×1"
+    },
+    {
+      "id": "craft_P09",
+      "name": "自制 聊天客户端",
+      "output": "P09",
+      "output_qty": 1,
+      "cash": 560,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P07": 1,
+        "H03": 1,
+        "H05": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P07×1 + H03×1 + H05×1"
+    },
+    {
+      "id": "craft_P10",
+      "name": "自制 加密库 / TLS",
+      "output": "P10",
+      "output_qty": 1,
+      "cash": 630,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1,
+        "G04": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1 + G04×1"
+    },
+    {
+      "id": "craft_P11",
+      "name": "自制 证书",
+      "output": "P11",
+      "output_qty": 1,
+      "cash": 350,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P10": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P10×1"
+    },
+    {
+      "id": "craft_P12",
+      "name": "自制 固件",
+      "output": "P12",
+      "output_qty": 1,
+      "cash": 420,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P03": 1,
+        "W04": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P03×1 + W04×1"
+    },
+    {
+      "id": "craft_P13",
+      "name": "自制 五子棋服务端",
+      "output": "P13",
+      "output_qty": 1,
+      "cash": 490,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P08": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P08×1"
+    },
+    {
+      "id": "craft_P14",
+      "name": "自制 五子棋客户端",
+      "output": "P14",
+      "output_qty": 1,
+      "cash": 350,
+      "ops": 2,
+      "inputs": {},
+      "key_items": {
+        "P09": 1
+      },
+      "requires_skill": null,
+      "source_recipe": "P09×1"
+    },
+    {
       "id": "bundle_wire",
-      "name": "拉制导线",
-      "desc": "把废铁拉成三根可用的导线。",
-      "inputs": { "scrap": 3 },
-      "outputs": { "wire": 3 },
-      "unlock_skill": null
+      "name": "捆导线",
+      "output": "wire",
+      "output_qty": 3,
+      "cash": 0,
+      "ops": 1,
+      "inputs": {
+        "scrap": 3
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "scrap×3"
     },
     {
       "id": "make_switch",
-      "name": "自制开关",
-      "desc": "两根导线加一块废铁，做出一个手动开关。",
-      "inputs": { "wire": 2, "scrap": 1 },
-      "outputs": { "switch": 1 },
-      "unlock_skill": null
+      "name": "装开关",
+      "output": "switch",
+      "output_qty": 1,
+      "cash": 0,
+      "ops": 1,
+      "inputs": {
+        "wire": 2,
+        "scrap": 1
+      },
+      "key_items": {},
+      "requires_skill": null,
+      "source_recipe": "wire×2 + scrap×1"
     },
     {
       "id": "demorgan_and",
-      "name": "德摩根与门",
-      "desc": "用或门加非门反相，等价于一个与门。这是布尔代数的第一次实战。",
-      "inputs": { "gate_or": 1, "gate_not": 1 },
-      "outputs": { "gate_and": 1 },
-      "unlock_skill": "demorgan"
+      "name": "德摩根：或门改与门",
+      "output": "gate_and",
+      "output_qty": 1,
+      "cash": 0,
+      "ops": 1,
+      "inputs": {
+        "gate_or": 1,
+        "gate_not": 1
+      },
+      "key_items": {},
+      "requires_skill": "demorgan",
+      "source_recipe": "gate_or×1 + gate_not×1"
     }
   ]
 }

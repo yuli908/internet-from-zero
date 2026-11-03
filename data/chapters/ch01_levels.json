@@ -1,110 +1,28 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "ch01",
-  "order": 1,
-  "title": "第一章 · 从电平到半加器",
-  "subtitle": "点亮第一盏灯，然后造出一台会做加法的机器。",
-  "start_scrap": 20,
+  "number": 1,
+  "title": "第一章 · 从电压到半加器",
+  "subtitle": "在废墟里重新发明「计算」",
+  "source": "docs/design/03-chapter1-vertical-slice.md",
+  "start_scrap": 120,
+  "start_items": {"M01": 1, "M09": 1},
+  "complete_reward": {"scrap": 0, "xp": 50, "badge": "CH01-FIRST-ADDER"},
   "next_chapter": "ch02",
   "labs": [
-    {
-      "id": "level",
-      "title": "电平实验室",
-      "subtitle": "0 与 1 的物理来源",
-      "objective": "obj_level",
-      "knowledge": "voltage",
-      "requires": null,
-      "data_key": "level"
-    },
-    {
-      "id": "binary",
-      "title": "二进制工作台",
-      "subtitle": "用 8 根开关表示世界",
-      "objective": "obj_binary",
-      "knowledge": "binary",
-      "requires": "level",
-      "data_key": "binary"
-    },
-    {
-      "id": "boolean",
-      "title": "布尔实验室",
-      "subtitle": "与、或、非",
-      "objective": "obj_boolean",
-      "knowledge": "boolean",
-      "requires": "binary",
-      "data_key": "boolean"
-    },
-    {
-      "id": "gate",
-      "title": "门电路解谜",
-      "subtitle": "让电路按你的意愿输出",
-      "objective": "obj_gate",
-      "knowledge": "logic_gates",
-      "requires": "boolean",
-      "data_key": "gate"
-    },
-    {
-      "id": "signal",
-      "title": "信号示波器",
-      "subtitle": "时间轴上的电平",
-      "objective": "obj_signal",
-      "knowledge": "signal",
-      "requires": "gate",
-      "data_key": "signal"
-    },
-    {
-      "id": "half_adder",
-      "title": "半加器工坊",
-      "subtitle": "两个门，一位加法",
-      "objective": "obj_half_adder",
-      "knowledge": "half_adder",
-      "requires": "signal",
-      "data_key": "half_adder"
-    }
+    {"id": "level", "order": 1, "title": "1.1 电有「意思」", "subtitle": "电压 → 0/1/X", "data_key": "level", "requires": [], "objective": "obj_level", "knowledge": "voltage", "milestone": "CH01-1", "knowledge_cards": ["KN-ELEC-01"], "skill_node": "SK-LEVEL", "gate_ids": ["T1.1-1", "T1.1-2", "T1.1-3", "T1.1-4"], "reward": {"scrap": 20, "xp": 10}},
+    {"id": "binary", "order": 2, "title": "1.2 两种状态装下世界", "subtitle": "二进制与位权", "data_key": "binary", "requires": ["level"], "objective": "obj_binary", "knowledge": "binary", "milestone": "CH01-2", "knowledge_cards": ["KN-BIN-01", "KN-BIN-02", "KN-BIN-03", "KN-BIN-04"], "skill_node": "SK-BIN", "gate_ids": ["T1.2-1", "T1.2-2", "T1.2-3", "T1.2-4"], "reward": {"scrap": 30, "xp": 15}},
+    {"id": "boolean", "order": 3, "title": "1.3 命题可以被电路计算", "subtitle": "真值表 · 与或非 · 德摩根", "data_key": "boolean", "requires": ["binary"], "objective": "obj_boolean", "knowledge": "boolean", "milestone": "CH01-3", "knowledge_cards": ["KN-BOOL-01", "KN-BOOL-02", "KN-BOOL-03"], "skill_node": "SK-BOOL", "gate_ids": ["T1.3-1", "T1.3-2", "T1.3-3", "T1.3-4"], "reward": {"scrap": 25, "xp": 10}},
+    {"id": "gate", "order": 4, "title": "1.4 把逻辑焊出来", "subtitle": "门级搭建 · 黑盒验收 · 封装", "data_key": "gate", "requires": ["boolean"], "objective": "obj_gate", "knowledge": "logic_gates", "milestone": "CH01-4", "knowledge_cards": ["KN-GATE-01"], "skill_node": "SK-GATE", "skill_nodes": ["SK-GATE", "SK-ENCAP"], "gate_ids": ["T1.4-1", "T1.4-2", "T1.4-3", "T1.4-4"], "reward": {"scrap": 35, "xp": 20}},
+    {"id": "signal", "order": 5, "title": "1.5 信号不是瞬时的", "subtitle": "延迟 · 竞争 · 毛刺", "data_key": "signal", "requires": ["gate"], "objective": "obj_signal", "knowledge": "signal", "milestone": "CH01-5", "knowledge_cards": ["KN-SIG-01", "KN-SIG-02", "KN-SIG-03"], "skill_node": "SK-SIGNAL", "skill_nodes": ["SK-SIGNAL", "SK-MEASURE"], "gate_ids": ["T1.5-1", "T1.5-2", "T1.5-3", "T1.5-4"], "reward": {"scrap": 20, "xp": 10}},
+    {"id": "half_adder", "order": 6, "title": "1.6 第一台加法器", "subtitle": "半加器 · 进位 · 封装", "data_key": "half_adder", "requires": ["signal"], "objective": "obj_half_adder", "knowledge": "half_adder", "milestone": "CH01-6", "knowledge_cards": ["KN-ADD-01"], "skill_node": "SK-ADD", "gate_ids": ["T1.6-1", "T1.6-2", "T1.6-3", "T1.6-4"], "reward": {"scrap": 30, "xp": 15}}
   ],
   "objectives": [
-    {
-      "id": "obj_level",
-      "title": "观察高/低电平",
-      "desc": "把电压推过阈值点亮灯泡，再降回阈值以下熄灭。",
-      "lab": "level",
-      "knowledge": "voltage"
-    },
-    {
-      "id": "obj_binary",
-      "title": "掌握二进制换算",
-      "desc": "完成拨码开关任务、两道十进制转二进制，并回答“为什么不是三进制”。",
-      "lab": "binary",
-      "knowledge": "binary"
-    },
-    {
-      "id": "obj_boolean",
-      "title": "填对与/或/非真值表",
-      "desc": "分别验证 AND、OR、NOT 的完整真值表。",
-      "lab": "boolean",
-      "knowledge": "boolean"
-    },
-    {
-      "id": "obj_gate",
-      "title": "解出三个门电路谜题",
-      "desc": "选择正确的门，让四个输入组合的输出全部符合目标。",
-      "lab": "gate",
-      "knowledge": "logic_gates"
-    },
-    {
-      "id": "obj_signal",
-      "title": "看见信号的延迟",
-      "desc": "推进时钟，观察输出波形相对输入滞后固定拍数。",
-      "lab": "signal",
-      "knowledge": "signal"
-    },
-    {
-      "id": "obj_half_adder",
-      "title": "搭出半加器",
-      "desc": "用 XOR 得到和、AND 得到进位，通过 4 行真值表验证。",
-      "lab": "half_adder",
-      "knowledge": "half_adder"
-    }
-  ],
-  "complete_reward": { "scrap": 25, "xp": 50 }
+    {"id": "obj_level", "title": "判读 0/1/X 并解释禁区", "lab": "level", "knowledge": "voltage"},
+    {"id": "obj_binary", "title": "完成 8 位换算与位宽测试", "lab": "binary", "knowledge": "binary"},
+    {"id": "obj_boolean", "title": "填出与/或/非真值表并做等价验证", "lab": "boolean", "knowledge": "boolean"},
+    {"id": "obj_gate", "title": "用门搭出与/或/非/异或并通过黑盒验收", "lab": "gate", "knowledge": "logic_gates"},
+    {"id": "obj_signal", "title": "测量延迟、复现并消除毛刺", "lab": "signal", "knowledge": "signal"},
+    {"id": "obj_half_adder", "title": "独立搭出半加器并通过封装测试", "lab": "half_adder", "knowledge": "half_adder"}
+  ]
 }

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "source": "docs/simulation/02_determinism.md, 03_components.md, ref/simcore/logic.py",
+  "note": "归一化教学延迟，不是真实工艺库；改这里必须同步改文档 03 与参考实现。",
+  "gate_delay": {
+    "buf": 1,
+    "not": 1,
+    "nand": 2,
+    "nor": 2,
+    "and": 3,
+    "or": 3,
+    "xor": 4,
+    "xnor": 5
+  },
+  "dff": {
+    "setup": 2,
+    "hold": 1,
+    "clk_to_q": 2
+  },
+  "frame": {
+    "render_fps": 60,
+    "budget_ms": 5,
+    "ticks_per_frame": 4
+  },
+  "limits": {
+    "max_events_per_tick": 20000,
+    "gdscript_gates": 200,
+    "gdscript_dff": 200,
+    "require_gdextension_above": 200
+  },
+  "relay": {
+    "delay_per_stage_ticks": 3,
+    "note": "第一章继电器实现的教学延迟；L1 归一化门模型仍使用 gate_delay。"
+  }
+}

@@ -1,68 +1,146 @@
 {
-  "version": 1,
+  "version": 2,
+  "source": "docs/design/03-chapter1-vertical-slice.md + docs/curriculum/02-chapter-01-teaching-script.md",
   "labs": {
     "level": {
-      "threshold": 2.5,
-      "max_voltage": 5.0,
-      "step": 0.1,
-      "body": "电压是连续的物理量。工程上只在两个稳定区间里取值：低电平接近 0V，高电平接近电源电压。阈值 2.5V 是这道题的分界线：低于它算 0，高于它算 1。",
-      "hint": "先把电压推到 5V，再拖回 0V。注意灯泡亮灭与二进制读数的同步变化。"
+      "id": "level",
+      "title": "1.1 电有「意思」",
+      "body": "电压本身是连续量，但电路只愿意认两种稳定状态。先在 0–3.3 V 区间里扫一遍，观察灯与判读结果。",
+      "rules": [
+        "V ≤ 0.8 V → 判 0（低电平），灯灭",
+        "V ≥ 2.0 V → 判 1（高电平），灯亮",
+        "0.8 V < V < 2.0 V → 判 X（禁止区/不确定）"
+      ],
+      "voltage": {"min": 0.0, "max": 3.3, "step": 0.05, "v_low_max": 0.8, "v_high_min": 2.0},
+      "presets": [0.2, 0.8, 1.2, 1.65, 2.0, 3.1],
+      "hint": "边界含：0.8 V 仍判 0，2.0 V 判 1。1.65 V 正好在禁区中间，此时下游看到的可能是随机值。",
+      "misconception": "「电压小就是 0，大就是 1」不够：中间带既不是 0 也不是 1，是电路拒绝判定的区间。",
+      "gate_cases": [
+        {"id": "T1.1-1", "title": "V=0.20 V：判 0，灯灭", "kind": "voltage_judge", "v": 0.2, "expect": "0", "required": true},
+        {"id": "T1.1-2", "title": "V=3.10 V：判 1，灯亮", "kind": "voltage_judge", "v": 3.1, "expect": "1", "required": true},
+        {"id": "T1.1-3", "title": "V=1.65 V：判 X（禁区）", "kind": "voltage_judge", "v": 1.65, "expect": "X", "required": true},
+        {"id": "T1.1-4", "title": "V=0.85 V：判 X（不是 0）", "kind": "voltage_judge", "v": 0.85, "expect": "X", "required": true}
+      ]
     },
     "binary": {
+      "id": "binary",
+      "title": "1.2 两种状态装下世界",
+      "body": "用 8 个开关摆出比特。每一位的权重是 2 的幂；当前值会同时显示为十进制与十六进制。",
       "bit_count": 8,
-      "switch_task": 45,
-      "convert_tasks": [
-        { "decimal": 13 },
-        { "decimal": 42 }
+      "coverage_max": 15,
+      "targets": [
+        {"id": "t137", "value": 137, "label": "十进制 137", "hint": "128 + 8 + 1"},
+        {"id": "t2f", "value": 47, "label": "十六进制 0x2F", "hint": "0x2F = 47 = 32 + 8 + 4 + 2 + 1"}
       ],
       "quiz": {
-        "question": "为什么数字电路普遍使用二进制，而不是三进制？",
+        "question": "三进制计算机（如苏联 Setun）在工程上更难普及，主要原因是？",
         "options": [
-          "因为三进制在物理上根本无法实现",
-          "因为只需要区分两个稳定状态更抗噪声、电路更简单，且布尔代数可直接映射到开关电路",
-          "因为人类有十根手指，所以选了最接近的二进制"
+          "三进制数学不成立",
+          "三态器件难以稳定、噪声裕度与互操作成本高",
+          "三进制无法表示负数",
+          "三进制只能做加法"
         ],
         "answer": 1,
-        "explain": "三进制并非不可能：苏联的 Setun 计算机真的用过三进制。但在同样的器件工艺下，二进制只需要两个容易区分的稳定电平，噪声裕量大、电路简单、功耗低，而且布尔代数可以一对一直译成开关电路。工程选择的是“最可靠的实现”，不是“数学上最紧凑的表示”。"
-      }
+        "explain": "不是数学问题，是物理与工程问题：稳定三态、抗噪声、与二态生态兼容都要付出额外成本。"
+      },
+      "hint": "0x2F：2 在十六位高位（16×2=32），F=15。8 位上界 255，再加 1 会回绕到 0。",
+      "misconception": "「二进制是计算机的唯一天然选择」不准确：它是工程折中后的最稳选择。",
+      "gate_cases": [
+        {"id": "T1.2-1", "title": "覆盖 0–15 并全部读对（16/16）", "kind": "coverage", "max": 15, "required": true},
+        {"id": "T1.2-2", "title": "摆出十进制 137", "kind": "target", "target": "t137", "required": true},
+        {"id": "T1.2-3", "title": "摆出十六进制 0x2F", "kind": "target", "target": "t2f", "required": true},
+        {"id": "T1.2-4", "title": "回答三进制问题", "kind": "quiz", "required": true}
+      ]
     },
     "boolean": {
-      "gates": ["and", "or", "not"],
-      "body": "真值表是逻辑电路的身份证。只要两个电路的真值表完全相同，它们就是同一个函数的不同实现。"
+      "id": "boolean",
+      "title": "1.3 命题可以被电路计算",
+      "body": "把每一行真值表填完。点击格子循环 0 → 1。填完后可运行等价验证，观察德摩根律在电路上成立。",
+      "gates": [
+        {"id": "and", "name": "AND 与", "inputs": 2, "rows": [[0, 0], [0, 1], [1, 0], [1, 1]], "expected": [0, 0, 0, 1]},
+        {"id": "or", "name": "OR 或", "inputs": 2, "rows": [[0, 0], [0, 1], [1, 0], [1, 1]], "expected": [0, 1, 1, 1]},
+        {"id": "not", "name": "NOT 非", "inputs": 1, "rows": [[0], [1]], "expected": [1, 0]}
+      ],
+      "demorgan": {
+        "left": "(A ∧ B)′",
+        "right": "A′ ∨ B′",
+        "rows": [[0, 0], [0, 1], [1, 0], [1, 1]]
+      },
+      "hint": "先写 0 行，再写 1 行；与门只有全 1 才 1，或门只有全 0 才 0。",
+      "misconception": "「与非门只是与门加个非门」：物理上 NAND 往往更基础、更便宜；逻辑等价不等于实现等价。",
+      "gate_cases": [
+        {"id": "T1.3-1", "title": "AND 真值表 4/4", "kind": "table", "gate": "and", "required": true},
+        {"id": "T1.3-2", "title": "OR 真值表 4/4", "kind": "table", "gate": "or", "required": true},
+        {"id": "T1.3-3", "title": "NOT 真值表 2/2", "kind": "table", "gate": "not", "required": true},
+        {"id": "T1.3-4", "title": "德摩根等价验证 4/4", "kind": "demorgan", "required": true}
+      ]
     },
     "gate": {
-      "puzzles": [
-        {
-          "id": "p_and",
-          "target": "and",
-          "prompt": "让灯只在两个开关都闭合时亮。",
-          "note": "两个输入都为 1 才输出 1。"
-        },
-        {
-          "id": "p_or",
-          "target": "or",
-          "prompt": "让灯在任意一个开关闭合时就亮。",
-          "note": "任一输入为 1 就输出 1。"
-        },
-        {
-          "id": "p_xor",
-          "target": "xor",
-          "prompt": "让灯只在两个开关状态不同时亮。",
-          "note": "异或：不同为 1，相同为 0。"
-        }
+      "id": "gate",
+      "title": "1.4 把逻辑焊出来",
+      "body": "用给定的门搭出目标函数。验收只看输入输出行为，不看你的拓扑，因此同一个函数允许多种搭法。",
+      "max_gates": 12,
+      "tasks": [
+        {"id": "t_and", "title": "任务 A：搭出 AND", "target": "and", "palette": ["not", "and", "or"], "input_ids": ["a", "b"]},
+        {"id": "t_or", "title": "任务 B：搭出 OR", "target": "or", "palette": ["not", "and", "or"], "input_ids": ["a", "b"]},
+        {"id": "t_not", "title": "任务 C：搭出 NOT", "target": "not", "palette": ["not", "and", "or"], "input_ids": ["a"]},
+        {"id": "t_xor", "title": "任务 D：只许用与/或/非搭出 XOR", "target": "xor", "palette": ["not", "and", "or"], "input_ids": ["a", "b"], "require_second": true}
+      ],
+      "encapsulation": {"name": "MY-XOR", "ports": ["a", "b", "out"]},
+      "hint": "XOR = (A ∧ ¬B) ∨ (¬A ∧ B)。先让两条路径各自正确，再或起来；也可以尝试别的等价式。",
+      "misconception": "「电路必须和标准答案画得一样」：验收是黑盒的，行为等价即可；不同结构在延迟与成本上仍有差别。",
+      "gate_cases": [
+        {"id": "T1.4-1", "title": "AND / OR / NOT 三个基础门通过", "kind": "basic", "required": true},
+        {"id": "T1.4-2", "title": "XOR 4/4 且延迟 ≤ 12 tick", "kind": "xor", "max_delay": 12, "required": true},
+        {"id": "T1.4-3", "title": "封装 MY-XOR 后端口行为不变", "kind": "encapsulation", "required": true},
+        {"id": "T1.4-4", "title": "用第二种不同结构再通过 XOR", "kind": "second", "required": true}
       ]
     },
     "signal": {
-      "clock_hz": 10,
-      "ticks_required": 10,
-      "gate_delay_ticks": 2,
-      "body": "输入在 0 和 1 之间来回跳变，就形成了信号。信号穿过门电路需要时间，输出波形相对输入整体向右平移，这段平移就是传播延迟。"
+      "id": "signal",
+      "title": "1.5 信号不是瞬时的",
+      "body": "三级非门串联测量延迟；再用 F = A·C + B·C′ 制造一次竞争，观察毛刺。最后用结构而不是「更快的门」修掉它。",
+      "chain": {"stages": 3, "delay_per_stage": 3, "expected_delay": 9},
+      "hazard": {"skew": 4, "min_width": 1},
+      "fix": {"toggles": 20, "mode": "equalize"},
+      "quiz": {
+        "question": "F = A·C + B·C′ 在 A=B=1、C 由 1 变 0 时出现窄脉冲，最根本的原因是？",
+        "options": [
+          "门的速度太慢",
+          "两条输入到输出的路径延迟不同，OR 的输入短暂同时为 0",
+          "电源电压不足",
+          "C 的变化太快"
+        ],
+        "answer": 1,
+        "explain": "竞争：C 与 C′ 到达 OR 的时间不同，导致输出短暂掉 0。"
+      },
+      "hint": "延迟是 tick 数累加；毛刺宽度不是 0，示波器能看到一个窄低脉冲。",
+      "misconception": "「毛刺是示波器噪声」：它是真实的逻辑值跳变，会被下游寄存器采到。",
+      "gate_cases": [
+        {"id": "T1.5-1", "title": "测出三级非门延迟 9 tick（3 t/级）", "kind": "delay", "expected": 9, "required": true},
+        {"id": "T1.5-2", "title": "复现竞争毛刺（宽度 ≥ 1 tick）", "kind": "glitch", "min_width": 1, "required": true},
+        {"id": "T1.5-3", "title": "修复后 20 次翻转无毛刺", "kind": "fix", "toggles": 20, "required": true},
+        {"id": "T1.5-4", "title": "回答毛刺成因", "kind": "quiz", "required": true}
+      ]
     },
     "half_adder": {
-      "sum_gate": "xor",
-      "carry_gate": "and",
-      "required_rows": 4,
-      "body": "半加器要做两件事：算出本位和（A XOR B），算出向高位的进位（A AND B）。先把两个输入分别接到两片门，再把门输出接到对应的灯。"
+      "id": "half_adder",
+      "title": "1.6 第一台加法器",
+      "body": "输入 A、B，输出 SUM（和）与 CARRY（进位）。要求 S = A ⊕ B，C = A ∧ B。可以放多个门；验收会逐行跑真值表。",
+      "inputs": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}],
+      "outputs": [{"id": "sum", "label": "SUM", "expect": "xor"}, {"id": "carry", "label": "CARRY", "expect": "and"}],
+      "palette": ["not", "and", "or", "xor"],
+      "max_gates": 8,
+      "max_delay": 12,
+      "random_cases": 8,
+      "hint": "SUM 用异或，CARRY 用与。两个输出可以共享同一个 A/B 输入。",
+      "misconception": "「加法器就是 CPU」：半加器只能算 1 位且没有进位输入；它只是更大算术单元的砖。",
+      "gate_cases": [
+        {"id": "T1.6-1", "title": "SUM/CARRY 四行真值表 4/4", "kind": "truth", "required": true},
+        {"id": "T1.6-2", "title": "输入到输出稳定时间 ≤ 12 tick", "kind": "delay", "max": 12, "required": true},
+        {"id": "T1.6-3", "title": "封装后端口 A/B/SUM/CARRY 行为不变", "kind": "encapsulation", "required": true},
+        {"id": "T1.6-4", "title": "含 X 的 8 组随机输入符合三值语义", "kind": "random_x", "count": 8, "seed": 1, "required": true}
+      ]
     }
   }
 }

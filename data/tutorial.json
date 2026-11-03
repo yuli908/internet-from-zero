@@ -5,7 +5,7 @@
       "id": "t_welcome",
       "title": "从零开始",
       "text": "文明断电了。你手里只有废铁、导线和一点电学常识。目标：在这个世界里，把互联网重新造出来。先从不值一提的“电平”开始。",
-      "trigger": "game_start"
+      "trigger": "manual"
     },
     {
       "id": "t_first_lab",
