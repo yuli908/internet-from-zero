@@ -2,6 +2,9 @@ class_name EconomyCore
 extends RefCounted
 
 ## 商店与经济规则。所有操作先校验再扣减，失败不留半成品。
+## 配方兼容两种写法：
+##  - 新表：output/output_qty/cash/inputs/key_items/requires_skill
+##  - 旧表：outputs{cash?}/inputs/unlock_skill
 
 static func discount_for(state: PlayerState, node_map: Dictionary) -> float:
 	var total := 0.0
@@ -48,19 +51,30 @@ static func can_craft(state: PlayerState, catalog: Catalog, recipe_id: String, t
 	var recipe := catalog.recipe(recipe_id)
 	if recipe.is_empty():
 		return {"ok": false, "error": "配方不存在", "missing": []}
-	var unlock_raw: Variant = recipe.get("unlock_skill", "")
+	var unlock_raw: Variant = recipe.get("requires_skill", recipe.get("unlock_skill", ""))
 	var unlock_skill := "" if unlock_raw == null else str(unlock_raw)
 	if not unlock_skill.is_empty() and not state.has_knowledge(unlock_skill):
 		return {"ok": false, "error": "配方未解锁：需要技能「%s」" % unlock_skill, "missing": []}
+	if times <= 0:
+		return {"ok": false, "error": "次数必须大于 0", "missing": []}
 	var missing := []
 	var inputs: Dictionary = recipe.get("inputs", {})
 	for k in inputs.keys():
 		var need := int(inputs[k]) * times
 		var have := _have(state, catalog, str(k))
 		if have < need:
-			missing.append({"id": str(k), "need": need, "have": have})
+			missing.append({"id": str(k), "need": need, "have": have, "kind": "input"})
+	var key_items: Dictionary = recipe.get("key_items", {})
+	for k in key_items.keys():
+		var need2 := int(key_items[k]) * times
+		var have2 := _have(state, catalog, str(k))
+		if have2 < need2:
+			missing.append({"id": str(k), "need": need2, "have": have2, "kind": "key"})
+	var cash := craft_cash(recipe, times)
+	if state.scrap < cash:
+		missing.append({"id": catalog.currency, "need": cash, "have": state.scrap, "kind": "cash"})
 	if not missing.is_empty():
-		return {"ok": false, "error": "原料不足", "missing": missing}
+		return {"ok": false, "error": "材料或废铁不足", "missing": missing}
 	return {"ok": true, "error": "", "missing": []}
 
 static func craft(state: PlayerState, catalog: Catalog, recipe_id: String, times: int = 1) -> Dictionary:
@@ -77,7 +91,12 @@ static func craft(state: PlayerState, catalog: Catalog, recipe_id: String, times
 			state.spend_scrap(need)
 		else:
 			state.remove_item(str(k), need)
+	var cash := craft_cash(recipe, times)
+	if cash > 0:
+		state.spend_scrap(cash)
 	var outputs: Dictionary = recipe.get("outputs", {})
+	if outputs.is_empty() and str(recipe.get("output", "")).length() > 0:
+		outputs[str(recipe["output"])] = int(recipe.get("output_qty", 1))
 	for k in outputs.keys():
 		var amount := int(outputs[k]) * times
 		if str(k) == catalog.currency:
@@ -85,6 +104,14 @@ static func craft(state: PlayerState, catalog: Catalog, recipe_id: String, times
 		else:
 			state.add_item(str(k), amount)
 	return {"ok": true, "error": "", "recipe": recipe_id}
+
+static func craft_cash(recipe: Dictionary, times: int = 1) -> int:
+	if recipe.has("cash"):
+		return maxi(0, int(recipe.get("cash", 0)) * times)
+	var outputs: Dictionary = recipe.get("outputs", {})
+	if outputs.has("cash"):
+		return maxi(0, int(outputs["cash"]) * times)
+	return 0
 
 static func _have(state: PlayerState, catalog: Catalog, id: String) -> int:
 	return state.scrap if id == catalog.currency else state.item_count(id)

@@ -41,6 +41,13 @@ const KEYS := {
 static func from_string(s: String) -> int:
 	return int(KEYS.get(s.to_lower(), -1))
 
+static func key_for(type: int) -> String:
+	## 反向查表：类型 → 小写键名（"and"/"or"/...）。未知返回空串。
+	for k in KEYS.keys():
+		if int(KEYS[k]) == type:
+			return str(k)
+	return ""
+
 static func gate_key(type: int) -> String:
 	return str(SYMBOLS.get(type, "UNKNOWN"))
 

@@ -69,3 +69,26 @@ func item_ids_for_sale() -> Array:
 		if buy_price(str(id)) > 0:
 			out.append(str(id))
 	return out
+
+func recipe_ids() -> Array:
+	return recipe_order.duplicate()
+
+func recipe_for_output(id: String) -> String:
+	var declared: Variant = item(id).get("recipe", null)
+	if declared is String:
+		var rid := str(declared)
+		if not rid.is_empty() and recipes.has(rid):
+			return rid
+	if declared is Array:
+		for raw in declared:
+			var rid := str(raw)
+			if not rid.is_empty() and recipes.has(rid):
+				return rid
+	for raw_rid in recipe_order:
+		var r: Dictionary = recipes[raw_rid]
+		if str(r.get("output", "")) == id:
+			return str(raw_rid)
+		var outs: Variant = r.get("outputs", null)
+		if outs is Dictionary and (outs as Dictionary).has(id):
+			return str(raw_rid)
+	return ""

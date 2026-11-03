@@ -46,21 +46,43 @@ func objective(id_in: String) -> Dictionary:
 func objective_for_lab(lab_id: String) -> String:
 	return str(lab(lab_id).get("objective", ""))
 
+func requires(lab_id: String) -> Array:
+	var v: Variant = lab(lab_id).get("requires", [])
+	if v == null:
+		return []
+	if v is Array:
+		return v
+	if str(v).is_empty():
+		return []
+	return [str(v)]
+
+func start_scrap() -> int:
+	return int(data.get("start_scrap", 0))
+
+func start_items() -> Dictionary:
+	return data.get("start_items", {})
+
+func next_chapter() -> String:
+	return str(data.get("next_chapter", ""))
+
 func lab_unlocked(state: PlayerState, lab_id: String) -> bool:
 	var lab_data := lab(lab_id)
 	if lab_data.is_empty():
 		return false
-	var req := _opt_string(lab_data, "requires")
-	if req.is_empty():
-		return true
-	return state.is_lab_completed(req)
+	for req in requires(lab_id):
+		if not state.is_lab_completed(str(req)):
+			return false
+	return true
 
 func lab_lock_reason(state: PlayerState, lab_id: String) -> String:
 	var lab_data := lab(lab_id)
-	var req := _opt_string(lab_data, "requires")
-	if req.is_empty() or state.is_lab_completed(req):
+	var missing := []
+	for req in requires(lab_id):
+		if not state.is_lab_completed(str(req)):
+			missing.append("「%s」" % str(lab(req).get("title", req)))
+	if missing.is_empty():
 		return ""
-	return "需要先完成「%s」" % str(lab(req).get("title", req))
+	return "需要先完成 %s" % "、".join(missing)
 
 static func _opt_string(d: Dictionary, key: String) -> String:
 	var v: Variant = d.get(key, "")
@@ -105,9 +127,9 @@ func dsl_errors() -> Array:
 		var obj := str(lab_data.get("objective", ""))
 		if obj.is_empty() or not objectives.has(obj):
 			errs.append("实验 %s 指向不存在的目标 %s" % [lab_id, obj])
-		var req := _opt_string(lab_data, "requires")
-		if not req.is_empty() and not labs.has(req):
-			errs.append("实验 %s 的前置实验 %s 不存在" % [lab_id, req])
-		if not str(lab_data.get("knowledge", "")).is_empty() and not lab_data.has("knowledge"):
+		for req in requires(lab_id):
+			if not labs.has(str(req)):
+				errs.append("实验 %s 的前置实验 %s 不存在" % [lab_id, str(req)])
+		if str(lab_data.get("knowledge", "")).is_empty():
 			errs.append("实验 %s 缺少知识节点" % lab_id)
 	return errs

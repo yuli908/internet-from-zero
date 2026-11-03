@@ -171,3 +171,65 @@ func input_ids() -> Array:
 		if str(nodes[id].kind) == KIND_INPUT:
 			out.append(str(id))
 	return out
+
+func gate_ids() -> Array:
+	var out := []
+	var keys := nodes.keys()
+	keys.sort()
+	for id in keys:
+		if str(nodes[id].kind) == KIND_GATE:
+			out.append(str(id))
+	return out
+
+func output_ids() -> Array:
+	var out := []
+	var keys := nodes.keys()
+	keys.sort()
+	for id in keys:
+		if str(nodes[id].kind) == KIND_OUTPUT:
+			out.append(str(id))
+	return out
+
+func to_dict() -> Dictionary:
+	var rows := []
+	var keys := nodes.keys()
+	keys.sort()
+	for raw_id in keys:
+		var n: Dictionary = nodes[raw_id]
+		var pos: Vector2 = n.get("pos", Vector2.ZERO)
+		rows.append({
+			"id": str(n["id"]),
+			"kind": str(n["kind"]),
+			"gate": int(n.get("gate", -1)),
+			"label": str(n.get("label", "")),
+			"a": str(n.get("a", "")),
+			"b": str(n.get("b", "")),
+			"value": bool(n.get("value", false)),
+			"x": pos.x,
+			"y": pos.y,
+		})
+	return {"version": 1, "nodes": rows}
+
+static func from_dict(doc: Dictionary) -> CircuitGraph:
+	var g := CircuitGraph.new()
+	var rows: Array = doc.get("nodes", [])
+	for raw in rows:
+		var r: Dictionary = raw
+		var id := str(r.get("id", ""))
+		if id.is_empty():
+			continue
+		var pos := Vector2(float(r.get("x", 0.0)), float(r.get("y", 0.0)))
+		var kind := str(r.get("kind", ""))
+		if kind == KIND_INPUT:
+			g.add_input(id, str(r.get("label", "")), pos)
+			g.set_input_value(id, bool(r.get("value", false)))
+		elif kind == KIND_OUTPUT:
+			g.add_output(id, str(r.get("label", "")), pos)
+		elif kind == KIND_GATE:
+			g.add_gate(id, int(r.get("gate", 0)), str(r.get("label", "")), pos)
+		else:
+			continue
+		var n: Dictionary = g.nodes[id]
+		n["a"] = str(r.get("a", ""))
+		n["b"] = str(r.get("b", ""))
+	return g
