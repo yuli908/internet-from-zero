@@ -20,7 +20,7 @@
 | 波形与毛刺、延迟测量 | `src/ui/widgets/waveform.gd`、`src/core/signal_lab_model.gd` |
 | 存档（信封 v2 + SHA-256 + 原子写 + `.bak` 回退） | `src/core/save_codec.gd`、`src/core/save_store.gd` |
 | 自动测试 902 项 / 12 套件 / 0 失败 | `scripts/run_tests.ps1` |
-| 10 张自动截图 | `artifacts/shots/*.png`（workbench / shop / skills / archive / diagnostics + 6 个 lab） |
+| 11 张自动截图 | `artifacts/shots/*.png`（workbench / shop / skills / archive / diagnostics + 6 个 lab） |
 
 ## 2. 环境要求
 
