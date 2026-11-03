@@ -10,6 +10,13 @@ static func read_json(path: String) -> Dictionary:
 		return parsed
 	return {}
 
+static func data_db() -> Node:
+	## `-s` 模式下 autoload 不会走 _ready，这里手动实例化数据层并加载。
+	var script: GDScript = load("res://src/autoload/data_db.gd")
+	var db: Node = script.new()
+	db.load_all()
+	return db
+
 static func items_doc() -> Dictionary:
 	return read_json("res://data/items/items.json")
 

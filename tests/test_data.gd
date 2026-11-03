@@ -1,112 +1,127 @@
-extends RefCounted
+﻿extends RefCounted
+
+## 数据完整性：物品、价格、配方、双树、章节、实验配置、gate 用例。
 
 func run(ctx: TestContext) -> void:
-	var manifest := TestUtil.read_json("res://data/manifest.json")
-	var files: Array = manifest.get("files", [])
-	ctx.eq("manifest file count", files.size(), 7)
-	for f in files:
-		ctx.check("data file exists %s" % str(f), FileAccess.file_exists(str(f)))
-		ctx.check("data file parses %s" % str(f), not TestUtil.read_json(str(f)).is_empty())
+	var db: Node = TestUtil.data_db()
+	var cat: Catalog = db.catalog
+	var kg: KnowledgeGraph = db.skill_graph
+	var ch: ChapterRuntime = db.chapter
 
-	var items_doc := TestUtil.items_doc()
-	var item_rows: Array = items_doc.get("items", [])
-	var ids := {}
-	for raw in item_rows:
-		var item: Dictionary = raw
-		ids[str(item["id"])] = item
-	ctx.eq("item count", ids.size(), 8)
-	var scrap_item: Dictionary = ids["scrap"]
-	ctx.eq("scrap is currency", str(scrap_item["kind"]), "currency")
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 8)
+	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
-	var prices := TestUtil.prices_doc()
-	ctx.eq("currency id", str(prices["currency"]), "scrap")
-	var buy_map: Dictionary = prices.get("buy", {})
-	var sell_map: Dictionary = prices.get("sell", {})
-	for key in buy_map.keys():
-		ctx.check("buy price item exists %s" % str(key), ids.has(str(key)))
-	for key in sell_map.keys():
-		ctx.check("sell price item exists %s" % str(key), ids.has(str(key)))
-
-	var recipes := TestUtil.recipes_doc()
-	var recipe_rows: Array = recipes.get("recipes", [])
-	var recipe_ids := {}
-	for raw in recipe_rows:
-		var recipe: Dictionary = raw
-		recipe_ids[str(recipe["id"])] = recipe
-		var ins: Dictionary = recipe.get("inputs", {})
-		var outs: Dictionary = recipe.get("outputs", {})
-		for key in ins.keys():
-			ctx.check("recipe input exists %s" % str(key), ids.has(str(key)))
-		for key in outs.keys():
-			ctx.check("recipe output exists %s" % str(key), ids.has(str(key)))
-	ctx.eq("recipe count", recipe_ids.size(), 3)
-
-	var skills := TestUtil.skill_doc()
-	var skill_rows: Array = skills.get("nodes", [])
-	var skill_map := TestUtil.skill_nodes()
-	for raw in skill_rows:
-		var node: Dictionary = raw
-		var nid := str(node["id"])
-		for p in node.get("prereq", []):
-			ctx.check("prereq exists %s" % str(p), skill_map.has(str(p)))
-		if str(node["kind"]) == "skill":
-			ctx.check("skill has xp cost %s" % nid, int(node.get("xp_cost", -1)) >= 0)
+	ctx.eq("items total", cat.items.size(), 85)
+	var doc_items := 0
+	var legacy := 0
+	for raw_id in cat.item_order:
+		var it: Dictionary = cat.item(str(raw_id))
+		if str(raw_id) == "scrap":
+			continue
+		if bool(it.get("legacy", false)):
+			legacy += 1
 		else:
-			ctx.check("knowledge has xp award %s" % nid, int(node.get("xp_award", -1)) > 0)
-		if node.has("effects"):
-			var effects: Dictionary = node["effects"]
-			if effects.has("unlock_recipe"):
-				var rid := str(effects["unlock_recipe"])
-				ctx.check("effect recipe exists %s" % rid, recipe_ids.has(rid))
+			doc_items += 1
+	ctx.eq("doc items (non-legacy)", doc_items, 77)
+	ctx.eq("legacy aliases", legacy, 7)
+	ctx.check("scrap is currency", cat.is_currency("scrap"))
+	for raw_id in cat.item_order:
+		ctx.check("item %s has name" % str(raw_id), not str(cat.item(str(raw_id)).get("name", "")).is_empty())
 
-	var chapter := TestUtil.chapter_doc()
-	var labs: Array = chapter.get("labs", [])
-	var objectives: Array = chapter.get("objectives", [])
-	ctx.eq("chapter lab count", labs.size(), 6)
-	ctx.eq("chapter objective count", objectives.size(), 6)
-	var obj_ids := {}
-	for raw in objectives:
-		var o: Dictionary = raw
-		obj_ids[str(o["id"])] = o
-		ctx.check("objective knowledge exists %s" % str(o["knowledge"]), skill_map.has(str(o["knowledge"])))
-	var lab_ids := {}
-	for raw in labs:
-		var lab: Dictionary = raw
-		lab_ids[str(lab["id"])] = lab
-		ctx.check("lab objective exists %s" % str(lab["objective"]), obj_ids.has(str(lab["objective"])))
-		ctx.check("lab knowledge exists %s" % str(lab["knowledge"]), skill_map.has(str(lab["knowledge"])))
-		var rv: Variant = lab.get("requires", null)
-		if rv != null and not str(rv).is_empty():
-			ctx.check("lab requires exists %s" % str(rv), lab_ids.has(str(rv)))
+	ctx.eq("currency", cat.currency, "scrap")
+	for raw_id in cat.buy_prices.keys():
+		ctx.check("buy ref %s exists" % str(raw_id), cat.items.has(str(raw_id)))
+	for raw_id in cat.sell_prices.keys():
+		ctx.check("sell ref %s exists" % str(raw_id), cat.items.has(str(raw_id)))
+	ctx.check("M02 buy 6", cat.buy_price("M02") == 6, "实际 %d" % cat.buy_price("M02"))
+	ctx.check("G10 buy 110", cat.buy_price("G10") == 110)
+	ctx.check("scrap not buyable", cat.buy_price("scrap") == -1)
+	ctx.check("gate_xor sell 4", cat.sell_price("gate_xor") == 4)
 
-	var labs_doc := TestUtil.labs_doc()
-	var labs_data: Dictionary = labs_doc.get("labs", {})
-	for raw in labs:
-		var lab2: Dictionary = raw
-		ctx.check("lab data key exists %s" % str(lab2["data_key"]), labs_data.has(str(lab2["data_key"])))
+	var recipes: Array = cat.recipe_ids()
+	ctx.check("recipes >= 77", recipes.size() >= 77, "实际 %d" % recipes.size())
+	for raw_rid in recipes:
+		var rid := str(raw_rid)
+		var r: Dictionary = cat.recipe(rid)
+		var out_id := str(r.get("output", ""))
+		ctx.check("recipe %s output exists" % rid, out_id.is_empty() or cat.items.has(out_id), out_id)
+		for iid in r.get("inputs", {}).keys():
+			ctx.check("recipe %s input %s" % [rid, str(iid)], cat.items.has(str(iid)) or str(iid) == "scrap")
+		for iid in r.get("key_items", {}).keys():
+			ctx.check("recipe %s key %s" % [rid, str(iid)], cat.items.has(str(iid)))
+		var need := str(r.get("requires_skill", "")) if r.get("requires_skill", null) != null else ""
+		if not need.is_empty():
+			ctx.check("recipe %s skill %s" % [rid, need], kg.nodes.has(need))
 
-	var quiz: Dictionary = labs_data.get("binary", {}).get("quiz", {})
-	var options: Array = quiz.get("options", [])
-	ctx.check("quiz answer in range", int(quiz.get("answer", -1)) >= 0 and int(quiz.get("answer", -1)) < options.size())
-	ctx.check("quiz explain present", not str(quiz.get("explain", "")).is_empty())
+	ctx.eq("skill node count", kg.nodes.size(), 36)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 7)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 19)
+	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 10)
+	ctx.check("CH01 milestone exists", kg.nodes.has("CH01"))
+	ctx.check("KN-ELEC-01 exists", kg.nodes.has("KN-ELEC-01"))
+	ctx.check("SK-LEVEL exists", kg.nodes.has("SK-LEVEL"))
+	ctx.check("legacy voltage exists", kg.nodes.has("voltage"))
 
-	var gate_lab: Dictionary = labs_data.get("gate", {})
-	var puzzles: Array = gate_lab.get("puzzles", [])
-	ctx.eq("gate puzzle count", puzzles.size(), 3)
-	for raw in puzzles:
-		var p: Dictionary = raw
-		ctx.check("puzzle target valid %s" % str(p["target"]), LogicGates.from_string(str(p["target"])) >= 0)
+	ctx.eq("chapter id", ch.id(), "ch01")
+	ctx.eq("start scrap", ch.start_scrap(), 120)
+	ctx.eq("labs", ch.lab_order.size(), 6)
+	ctx.eq("objectives", ch.objectives.size(), 6)
+	ctx.eq("start items", ch.start_items().size(), 2)
+	for key in ch.start_items().keys():
+		ctx.check("start item %s" % str(key), cat.items.has(str(key)))
+	ctx.check("level has no prereq", ch.requires("level").is_empty())
+	ctx.check("binary requires level", ch.requires("binary").has("level"))
+	ctx.eq("lab order first", str(ch.lab_order[0]), "level")
 
-	var adder: Dictionary = labs_data.get("half_adder", {})
-	ctx.check("half adder sum gate valid", LogicGates.from_string(str(adder.get("sum_gate", ""))) >= 0)
-	ctx.check("half adder carry gate valid", LogicGates.from_string(str(adder.get("carry_gate", ""))) >= 0)
-	var sig: Dictionary = labs_data.get("signal", {})
-	ctx.check("signal ticks required > 0", int(sig.get("ticks_required", 0)) > 0)
-	ctx.check("signal delay <= ticks", int(sig.get("gate_delay_ticks", 99)) <= int(sig.get("ticks_required", 0)))
+	var gate_total := 0
+	for lid in ch.lab_order:
+		var lab: Dictionary = ch.lab(str(lid))
+		var key := str(lab.get("data_key", ""))
+		var cfg: Dictionary = db.lab_data(key)
+		ctx.check("lab %s cfg exists" % str(lid), not cfg.is_empty())
+		var cases: Array = cfg.get("gate_cases", [])
+		gate_total += cases.size()
+		ctx.eq("lab %s gate cases" % str(lid), cases.size(), 4)
+		var ids := []
+		for raw in cases:
+			if raw is Dictionary:
+				ids.append(str(raw.get("id", "")))
+				ctx.check("case has kind %s" % str(raw.get("id", "")), not str(raw.get("kind", "")).is_empty())
+		ctx.check("lab %s gate ids match cases" % str(lid), ids == Array(lab.get("gate_ids", [])), "配置 %s 用例 %s" % [str(lab.get("gate_ids", [])), str(ids)])
+		var kn: Variant = lab.get("knowledge", null)
+		if kn is String and not str(kn).is_empty():
+			ctx.check("lab %s knowledge %s" % [str(lid), str(kn)], kg.nodes.has(str(kn)))
+		var cards: Array = lab.get("knowledge_cards", [])
+		for cid in cards:
+			ctx.check("lab %s card %s" % [str(lid), str(cid)], kg.nodes.has(str(cid)))
+		var nodes: Array = lab.get("skill_nodes", [])
+		for nid in nodes:
+			ctx.check("lab %s skill node %s" % [str(lid), str(nid)], kg.nodes.has(str(nid)))
+		var sk := str(lab.get("skill_node", ""))
+		if not sk.is_empty():
+			ctx.check("lab %s skill_node %s" % [str(lid), sk], kg.nodes.has(sk))
+		var ms := str(lab.get("milestone", ""))
+		if not ms.is_empty():
+			ctx.check("lab %s milestone %s" % [str(lid), ms], kg.nodes.has(ms))
+		var reward: Dictionary = lab.get("reward", {})
+		ctx.check("lab %s reward xp" % str(lid), int(reward.get("xp", 0)) > 0)
 
-	var tutorial := TestUtil.tutorial_doc()
-	var steps: Array = tutorial.get("steps", [])
-	ctx.check("tutorial steps non-empty", steps.size() > 0)
-	for raw in steps:
-		var s: Dictionary = raw
-		ctx.check("tutorial trigger present %s" % str(s["id"]), not str(s.get("trigger", "")).is_empty())
+	ctx.check("total gate cases 24", gate_total == 24, "实际 %d" % gate_total)
+
+	var sim: Dictionary = db.sim_doc
+	ctx.eq("sim frame ticks", int(sim.get("frame", {}).get("ticks_per_frame", 0)), 4)
+	ctx.eq("sim budget ms", int(sim.get("frame", {}).get("budget_ms", 0)), 5)
+	ctx.eq("gdscript gate limit", int(sim.get("limits", {}).get("gdscript_gates", 0)), 200)
+	ctx.eq("not delay", int(sim.get("gate_delay", {}).get("not", 0)), 1)
+	ctx.eq("xor delay", int(sim.get("gate_delay", {}).get("xor", 0)), 4)
+	ctx.eq("relay delay", int(sim.get("relay", {}).get("delay_per_stage_ticks", 0)), 3)
+
+	var room: Dictionary = db.lab_data("half_adder")
+	ctx.check("half adder inputs a/b", room.get("inputs", []).size() == 2)
+	ctx.check("half adder outputs sum/carry", room.get("outputs", []).size() == 2)
+	ctx.eq("half adder max gates", int(room.get("max_gates", 0)), 8)
+	ctx.eq("gate lab max gates", int(db.lab_data("gate").get("max_gates", 0)), 12)
+
+	var tut: Array = db.tutorial_doc.get("steps", [])
+	ctx.check("tutorial has steps", tut.size() >= 5)
+	ctx.eq("DataDB errors", db.errors.size(), 0)

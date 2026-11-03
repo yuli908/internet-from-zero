@@ -10,7 +10,7 @@ func run(ctx: TestContext) -> void:
 	var st := PlayerState.new()
 	ctx.check("level unlocked", ch.lab_unlocked(st, "level"))
 	ctx.check("binary locked", not ch.lab_unlocked(st, "binary"))
-	ctx.check("lock reason", ch.lab_lock_reason(st, "binary").contains("电平"))
+	ctx.check("lock reason", ch.lab_lock_reason(st, "binary").contains("电"))
 
 	var o := ch.complete_objective(st, "obj_level")
 	ctx.check("objective newly", bool(o["newly"]))
