@@ -1,0 +1,2 @@
+# 让 Godot 忽略本目录：M1 的 native/ 只有脚手架，不参与导入、不加载 .gdextension。
+# 启用原生扩展时，删除本文件（见 native/README.md 与 docs/adr/0002-native-boundary.md）。

@@ -26,6 +26,7 @@ logs/
 *.tmp
 *.tmp.*
 screenshot_*.png
+screenshots/
 
 # OS noise
 Thumbs.db

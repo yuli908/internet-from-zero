@@ -1,0 +1,26 @@
+; ifz_native.gdextension —— GDExtension 描述文件（M1 未启用）
+;
+; 状态：脚手架。M1 不生成 dll，也没有任何脚本加载本文件。
+;
+; ⚠ 本文件一旦被 Godot 扫描到，就会尝试加载 res://native/bin/ifz_native.dll；
+;   dll 尚未构建时，启动日志会出现 "GDExtension dynamic library not found"。
+;   因此 native/.gdignore 让编辑器忽略整个 native/ 目录。
+;
+; 启用原生扩展的顺序（详见 native/README.md 与 docs/adr/0002-native-boundary.md）：
+;   1. 构建出 native/bin/ifz_native.dll；
+;   2. 删除 native/.gdignore；
+;   3. 重跑导入检查，确认日志无 ERROR。
+;
+; 入口符号必须与 native/src/ifz_native.cpp 的 ifz_library_init 一致。
+
+[configuration]
+
+entry_symbol = "ifz_library_init"
+compatibility_minimum = "4.4"
+reloadable = true
+
+[libraries]
+
+windows.x86_64 = "res://native/bin/ifz_native.dll"
+windows.debug.x86_64 = "res://native/bin/ifz_native.dll"
+windows.release.x86_64 = "res://native/bin/ifz_native.dll"

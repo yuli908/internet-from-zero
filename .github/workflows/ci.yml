@@ -1,0 +1,77 @@
+# CI 草案（Windows）
+#
+# ⚠️ 未在真实 CI 上验证，需人工。
+#    - 首次推送后请人工检查 Actions 日志与产物；Godot 下载地址/版本若变更，需要同步更新。
+#    - headless 无渲染，所以这里不跑截图；"可启动性"由本地 scripts/selfcheck.ps1 的 GUI 冒烟负责。
+#    - `--editor --quit` 不会编译"运行时才 load()"的脚本（曾漏掉 lab_binary.gd 语法错误），
+#      因此 CI 的导入检查不能替代本地冒烟（见 docs/PROGRESS.md 偏差 9/10）。
+#    - native/ 不在本流水线构建（M1 未编译，见 docs/adr/0002-native-boundary.md）。
+
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-headless:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Godot 4.4.1 到 C:\tools\godot-4.4.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "4.4.1"
+          $url = "https://github.com/godotengine/godot/releases/download/$version-stable/Godot_v$version-stable_win64.exe.zip"
+          $dest = "C:\tools\godot-$version"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          $zip = Join-Path $env:RUNNER_TEMP "godot.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          $exe = Join-Path $dest "Godot_v$version-stable_win64.exe"
+          if (-not (Test-Path $exe)) { throw "未找到 $exe" }
+          # 与本地 scripts/*.ps1 约定的启动器路径保持一致
+          $cmd = Join-Path $dest "godot.cmd"
+          Set-Content -Path $cmd -Value "@echo off`r`n`"%~dp0Godot_v$version-stable_win64.exe`" %*" -Encoding ASCII
+          & $cmd --version
+
+      - name: 导入检查（headless --editor --quit）
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+          New-Item -ItemType Directory -Force -Path artifacts\logs | Out-Null
+          & "C:\tools\godot-4.4.1\godot.cmd" --headless --path "$env:GITHUB_WORKSPACE" --editor --quit *> artifacts\logs\import.log
+          $code = $LASTEXITCODE
+          Get-Content artifacts\logs\import.log | Select-Object -Last 20
+          $text = Get-Content -Raw artifacts\logs\import.log
+          if ($code -ne 0) { Write-Host "导入检查失败：返回码 $code"; exit 1 }
+          if ($text -match "ERROR:" -or $text -match "Parse Error" -or $text -match "SCRIPT ERROR") {
+            Write-Host "导入检查失败：日志出现 ERROR / Parse Error"
+            exit 1
+          }
+          Write-Host "导入检查通过"
+
+      - name: 全量测试（tests/run_tests.gd）
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: 汇总日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: artifacts/logs/**
+          if-no-files-found: ignore
