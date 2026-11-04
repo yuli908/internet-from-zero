@@ -4,7 +4,7 @@ extends GameScreen
 
 const LAYER_KEYS = ["L0a", "L0b", "L0", "L1", "L2", "L3", "L4", "L5", "L6a", "L6b", "L6c", "L7"]
 
-var _scrap_value: Label
+var _gold_value: Label
 var _discount_value: Label
 var _items_host: VBoxContainer
 var _recipes_host: VBoxContainer
@@ -50,11 +50,11 @@ func _build_header() -> PanelContainer:
 
 	var row := Ui.hbox(16)
 	col.add_child(row)
-	row.add_child(Ui.title("商店 · 废铁交易", 22))
+	row.add_child(Ui.title("商店 · 金币交易", 22))
 	row.add_child(Ui.spacer())
-	var scrap_stat := Ui.stat("废铁", "0", UiTheme.AMBER)
-	_scrap_value = scrap_stat.get_child(1) as Label
-	row.add_child(scrap_stat)
+	var gold_stat := Ui.stat("金币", "0", UiTheme.AMBER)
+	_gold_value = gold_stat.get_child(1) as Label
+	row.add_child(gold_stat)
 	_discount_value = Ui.label("优惠 0%", 13, UiTheme.OK)
 	row.add_child(_discount_value)
 
@@ -90,11 +90,11 @@ func _clear(container: Node) -> void:
 		c.queue_free()
 
 func _refresh_header() -> void:
-	var scrap := 0
+	var gold := 0
 	if GameState.player != null:
-		scrap = int(GameState.player.scrap)
-	if _scrap_value != null:
-		_scrap_value.text = str(scrap)
+		gold = int(GameState.player.gold)
+	if _gold_value != null:
+		_gold_value.text = str(gold)
 	if _discount_value != null:
 		_discount_value.text = "优惠 %d%%" % roundi(Economy.discount() * 100.0)
 
@@ -164,7 +164,7 @@ func _item_row(iid: String) -> PanelContainer:
 
 	var price_label := Ui.mono(str(maxi(price, 0)), 16, UiTheme.AMBER)
 	if base_price > 0:
-		price_label.tooltip_text = "原价 %d 废铁" % base_price
+		price_label.tooltip_text = "原价 %d 金币" % base_price
 	row.add_child(price_label)
 
 	var stock := Ui.label("×%d" % have, 13, UiTheme.TEXT if have > 0 else UiTheme.MUTED)
@@ -180,7 +180,7 @@ func _item_row(iid: String) -> PanelContainer:
 	var buy_btn := Ui.button("买 1", _on_buy.bind(iid), true)
 	buy_btn.custom_minimum_size = Vector2(62, 28)
 	buy_btn.add_theme_font_size_override("font_size", 12)
-	buy_btn.tooltip_text = "单价 %d 废铁" % maxi(price, 0)
+	buy_btn.tooltip_text = "单价 %d 金币" % maxi(price, 0)
 	buy_btn.disabled = price < 0
 	actions.add_child(buy_btn)
 
@@ -264,7 +264,7 @@ func _format_entries(recipe: Dictionary, keys: Array, with_cash: bool) -> String
 	if with_cash:
 		var cash := int(recipe.get("cash", 0))
 		if cash <= 0:
-			cash = int(recipe.get("scrap_cost", 0))
+			cash = int(recipe.get("gold_cost", 0))
 		if cash > 0:
 			parts.append("%s ×%d" % [_currency_name(), cash])
 	if parts.is_empty():
@@ -280,7 +280,7 @@ func _item_name(iid: String) -> String:
 	return n
 
 func _currency_name() -> String:
-	var cid := "scrap"
+	var cid := "gold"
 	if DataDB.catalog != null:
 		cid = str(DataDB.catalog.currency)
 	return _item_name(cid)

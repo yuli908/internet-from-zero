@@ -32,7 +32,7 @@ func boot() -> void:
 func new_game(save_now: bool = true) -> void:
 	player = PlayerState.new(seed_value)
 	player.chapter_id = DataDB.chapter_id()
-	player.scrap = int(DataDB.chapter.start_scrap())
+	player.gold = int(DataDB.chapter.start_gold())
 	var start_items: Dictionary = DataDB.chapter.start_items()
 	for id in start_items.keys():
 		player.add_item(str(id), int(start_items[id]))

@@ -62,21 +62,21 @@ func unlock(state: PlayerState, id: String) -> Dictionary:
 	if not bool(check.ok):
 		return check
 	var n := node(id)
-	var awarded_scrap := 0
+	var awarded_gold := 0
 	var awarded_xp := 0
 	var cost_xp := 0
 	if kind(id) == "skill" and not bool(n.get("auto", false)):
 		cost_xp = int(n.get("xp_cost", n.get("cost", 0)))
 		state.spend_xp(cost_xp)
 	else:
-		awarded_scrap = int(n.get("scrap_award", 0))
+		awarded_gold = int(n.get("gold_award", 0))
 		awarded_xp = int(n.get("xp_award", 0))
-		state.add_scrap(awarded_scrap)
+		state.add_gold(awarded_gold)
 		state.add_xp(awarded_xp)
 	state.grant_knowledge(id)
 	return {
 		"ok": true, "error": "", "already": false, "id": id, "kind": kind(id), "node": n,
-		"awarded_scrap": awarded_scrap, "awarded_xp": awarded_xp, "cost_xp": cost_xp,
+		"awarded_gold": awarded_gold, "awarded_xp": awarded_xp, "cost_xp": cost_xp,
 	}
 
 func node_state(state: PlayerState, id: String) -> String:

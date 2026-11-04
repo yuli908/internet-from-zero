@@ -8,24 +8,24 @@
 ## 1. 一句话结论
 
 M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 + 24 条 gate + 多解黑盒 + L0a/L0b/L1 仿真；
-`RESULT: 902 checks, 0 failures`。**没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、性能实测、题库与逐题评分、
-存档前向迁移框架、真实 CI 验证——这些要么只有 ADR，要么完全没有。
+`RESULT: 920 checks, 0 failures`。**没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、性能实测、题库与逐题评分、
+更远版本的前向迁移（当前只有 v1→v2→v3 迁移链）、真实 CI 验证——这些要么只有 ADR，要么完全没有。
 
 ## 2. 已完成（附验证方式）
 
 | 项 | 内容 | 验证 |
 |---|---|---|
-| 数据层 | 8 个 JSON（manifest 版本 2）：85 物品（77 正式 + 7 旧别名 + `scrap`）、37 买价 / 61 回收价、77 配方、36 节点（7 里程碑 / 19 知识 / 10 技能）、6 实验 / 24 gate、延迟表、引导、manifest | `tests/test_data.gd`；启动日志 `IFZ_BOOT data_ok=true files=8 chapter=ch01` |
+| 数据层 | 8 个 JSON（manifest 版本 2）：86 物品（77 正式 + 7 旧别名 + `scrap` 材料 + `gold` 货币）、37 买价 / 61 回收价、77 配方、36 节点（7 里程碑 / 19 知识 / 10 技能）、6 实验 / 24 gate、延迟表、引导、manifest | `tests/test_data.gd`；启动日志 `IFZ_BOOT data_ok=true files=8 chapter=ch01` |
 | 纯逻辑层 | `src/core`：`SimValue`/`VoltageModel`/`LabChecks`/`BlackBox`/`CircuitGraph`/`KnowledgeGraph`/`EconomyCore`/`ChapterRuntime`/`PlayerState`/`SaveCodec`/`SaveStore`…（不依赖 autoload） | headless 直测；`tests/run_tests.gd` 是 `SceneTree` 脚本，不加载主场景 |
 | 仿真 L0b/L1 | `src/sim`：Kleene 三值 + 整数 tick + `(tick, seq)` 堆 + 传输延迟/惯性过滤 + 毛刺 + 静止快照 + digest | `tests/test_sim.gd`：30 条门向量 + 9 条半加器向量 + 延迟表、同 tick 顺序、1 vs 4 tick/帧一致、快照往返 digest 一致、毛刺宽度与修复 |
 | 判定层 | `LabChecks` 输出 `GateReport`，UI 只采集与展示；24 条 gate 逐条判定 | `tests/test_lab_checks.gd`：每种 lab 的"正确解全过 + 错误解失败"两条路径 |
 | 多解验收 | `BlackBox` 只判行为不判拓扑；XOR 两种结构、半加器 | `tests/test_black_box.gd`：多解通过、错误拓扑失败、`signature` 区分结构 |
-| 存档 | 信封 v2 + SHA-256 + 原子写 tmp→校验→`.bak`→rename；主文件坏则回退 `.bak` | `tests/test_save.gd`：篡改检测、坏 JSON 拒绝、`.bak` 回退、往返一致、v1 迁移、v3+ 拒绝 |
-| 经济/知识/章节/引导 | 废铁 + XP、商店与配方、技能树四态、章节目标与奖励、引导步骤 | `tests/test_economy/test_knowledge/test_chapter/test_tutorial.gd` |
+| 存档 | 信封 v3 + SHA-256 + 原子写 tmp→校验→`.bak`→rename；主文件坏则回退 `.bak`；迁移注册表串联 v1→v2→v3（未知字段保留） | `tests/test_save.gd`：篡改检测、坏 JSON 拒绝、`.bak` 回退、往返一致、v1/v2 迁移（含 `scrap`→`gold`）、v4+ 拒绝 |
+| 经济/知识/章节/引导 | 金币 + XP、商店与配方、技能树四态、章节目标与奖励、引导步骤 | `tests/test_economy/test_knowledge/test_chapter/test_tutorial.gd` |
 | UI | 工作台（6 实验卡）、6 个实验页、知识树、商店、档案、诊断；点击式电路编辑器；波形与判读条 | `artifacts/shots/*.png`（workbench/shop/skills/archive/diagnostics + lab_level…lab_half_adder） |
 | 工程化 | `README.md`、5 篇 ADR、本文件、4 个 PowerShell 脚本、CI 草案、`native/` 脚手架 | 本文档与 `scripts/selfcheck.ps1` |
 
-### 2.1 自动测试构成（12 套件，902 项）
+### 2.1 自动测试构成（12 套件，920 项）
 
 `bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `black_box` / `lab_checks`
 
@@ -37,21 +37,22 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 | 2 | 门级仿真宿主允许 C++/Rust GDExtension | 纯 GDScript（`src/sim/`），≤200 门满足预算；`native/` 仅有脚手架、未编译 | 先保证可运行与可测；性能实测与原生移植列为需人工/后续 |
 | 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 按设计约束实现，**尚未实测**；超标策略"降速不丢事件"已体现在 `SimEngine` 的 tick 推进与单 tick 上限 | 未建立基准关；数值来自 `docs/simulation/06` 的估算 |
 | 4 | 内嵌 Linux、宿主编译器桥接（汇编/C/Java/Python）、沙箱进程隔离与资源限制 | 均未实现，仅有 ADR 设计（0004） | M1 范围克制在 L0–L1 |
-| 5 | 存档版本迁移 | 信封 v2 + **v1→v2 迁移已实现**（`SaveCodec.decode()` 对 `version=1` 的 legacy payload 自动升级，`migrated_from=1`，`tests/test_save.gd` 有断言）；**v2 之后的前向迁移框架未实现**（无注册式迁移器，新版本需手写分支），v3+ 存档被明确拒绝而非尝试迁移 | 只出现过一次结构调整；迁移框架需要版本数量支撑，提前做会过度设计 |
+| 5 | 存档版本迁移 | 信封 v3 + **迁移注册表**（`SaveCodec.MIGRATIONS`，v1→v2→v3 串联）；`tests/test_save.gd` 断言 `migrated_from=1/2`、`scrap`→`gold` 改名、未知字段保留；v4+ 存档被明确拒绝而非尝试迁移 | 只有一次结构调整时不做框架是克制；货币改名带来第二次结构变化，遂补注册式迁移器 |
 | 6 | 练习：文档 42 道、每题 ≥2 解 | 第一章 24 条 gate（每节 4 条）+ 黑盒多解验收（XOR 两种结构、半加器）；题库与逐题评分表未落地 | M1 只覆盖第一章 |
 | 7 | 电路编辑：设计台 HUD/自由布线（拖拽、吸附、撤销重做） | 点击式编辑器（点空白放门、点端口连线、右键断线/删门），不支持拖拽 | 先保证可操作与可判定 |
 | 8 | 引导浮层：原实现为右下浮动面板 | 会遮挡实验操作区；已改为标题栏下方文档流内横条（`main.gd::_build_tutorial`） | 浮层遮挡与"提示不覆盖工作台"的设计硬规则冲突 |
 | 9 | 截图（无明确后端要求） | 截图只能在 GUI 后端生成（headless 无渲染）；验收用窗口模式 1600×900 自动截图后退出 | headless 的 viewport 无纹理可读 |
 | 10 | 以 `--editor --quit` 作为可启动性检查 | 不会编译"运行时才 `load()`"的脚本，曾漏掉 `lab_binary.gd` 语法错误；已改为"跑 11 张截图 + 扫描日志 ERROR"作为可启动性冒烟 | 导入检查只覆盖被引用/被扫描到的资源 |
-| 11 | CH01 里程碑额外奖励 | CH01 里程碑不额外给废铁（奖励在 lab 的 `reward` 里）；章末 `complete_reward` 为 `scrap 0 / xp 50`，另由 `data/skilltree.json` 的 `CH01` 节点发放 `scrap_award 25 / xp_award 50` | 里程碑奖励与 lab 奖励分开配置，避免重复发放 |
-| 12 | 首位玩家初始资源 | 初始废铁 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_scrap/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
+| 11 | CH01 里程碑额外奖励 | CH01 里程碑不额外给金币（奖励在 lab 的 `reward` 里）；章末 `complete_reward` 为 `gold 0 / xp 50`，另由 `data/skilltree.json` 的 `CH01` 节点发放 `gold_award 25 / xp_award 50` | 里程碑奖励与 lab 奖励分开配置，避免重复发放 |
+| 12 | 首位玩家初始资源 | 初始金币 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_gold/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
+| 13 | 货币单位 | 货币单位曾是 `scrap`（废铁），已按负责人裁决改为 **`gold`（金币，单位 g）**；`scrap` 降级为普通材料/回收物（`kind=material`）；旧档通过存档 v3 迁移（`scrap`→`gold`）兼容 | 与 `docs/design/03` §3「金币 g」口径统一；单字货币让材料与通货语义混淆 |
 
-### 3.1 偏差 11 的数值组成（避免"25 废铁/50 XP"读成单一来源）
+### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
-- 六节 lab 奖励合计：`20+30+25+35+20+30 = 160` 废铁，`10+15+10+20+10+15 = 80` XP（`ch01_levels.json`）。
-- 章末 `complete_reward`：`scrap 0`、`xp 50`、`badge CH01-FIRST-ADDER`。
-- 章末 `Knowledge.unlock("CH01")`（`skilltree.json` 的 `CH01` 节点）：`scrap_award 25`、`xp_award 50`。
-- 合计章末额外：**25 废铁 / 100 XP**（50 来自 `complete_reward` + 50 来自节点）。
+- 六节 lab 奖励合计：`20+30+25+35+20+30 = 160` 金币，`10+15+10+20+10+15 = 80` XP（`ch01_levels.json`）。
+- 章末 `complete_reward`：`gold 0`、`xp 50`、`badge CH01-FIRST-ADDER`。
+- 章末 `Knowledge.unlock("CH01")`（`skilltree.json` 的 `CH01` 节点）：`gold_award 25`、`xp_award 50`。
+- 合计章末额外：**25 金币 / 100 XP**（50 来自 `complete_reward` + 50 来自节点）。
 
 ## 4. 未完成（需人工）/ 未完成
 
@@ -77,9 +78,9 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 
 | 冲突 | 文档侧 | 工程侧 | 建议 |
 |---|---|---|---|
-| 配方条数 | 早期盘点写"80 配方" | `data/economy/recipes.json` 实为 **77 条**；`tests/test_data.gd` 断言 `recipes >= 77` | 以数据为准；文档改为 77 或说明 3 条差异来源（需人工） |
-| gate 测试文件名 | `specs/m1/spec.md` §4.4.4 写 `tests/test_gate_cases.gd` | 实际由 `tests/test_lab_checks.gd` 覆盖 24 条 gate（无独立文件） | 改规格措辞或补文件（二选一，需人工） |
-| 货币命名 | `docs/design/03` §3 用"金币 g" | 工程与 UI 用"废铁 scrap" | 统一术语（文案层面），涉及只读文档需负责人确认 |
+| 配方条数 | 早期盘点写"80 配方" | `data/economy/recipes.json` 实为 **77 条**；`tests/test_data.gd` 断言 `recipes >= 77` | **已裁决：以实测 77 条为准**（04 表合计即 77；05 无配方计数）。历史上的 80 来源于早期盘点未按章节去重 |
+| gate 测试文件名 | `specs/m1/spec.md` §4.4.4 写 `tests/test_gate_cases.gd` | 实际由 `tests/test_lab_checks.gd` 覆盖 24 条 gate（无独立文件） | 已解决：规格措辞改为 `tests/test_lab_checks.gd`，并注明 24 条 gate 与黑盒多解均在该套件内 |
+| 货币命名 | `docs/design/03` §3 用"金币 g" | 工程、数据与 UI 已统一为"金币 g"（id `gold`）；废铁 `scrap` 仅为材料/回收物 | 已裁决并落地（偏差 13）；旧档经 v3 迁移兼容 |
 | 快照格式 | `docs/simulation/02` §8.1 `ifz-sim/1`（含 regs/memory/timers/next_seq） | `SimCircuit.snapshot()` 为 `ifz-circuit/1`（tick + wires + digest） | M1 无寄存器/内存，属合理子集；升 L3 时要换格式（ADR 0003 §5） |
 | 电路编辑交互 | `docs/design/03` §1.2：拖拽放置、吸附 24 px、直角绕线、`Z/Y` 撤销重做 50 步 | 点击式，无拖拽/无撤销 | 偏差 7；若坚持拖拽需单独立项 |
 | 引导位置 | 设计未明确要求浮动，但原实现浮在右下 | 已改为文档流横条（偏差 8） | 已解决，记录备查 |

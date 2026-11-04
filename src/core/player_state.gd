@@ -3,7 +3,7 @@ extends RefCounted
 
 ## 玩家全部可存档状态。不依赖场景树与 autoload，测试可直接构造。
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const XP_LEVELS := [0, 60, 160, 300, 520, 800]
 
 var save_version := SAVE_VERSION
@@ -11,7 +11,7 @@ var slot := 1
 var created_at := ""
 var updated_at := ""
 var chapter_id := "ch01"
-var scrap := 20
+var gold := 20
 var xp := 0
 var inventory: Dictionary = {}
 var knowledge: Dictionary = {}
@@ -30,13 +30,13 @@ func _init(seed_value_in: int = 1) -> void:
 	rng_seed = seed_value_in
 	_rng = DeterministicRng.new(seed_value_in)
 
-func add_scrap(n: int) -> void:
-	scrap = maxi(0, scrap + n)
+func add_gold(n: int) -> void:
+	gold = maxi(0, gold + n)
 
-func spend_scrap(n: int) -> bool:
-	if n < 0 or scrap < n:
+func spend_gold(n: int) -> bool:
+	if n < 0 or gold < n:
 		return false
-	scrap -= n
+	gold -= n
 	return true
 
 func add_xp(n: int) -> void:
@@ -137,7 +137,7 @@ func to_dict() -> Dictionary:
 		"created_at": created_at,
 		"updated_at": updated_at,
 		"chapter_id": chapter_id,
-		"scrap": scrap,
+		"gold": gold,
 		"xp": xp,
 		"inventory": inventory.duplicate(true),
 		"knowledge": knowledge.duplicate(true),
@@ -156,7 +156,8 @@ static func from_dict(d: Dictionary) -> PlayerState:
 	s.created_at = str(d.get("created_at", ""))
 	s.updated_at = str(d.get("updated_at", ""))
 	s.chapter_id = str(d.get("chapter_id", "ch01"))
-	s.scrap = int(d.get("scrap", 0))
+	var raw_gold: Variant = d.get("gold", d.get("scrap", 0))
+	s.gold = int(raw_gold)
 	s.xp = int(d.get("xp", 0))
 	s.inventory = _copy_int_dict(d.get("inventory", {}))
 	s.knowledge = _copy_bool_dict(d.get("knowledge", {}))

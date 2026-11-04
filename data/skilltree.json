@@ -13,7 +13,7 @@
     {"id": "CH01-4", "kind": "milestone", "tree": "progress", "title": "用门搭出异或", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "CH01-3"}, {"type": "gate", "id": "T1.4-4"}]}, "pos": {"col": 4, "row": 0}, "desc": "组合逻辑的黑盒验收与封装。"},
     {"id": "CH01-5", "kind": "milestone", "tree": "progress", "title": "延迟与毛刺", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "CH01-4"}, {"type": "gate", "id": "T1.5-4"}]}, "pos": {"col": 5, "row": 0}, "desc": "信号不是瞬时；竞争会产生毛刺。"},
     {"id": "CH01-6", "kind": "milestone", "tree": "progress", "title": "第一台加法器", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "CH01-5"}, {"type": "gate", "id": "T1.6-4"}]}, "pos": {"col": 6, "row": 0}, "desc": "S=A⊕B，C=A·B，封装成半加器。"},
-    {"id": "CH01", "kind": "milestone", "tree": "progress", "title": "第一章完成", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "CH01-6"}]}, "pos": {"col": 7, "row": 0}, "scrap_award": 25, "xp_award": 50, "desc": "从电压到半加器；下一章把半加器接成加法器与存储器。"},
+    {"id": "CH01", "kind": "milestone", "tree": "progress", "title": "第一章完成", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "CH01-6"}]}, "pos": {"col": 7, "row": 0}, "gold_award": 25, "xp_award": 50, "desc": "从电压到半加器；下一章把半加器接成加法器与存储器。"},
 
     {"id": "KN-ELEC-01", "kind": "knowledge", "tree": "knowledge", "title": "电压、电平与阈值", "level": 1, "prereq": [], "auto": true, "requires": {"all": [{"type": "gate", "id": "T1.1-4"}]}, "pos": {"col": 1, "row": 1}, "desc": "V_IL ≤ 0.8 V 判 0，V_IH ≥ 2.0 V 判 1，中间是禁区；阈值不是魔法。"},
     {"id": "KN-BIN-01", "kind": "knowledge", "tree": "knowledge", "title": "两种稳定状态", "level": 2, "prereq": [], "auto": true, "requires": {"all": [{"type": "gate", "id": "T1.2-1"}, {"type": "gate", "id": "T1.2-4"}]}, "pos": {"col": 2, "row": 1}, "desc": "用 0/1 编码信息；三进制在工程上为何更难。"},
@@ -38,7 +38,7 @@
     {"id": "SK-ENCAP", "kind": "skill", "tree": "skill", "title": "子电路封装", "level": 4, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "SK-GATE"}, {"type": "gate", "id": "T1.4-4"}]}, "pos": {"col": 4, "row": 6}, "desc": "把已验证拓扑固化成端口一致的宏单元。"},
     {"id": "SK-MEASURE", "kind": "skill", "tree": "skill", "title": "延迟测量", "level": 4, "prereq": [], "auto": true, "requires": {"all": [{"type": "node", "id": "SK-SIGNAL"}, {"type": "gate", "id": "T1.5-1"}]}, "pos": {"col": 5, "row": 6}, "desc": "用示波器/计时器测出稳定时间，而不是猜。"},
 
-    {"id": "voltage", "kind": "knowledge", "tree": "knowledge", "title": "电压与电平", "level": 1, "prereq": [], "auto": true, "legacy": true, "xp_award": 15, "scrap_award": 10, "desc": "旧版兼容节点：电压高低可映射为 0/1。"},
+    {"id": "voltage", "kind": "knowledge", "tree": "knowledge", "title": "电压与电平", "level": 1, "prereq": [], "auto": true, "legacy": true, "xp_award": 15, "gold_award": 10, "desc": "旧版兼容节点：电压高低可映射为 0/1。"},
     {"id": "binary", "kind": "knowledge", "tree": "knowledge", "title": "二进制", "level": 2, "prereq": ["voltage"], "auto": true, "legacy": true, "xp_award": 20, "desc": "旧版兼容节点。"},
     {"id": "boolean", "kind": "knowledge", "tree": "knowledge", "title": "布尔代数", "level": 2, "prereq": ["voltage"], "auto": true, "legacy": true, "xp_award": 20, "desc": "旧版兼容节点。"},
     {"id": "logic_gates", "kind": "knowledge", "tree": "knowledge", "title": "逻辑门", "level": 3, "prereq": ["boolean"], "auto": true, "legacy": true, "xp_award": 25, "desc": "旧版兼容节点。"},

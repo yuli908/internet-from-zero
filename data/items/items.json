@@ -2,7 +2,8 @@
   "version": 2,
   "generated_from": "docs/design/04-content-catalog.md v0.1",
   "items": [
-    {"id": "scrap", "name": "废铁", "layer": "CUR", "acquire": ["quest"], "price": 0, "craft_cost": 0, "craft_ops": 0, "recipe": [], "recipe_consume": true, "reusable": "permanent", "uses": [], "unlock_chapter": "CH01", "blueprint": false, "tags": ["currency"], "kind": "currency", "desc": "废土上流通的金属碎片，本作唯一货币。"},
+    {"id": "gold", "name": "金币", "layer": "CUR", "acquire": ["quest"], "price": 0, "craft_cost": 0, "craft_ops": 0, "recipe": [], "recipe_consume": true, "reusable": "permanent", "uses": [], "unlock_chapter": "CH01", "blueprint": false, "tags": ["currency"], "kind": "currency", "desc": "文明遗址里挖出的合金币，本作唯一货币，单位 g。"},
+    {"id": "scrap", "name": "废铁", "layer": "MAT", "acquire": ["quest", "salvage"], "price": 0, "craft_cost": 0, "craft_ops": 0, "recipe": [], "recipe_consume": true, "reusable": "permanent", "uses": [], "unlock_chapter": "CH01", "blueprint": false, "tags": ["material", "salvage"], "kind": "material", "desc": "废土上捡到的金属碎片，可回收或作合成材料。"},
 
     {"id": "M00", "name": "散件包（2 散件）", "layer": "L0", "acquire": ["shop"], "price": 10, "craft_cost": 7, "craft_ops": 1, "recipe": [], "recipe_consume": true, "reusable": "consumed", "uses": ["CH01", "CH19"], "unlock_chapter": "CH01", "blueprint": false, "tags": ["material"], "desc": "拆解废料得到的小零件包，是 L0 自造的材料源。"},
     {"id": "M01", "name": "电池 / 电源模块", "layer": "L0", "acquire": ["teach", "shop"], "price": 12, "craft_cost": 8, "craft_ops": 2, "recipe": [{"id": "M00", "qty": 2}], "recipe_consume": true, "reusable": "semi", "uses": ["CH01", "CH19"], "unlock_chapter": "CH01", "blueprint": false, "tags": ["power"], "bound_first": true, "desc": "提供 3.3 V 供电；第一章首件由教学赠送。"},

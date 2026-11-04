@@ -13,7 +13,7 @@ func unlock(id: String) -> Dictionary:
 		if str(res.get("kind", "knowledge")) == "skill":
 			EventBus.toast("技能解锁：%s（消耗 %d XP）" % [str(n.get("title", id)), int(res.get("cost_xp", 0))], "ok")
 		else:
-			EventBus.toast("知识解锁：%s（+%d XP / +%d 废铁）" % [str(n.get("title", id)), int(res.get("awarded_xp", 0)), int(res.get("awarded_scrap", 0))], "ok")
+			EventBus.toast("知识解锁：%s（+%d XP / +%d 金币）" % [str(n.get("title", id)), int(res.get("awarded_xp", 0)), int(res.get("awarded_gold", 0))], "ok")
 		EventBus.fire("knowledge_unlocked:%s" % id)
 	return res
 

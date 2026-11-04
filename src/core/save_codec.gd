@@ -4,9 +4,14 @@ extends RefCounted
 ## 存档编解码：版本号 + 校验和 + 迁移链。格式为信封包着 payload 字符串。
 ## 信封：{"fmt","version","algo","checksum","payload"}，payload 是 JSON 字符串。
 
-const FORMAT_VERSION := 2
+const FORMAT_VERSION := 3
 const ENVELOPE_FMT := "internet-from-zero.save"
 const ALGO := "sha256"
+## 迁移注册表：起点版本 → 迁移函数名。迁移器必须自带推进 version（v1→v2→v3 串联）。
+const MIGRATIONS := {
+	1: "_migrate_v1_to_v2",
+	2: "_migrate_2_to_3",
+}
 
 static func encode(state: PlayerState) -> String:
 	return encode_payload(state.to_dict())
@@ -80,11 +85,13 @@ static func migrate(payload: Dictionary) -> Dictionary:
 		guard += 1
 		if guard > 16:
 			return _fail("迁移链过长，已中止")
-		match v:
-			1:
-				p = _migrate_v1_to_v2(p)
-			_:
-				return _fail("没有 v%d 的迁移器" % v)
+		var migrator := str(MIGRATIONS.get(v, ""))
+		if migrator.is_empty():
+			return _fail("没有 v%d 的迁移器" % v)
+		var migrated := _apply_migration(migrator, p)
+		if not bool(migrated.get("ok", false)):
+			return migrated
+		p = migrated.payload
 		var nv := int(p.get("version", 0))
 		if nv <= v:
 			return _fail("迁移器没有推进版本号（v%d）" % v)
@@ -120,6 +127,32 @@ static func _migrate_v1_to_v2(p: Dictionary) -> Dictionary:
 	if not out.has("xp"):
 		out["xp"] = 0
 	return out
+
+static func _apply_migration(name: String, p: Dictionary) -> Dictionary:
+	match name:
+		"_migrate_v1_to_v2":
+			return {"ok": true, "error": "", "payload": _migrate_v1_to_v2(p)}
+		"_migrate_2_to_3":
+			return {"ok": true, "error": "", "payload": _migrate_2_to_3(p)}
+	return _fail("未知迁移器 %s" % name)
+
+## v2 → v3：货币 scrap 改名为 gold，未知字段原样保留。
+static func _migrate_2_to_3(p: Dictionary) -> Dictionary:
+	var out := p.duplicate(true)
+	_rename_scrap_to_gold(out)
+	var inner: Variant = out.get("player", null)
+	if inner is Dictionary:
+		_rename_scrap_to_gold(inner)
+	out["version"] = 3
+	return out
+
+static func _rename_scrap_to_gold(d: Dictionary) -> void:
+	if d.has("scrap"):
+		if not d.has("gold"):
+			d["gold"] = d["scrap"]
+		d.erase("scrap")
+	if not d.has("gold"):
+		d["gold"] = 0
 
 static func _fail(msg: String) -> Dictionary:
 	return {"ok": false, "error": msg, "payload": {}, "version": 0, "migrated_from": 0}

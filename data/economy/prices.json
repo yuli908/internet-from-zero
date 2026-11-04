@@ -1,7 +1,7 @@
 {
   "version": 2,
   "source": "docs/design/05-economy.md",
-  "currency": "scrap",
+  "currency": "gold",
   "sell_ratio": 0.3,
   "buy": {
     "M00": 10,

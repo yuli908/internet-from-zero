@@ -102,11 +102,11 @@ internet_from_zero/
 | 文件 | 内容 |
 |---|---|
 | `data/manifest.json` | 版本 2，8 个数据文件清单 |
-| `data/items/items.json` | 85 项（77 文档物品 + 7 旧别名 + `scrap` 货币） |
+| `data/items/items.json` | 86 项（77 文档物品 + 7 旧别名 + `gold` 货币 + `scrap` 材料） |
 | `data/economy/prices.json` | 37 项买价 / 61 项回收价 |
 | `data/economy/recipes.json` | 77 条配方（`output` + `output_qty` 结构） |
 | `data/skilltree.json` | 36 节点 = 7 里程碑 + 19 知识卡 + 10 技能 |
-| `data/chapters/ch01_levels.json` | 6 个实验 / 24 条 gate；初始 `scrap=120`、初始物品 `M01/M09` 各 1 |
+| `data/chapters/ch01_levels.json` | 6 个实验 / 24 条 gate；初始 `gold=120`、初始物品 `M01/M09` 各 1 |
 | `data/labs/ch01_labs.json` | 6 节实验配置（阈值、目标值、门任务、毛刺参数、真值表、gate 用例） |
 | `data/sim/delays.json` | 门延迟 buf/not=1、nand/nor=2、and/or=3、xor=4、xnor=5；DFF setup=2/hold=1/clk_to_q=2；帧 60 FPS / 5 ms / 4 tick；上限 200 门 / 200 DFF；继电器 3 tick/级 |
 | `data/tutorial.json` | 引导脚本（标题栏下方文档流内的横条，不遮挡实验区） |

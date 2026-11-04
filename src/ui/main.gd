@@ -25,7 +25,7 @@ var _current := ""
 var _host: MarginContainer
 var _page: VBoxContainer
 var _status_label: Label
-var _stat_scrap: Label
+var _stat_gold: Label
 var _stat_xp: Label
 var _stat_knowledge: Label
 var _stat_level: Label
@@ -106,8 +106,8 @@ func _build_header() -> PanelContainer:
 	var stats := Ui.hbox(18)
 	stats.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(stats)
-	stats.add_child(Ui.stat("废铁", "0", UiTheme.AMBER))
-	_stat_scrap = stats.get_child(stats.get_child_count() - 1).get_child(1)
+	stats.add_child(Ui.stat("金币", "0", UiTheme.AMBER))
+	_stat_gold = stats.get_child(stats.get_child_count() - 1).get_child(1)
 	stats.add_child(Ui.stat("等级", "Lv 1", UiTheme.ACCENT))
 	_stat_level = stats.get_child(stats.get_child_count() - 1).get_child(1)
 	stats.add_child(Ui.stat("经验", "0", UiTheme.OK))
@@ -209,7 +209,7 @@ func _refresh_all() -> void:
 	var p := GameState.player
 	if p == null:
 		return
-	_stat_scrap.text = str(p.scrap)
+	_stat_gold.text = str(p.gold)
 	_stat_level.text = "Lv %d" % p.level()
 	if p.xp_for_next_level() > 0:
 		_stat_xp.text = "%d / %d" % [p.xp_into_level(), p.xp_for_next_level()]

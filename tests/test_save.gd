@@ -2,7 +2,7 @@ extends RefCounted
 
 func run(ctx: TestContext) -> void:
 	var st := PlayerState.new(42)
-	st.scrap = 77
+	st.gold = 77
 	st.xp = 33
 	st.add_item("wire", 2)
 	st.grant_knowledge("voltage")
@@ -14,11 +14,11 @@ func run(ctx: TestContext) -> void:
 	ctx.check("save text non-empty", text.length() > 100)
 	var dec := SaveCodec.decode(text)
 	ctx.check("decode ok", bool(dec["ok"]), str(dec["error"]))
-	ctx.eq("decoded version", int(dec["version"]), 2)
+	ctx.eq("decoded version", int(dec["version"]), 3)
 	ctx.eq("not migrated", int(dec["migrated_from"]), 0)
 
 	var st2 := PlayerState.from_dict(dec["payload"])
-	ctx.eq("scrap roundtrip", st2.scrap, 77)
+	ctx.eq("gold roundtrip", st2.gold, 77)
 	ctx.eq("xp roundtrip", st2.xp, 33)
 	ctx.eq("item roundtrip", st2.item_count("wire"), 2)
 	ctx.check("knowledge roundtrip", st2.has_knowledge("voltage"))
@@ -29,7 +29,7 @@ func run(ctx: TestContext) -> void:
 	var payload_str := JSON.stringify(st.to_dict(), "", true)
 	var env := {
 		"fmt": SaveCodec.ENVELOPE_FMT,
-		"version": 2,
+		"version": 3,
 		"algo": "sha256",
 		"checksum": "deadbeef",
 		"payload": payload_str,
@@ -55,21 +55,67 @@ func run(ctx: TestContext) -> void:
 	var migrated := SaveCodec.decode(legacy_text)
 	ctx.check("legacy decode", bool(migrated["ok"]), str(migrated["error"]))
 	ctx.eq("migrated from v1", int(migrated["migrated_from"]), 1)
-	ctx.eq("migrated version", int(migrated["payload"]["version"]), 2)
+	ctx.eq("migrated version", int(migrated["payload"]["version"]), 3)
 	var lst := PlayerState.from_dict(migrated["payload"])
-	ctx.eq("legacy scrap", lst.scrap, 12)
+	ctx.eq("legacy gold", lst.gold, 12)
 	ctx.eq("legacy wire", lst.item_count("wire"), 2)
 	ctx.check("legacy knowledge", lst.has_knowledge("voltage"))
 	ctx.check("legacy defaults labs", lst.labs_completed.is_empty())
 	ctx.eq("legacy rng seed default", lst.rng_seed, 1)
 
-	var newer := SaveCodec.encode_payload({"version": 3, "scrap": 1}, 3)
+	var newer := SaveCodec.encode_payload({"version": 4, "gold": 1}, 4)
 	var nres := SaveCodec.decode(newer)
 	ctx.check("newer version rejected", not bool(nres["ok"]))
 	ctx.check("newer message", str(nres["error"]).contains("高于"))
 
+	_test_v2_migration(ctx)
 	_test_store(ctx)
 	_test_determinism(ctx)
+
+func _test_v2_migration(ctx: TestContext) -> void:
+	# v2 存档：货币键仍是 scrap，且带一个 v3 不认识的字段。
+	var v2 := {
+		"version": 2,
+		"scrap": 45,
+		"xp": 12,
+		"inventory": {"wire": 3},
+		"legacy_extra": 7,
+	}
+	var res := SaveCodec.decode(SaveCodec.encode_payload(v2, 2))
+	ctx.check("v2 decode ok", bool(res["ok"]), str(res["error"]))
+	ctx.eq("v2 migrated_from", int(res["migrated_from"]), 2)
+	ctx.eq("v2 migrated version", int(res["payload"]["version"]), 3)
+	ctx.check("v2 scrap key renamed", not (res["payload"] as Dictionary).has("scrap"))
+	ctx.eq("v2 gold from scrap", int(res["payload"].get("gold", -1)), 45)
+	ctx.eq("v2 unknown field kept", int(res["payload"].get("legacy_extra", -1)), 7)
+	var st := PlayerState.from_dict(res["payload"])
+	ctx.eq("v2 gold loaded", st.gold, 45)
+	ctx.eq("v2 inventory loaded", st.item_count("wire"), 3)
+
+	# v2 存档中的进度（gate flags / 知识 / 目标）迁移后不得丢失。
+	var progress := PlayerState.new(3)
+	progress.gold = 88
+	progress.set_flag("gate:T1.1-4", true)
+	progress.set_flag("lab:level", true)
+	progress.set_flag("chapter_reward:ch01", true)
+	progress.grant_knowledge("voltage")
+	progress.grant_knowledge("KN-ELEC-01")
+	progress.complete_objective("obj_level")
+	progress.mark_lab_completed("level")
+	var snapshot := progress.to_dict()
+	snapshot["version"] = 2
+	snapshot["scrap"] = snapshot.get("gold", 0)
+	snapshot.erase("gold")
+	var kept := SaveCodec.decode(SaveCodec.encode_payload(snapshot, 2))
+	ctx.check("v2 progress decode ok", bool(kept["ok"]), str(kept["error"]))
+	var restored := PlayerState.from_dict(kept["payload"])
+	ctx.eq("v2 progress gold", restored.gold, 88)
+	ctx.check("v2 progress gate flag kept", bool(restored.get_flag("gate:T1.1-4", false)))
+	ctx.check("v2 progress lab flag kept", bool(restored.get_flag("lab:level", false)))
+	ctx.check("v2 progress chapter flag kept", bool(restored.get_flag("chapter_reward:ch01", false)))
+	ctx.check("v2 progress knowledge kept", restored.has_knowledge("voltage") and restored.has_knowledge("KN-ELEC-01"))
+	ctx.check("v2 progress objective kept", restored.is_objective_done("obj_level"))
+	ctx.check("v2 progress lab kept", restored.is_lab_completed("level"))
 
 func _test_store(ctx: TestContext) -> void:
 	var store := SaveStore.new("user://test_saves")
@@ -79,22 +125,22 @@ func _test_store(ctx: TestContext) -> void:
 			DirAccess.remove_absolute(p)
 
 	var s1 := PlayerState.new()
-	s1.scrap = 10
+	s1.gold = 10
 	s1.add_item("wire", 1)
 	var w := store.save(s1, 1)
 	ctx.check("store save ok", bool(w["ok"]), str(w["error"]))
 	ctx.check("slot file exists", FileAccess.file_exists(store.slot_path(1)))
 	var info := store.slot_info(1)
 	ctx.check("slot info ok", bool(info["ok"]), str(info["error"]))
-	ctx.eq("slot info scrap", int(info["scrap"]), 10)
+	ctx.eq("slot info gold", int(info["gold"]), 10)
 
 	var loaded := store.load_slot(1)
 	ctx.check("store load ok", bool(loaded["ok"]), str(loaded["error"]))
-	ctx.eq("store load scrap", loaded["state"].scrap, 10)
+	ctx.eq("store load gold", loaded["state"].gold, 10)
 	ctx.eq("store load wire", loaded["state"].item_count("wire"), 1)
 	ctx.check("no backup used", not bool(loaded["used_backup"]))
 
-	s1.scrap = 999
+	s1.gold = 999
 	s1.add_item("wire", 5)
 	var w2 := store.save(s1, 1)
 	ctx.check("second save ok", bool(w2["ok"]))
@@ -106,7 +152,7 @@ func _test_store(ctx: TestContext) -> void:
 	var recovered := store.load_slot(1)
 	ctx.check("backup recovery ok", bool(recovered["ok"]), str(recovered["error"]))
 	ctx.check("backup flag", bool(recovered["used_backup"]))
-	ctx.eq("recovered stale scrap", recovered["state"].scrap, 10)
+	ctx.eq("recovered stale gold", recovered["state"].gold, 10)
 	ctx.check("primary error reported", str(recovered.get("primary_error", "")).contains("失败"))
 
 	var bad_info := store.slot_info(1)

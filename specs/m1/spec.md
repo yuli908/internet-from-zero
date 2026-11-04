@@ -110,7 +110,7 @@
 1. 更新旧测试：`tests/test_data.gd`（manifest 8；非 legacy 77；配方完整性；节点四态条件；6 实验/24 用例）、`test_chapter`、`test_economy`、`test_knowledge`、`test_save`、`test_tutorial`（按新 API）。
 2. 新增 `tests/test_sim.gd`：Kleene 表、AND/OR/XOR/NAND/NOR/XNOR 真值、`SimEngine` 同 tick 顺序、1 vs 4 tick/帧结果一致、snapshot/restore、digest 稳定、毛刺宽度。
 3. 新增 `tests/test_black_box.gd`：AND/OR/NOT/XOR/半加器多解通过；错误拓扑失败；`signature` 区分结构。
-4. 新增 `tests/test_gate_cases.gd`：对 6 节各构造「正确解」与「错误解」，`LabChecks.*` required 全过/失败；覆盖 24 个 case id。
+4. 新增 `tests/test_lab_checks.gd`：对 6 节各构造「正确解」与「错误解」，`LabChecks.*` required 全过/失败；覆盖 24 个 case id。24 条 gate 的通过/失败路径 + 黑盒多解均在该套件内。
 5. 新增 `tests/data/ref_vectors.json` + `tools/gen_ref_vectors.py`：从 `docs/simulation/ref` 导出真值向量；测试逐条与 `SimCircuit` 结果比较（同向量一致）。
 6. `tests/run_tests.gd` 注册新套件；`tests/test_util.gd` 如需补读取 ref_vectors。
 
@@ -139,7 +139,7 @@ $godot = "C:\tools\godot-4.4.1\godot.cmd"
 - 启动日志 `IFZ_BOOT data_ok=true`，无脚本解析错误、无资源缺失、无 `ERROR:`。
 - 测试 `ALL PASS`，含 ref 向量一致。
 - 6 节 gate 用例在 UI 中可执行；通过后知识树节点变 `completed`、gate flags 入库。
-- 存档保存/读取往返后 `scrap/xp/inventory/flags/knowledge` 一致。
+- 存档保存/读取往返后 `gold/xp/inventory/flags/knowledge` 一致。
 
 ## 6. 计划内偏差（写入 `docs/PROGRESS.md`）
 

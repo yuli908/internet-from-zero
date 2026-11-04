@@ -108,14 +108,14 @@ func _slot_card(slot: int) -> PanelContainer:
 	head.add_child(Ui.label(_fmt_time(info) if exists else "—", 11, UiTheme.MUTED))
 
 	var lv_text := "—"
-	var scrap_text := "—"
+	var gold_text := "—"
 	var chapter_text := "—"
 	var obj_text := "—"
 	var know_text := "—"
 	if exists:
 		var xp := int(info.get("xp", 0))
 		lv_text = "Lv %d" % _level_from_xp(xp)
-		scrap_text = str(int(info.get("scrap", 0)))
+		gold_text = str(int(info.get("gold", 0)))
 		var cid := str(info.get("chapter_id", ""))
 		if not cid.is_empty():
 			chapter_text = cid
@@ -125,7 +125,7 @@ func _slot_card(slot: int) -> PanelContainer:
 	var stats := Ui.hbox(20)
 	col.add_child(stats)
 	stats.add_child(Ui.stat("等级", lv_text, UiTheme.ACCENT))
-	stats.add_child(Ui.stat("废铁", scrap_text, UiTheme.AMBER))
+	stats.add_child(Ui.stat("金币", gold_text, UiTheme.AMBER))
 	stats.add_child(Ui.stat("章节", chapter_text))
 	stats.add_child(Ui.stat("目标进度", obj_text))
 	stats.add_child(Ui.stat("知识", know_text))

@@ -92,7 +92,7 @@ func _chapter_block() -> PanelContainer:
 	head.add_child(Ui.mono(_chapter_id(), 17, UiTheme.ACCENT))
 	head.add_child(Ui.label(_chapter_title(), 15, UiTheme.TEXT))
 	head.add_child(Ui.spacer())
-	head.add_child(Ui.stat("起始废铁", _start_scrap()))
+	head.add_child(Ui.stat("起始金币", _start_gold()))
 	head.add_child(Ui.stat("目标进度", "%d / %d" % [int(cp.get("done", 0)), int(cp.get("total", 0))], UiTheme.OK))
 
 	col.add_child(_lab_header())
@@ -188,7 +188,7 @@ func _system_block() -> PanelContainer:
 	var slot_text := "槽位 1 · 空"
 	var slot_color := UiTheme.MUTED
 	if info_ok:
-		slot_text = "槽位 1 · %s · %d 废铁 · Lv %d · %s" % [_fmt_time(info), int(info.get("scrap", 0)), _level_from_xp(int(info.get("xp", 0))), str(info.get("chapter_id", "—"))]
+		slot_text = "槽位 1 · %s · %d 金币 · Lv %d · %s" % [_fmt_time(info), int(info.get("gold", 0)), _level_from_xp(int(info.get("xp", 0))), str(info.get("chapter_id", "—"))]
 		slot_color = UiTheme.OK
 	else:
 		var err := str(info.get("error", ""))
@@ -242,10 +242,10 @@ func _chapter_title() -> String:
 		return "—"
 	return t
 
-func _start_scrap() -> String:
+func _start_gold() -> String:
 	if DataDB.chapter == null:
 		return "—"
-	var raw: Variant = DataDB.chapter.data.get("start_scrap", null)
+	var raw: Variant = DataDB.chapter.data.get("start_gold", null)
 	if raw == null:
 		return "—"
 	return str(raw)

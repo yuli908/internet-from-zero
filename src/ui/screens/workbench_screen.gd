@@ -167,7 +167,7 @@ func _refresh_list() -> void:
 		if not unlocked:
 			col.add_child(Ui.label("需先完成：%s" % ChapterFlow.lab_lock_reason(lid), 10, UiTheme.DANGER))
 		else:
-			col.add_child(Ui.label("gate %d / %d · 奖励 %d 废铁 / %d XP" % [passed, gate_ids.size(), int(lab.get("reward", {}).get("scrap", 0)), int(lab.get("reward", {}).get("xp", 0))], 10, UiTheme.MUTED))
+			col.add_child(Ui.label("gate %d / %d · 奖励 %d 金币 / %d XP" % [passed, gate_ids.size(), int(lab.get("reward", {}).get("gold", 0)), int(lab.get("reward", {}).get("xp", 0))], 10, UiTheme.MUTED))
 		_list.add_child(card)
 	var nxt := ChapterFlow.next_objective()
 	if nxt.is_empty():

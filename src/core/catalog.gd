@@ -6,7 +6,7 @@ extends RefCounted
 var items: Dictionary = {}
 var buy_prices: Dictionary = {}
 var sell_prices: Dictionary = {}
-var currency := "scrap"
+var currency := "gold"
 var recipes: Dictionary = {}
 var recipe_order: Array = []
 var item_order: Array = []
@@ -26,7 +26,7 @@ static func from_data(items_doc: Dictionary, prices_doc: Dictionary, recipes_doc
 	var sell_doc: Dictionary = prices_doc.get("sell", {})
 	for k in sell_doc.keys():
 		c.sell_prices[str(k)] = int(sell_doc[k])
-	c.currency = str(prices_doc.get("currency", "scrap"))
+	c.currency = str(prices_doc.get("currency", "gold"))
 	for raw in recipes_doc.get("recipes", []):
 		if raw is Dictionary:
 			var r: Dictionary = raw

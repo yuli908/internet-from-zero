@@ -16,7 +16,7 @@ func price_of(item_id: String) -> int:
 func buy(item_id: String, qty: int = 1) -> Dictionary:
 	var res := EconomyCore.buy(GameState.player, DataDB.catalog, DataDB.skill_nodes(), item_id, qty)
 	if bool(res.get("ok", false)):
-		EventBus.toast("购买 %s ×%d（-%d 废铁）" % [DataDB.catalog.item_name(item_id), qty, int(res.get("cost", 0))], "ok")
+		EventBus.toast("购买 %s ×%d（-%d 金币）" % [DataDB.catalog.item_name(item_id), qty, int(res.get("cost", 0))], "ok")
 		EventBus.economy_changed.emit()
 		EventBus.state_changed.emit()
 	else:
@@ -26,7 +26,7 @@ func buy(item_id: String, qty: int = 1) -> Dictionary:
 func sell(item_id: String, qty: int = 1) -> Dictionary:
 	var res := EconomyCore.sell(GameState.player, DataDB.catalog, item_id, qty)
 	if bool(res.get("ok", false)):
-		EventBus.toast("出售 %s ×%d（+%d 废铁）" % [DataDB.catalog.item_name(item_id), qty, int(res.get("gain", 0))], "ok")
+		EventBus.toast("出售 %s ×%d（+%d 金币）" % [DataDB.catalog.item_name(item_id), qty, int(res.get("gain", 0))], "ok")
 		EventBus.economy_changed.emit()
 		EventBus.state_changed.emit()
 	else:

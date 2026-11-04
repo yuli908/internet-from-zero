@@ -56,8 +56,8 @@ func requires(lab_id: String) -> Array:
 		return []
 	return [str(v)]
 
-func start_scrap() -> int:
-	return int(data.get("start_scrap", 0))
+func start_gold() -> int:
+	return int(data.get("start_gold", 0))
 
 func start_items() -> Dictionary:
 	return data.get("start_items", {})

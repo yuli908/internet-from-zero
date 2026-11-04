@@ -10,7 +10,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 19)
 
 	var st := PlayerState.new()
-	st.scrap = 0
+	st.gold = 0
 	ctx.eq("CH01-1 locked before gate", kg.node_state(st, "CH01-1"), "locked")
 	ctx.check("CH01-1 cannot unlock", not bool(kg.can_unlock(st, "CH01-1").get("ok", false)))
 	st.set_flag("gate:T1.1-4", true)
@@ -18,7 +18,7 @@ func run(ctx: TestContext) -> void:
 	var u1 := kg.unlock(st, "CH01-1")
 	ctx.check("CH01-1 unlock", bool(u1.get("ok", false)), str(u1.get("error", "")))
 	ctx.eq("CH01-1 completed", kg.node_state(st, "CH01-1"), "completed")
-	ctx.eq("milestone no scrap", st.scrap, 0)
+	ctx.eq("milestone no gold", st.gold, 0)
 
 	ctx.eq("CH01-2 locked before node", kg.node_state(st, "CH01-2"), "locked")
 	st.set_flag("gate:T1.2-4", true)
@@ -31,16 +31,16 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("CH01 available", kg.node_state(st, "CH01"), "available")
 	var u2 := kg.unlock(st, "CH01")
 	ctx.check("CH01 unlock", bool(u2.get("ok", false)))
-	ctx.eq("chapter scrap award", st.scrap, 25)
+	ctx.eq("chapter gold award", st.gold, 25)
 	ctx.eq("chapter xp award", st.xp, 50)
 
 	var legacy := PlayerState.new()
-	legacy.scrap = 0
+	legacy.gold = 0
 	ctx.eq("legacy voltage available", kg.node_state(legacy, "voltage"), "available")
 	ctx.eq("legacy binary locked", kg.node_state(legacy, "binary"), "locked")
 	var uv := kg.unlock(legacy, "voltage")
 	ctx.check("legacy voltage unlock", bool(uv.get("ok", false)))
-	ctx.eq("legacy voltage scrap", legacy.scrap, 10)
+	ctx.eq("legacy voltage gold", legacy.gold, 10)
 	ctx.eq("legacy voltage xp", legacy.xp, 15)
 	ctx.eq("legacy binary now available", kg.node_state(legacy, "binary"), "available")
 

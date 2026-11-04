@@ -91,7 +91,7 @@ func slot_info(slot: int) -> Dictionary:
 		"ok": true, "error": "", "path": path,
 		"updated_at": str(p.get("updated_at", "")),
 		"chapter_id": str(p.get("chapter_id", "")),
-		"scrap": int(p.get("scrap", 0)),
+		"gold": int(p.get("gold", 0)),
 		"xp": int(p.get("xp", 0)),
 		"knowledge": int((p.get("knowledge", {}) as Dictionary).size()),
 		"objectives": int((p.get("objectives", {}) as Dictionary).size()),

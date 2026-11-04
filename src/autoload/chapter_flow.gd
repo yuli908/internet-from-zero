@@ -24,7 +24,7 @@ func complete_lab(lab_id: String) -> Dictionary:
 	if bool(res.get("newly", false)):
 		var reward: Dictionary = lab.get("reward", {})
 		if not p.has_flag("lab_reward:%s" % lab_id):
-			p.add_scrap(int(reward.get("scrap", 0)))
+			p.add_gold(int(reward.get("gold", 0)))
 			p.add_xp(int(reward.get("xp", 0)))
 			p.set_flag("lab_reward:%s" % lab_id, true)
 		var k := str(lab.get("knowledge", ""))
@@ -44,7 +44,7 @@ func complete_lab(lab_id: String) -> Dictionary:
 		EventBus.lab_completed.emit(lab_id)
 		EventBus.objective_completed.emit(obj_id)
 		var title := str(runtime().objective(obj_id).get("title", obj_id))
-		EventBus.toast("实验完成：%s（+%d 废铁 / +%d XP）" % [title, int(reward.get("scrap", 0)), int(reward.get("xp", 0))], "ok")
+		EventBus.toast("实验完成：%s（+%d 金币 / +%d XP）" % [title, int(reward.get("gold", 0)), int(reward.get("xp", 0))], "ok")
 		EventBus.state_changed.emit()
 		if bool(res.get("all_done", false)):
 			_finish_chapter()
@@ -59,7 +59,7 @@ func _finish_chapter() -> void:
 	p.set_flag(key, true)
 	p.set_flag("chapter_complete:%s" % runtime().id(), true)
 	var reward: Dictionary = runtime().data.get("complete_reward", {})
-	p.add_scrap(int(reward.get("scrap", 0)))
+	p.add_gold(int(reward.get("gold", 0)))
 	p.add_xp(int(reward.get("xp", 0)))
 	Knowledge.unlock("CH01")
 	EventBus.chapter_completed.emit(runtime().id())

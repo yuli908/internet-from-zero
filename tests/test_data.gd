@@ -11,12 +11,12 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 8)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
-	ctx.eq("items total", cat.items.size(), 85)
+	ctx.eq("items total", cat.items.size(), 86)
 	var doc_items := 0
 	var legacy := 0
 	for raw_id in cat.item_order:
 		var it: Dictionary = cat.item(str(raw_id))
-		if str(raw_id) == "scrap":
+		if str(raw_id) == "scrap" or str(raw_id) == "gold":
 			continue
 		if bool(it.get("legacy", false)):
 			legacy += 1
@@ -24,11 +24,12 @@ func run(ctx: TestContext) -> void:
 			doc_items += 1
 	ctx.eq("doc items (non-legacy)", doc_items, 77)
 	ctx.eq("legacy aliases", legacy, 7)
-	ctx.check("scrap is currency", cat.is_currency("scrap"))
+	ctx.check("gold is currency", cat.is_currency("gold"))
+	ctx.check("scrap is not currency", not cat.is_currency("scrap"))
 	for raw_id in cat.item_order:
 		ctx.check("item %s has name" % str(raw_id), not str(cat.item(str(raw_id)).get("name", "")).is_empty())
 
-	ctx.eq("currency", cat.currency, "scrap")
+	ctx.eq("currency", cat.currency, "gold")
 	for raw_id in cat.buy_prices.keys():
 		ctx.check("buy ref %s exists" % str(raw_id), cat.items.has(str(raw_id)))
 	for raw_id in cat.sell_prices.keys():
@@ -46,7 +47,7 @@ func run(ctx: TestContext) -> void:
 		var out_id := str(r.get("output", ""))
 		ctx.check("recipe %s output exists" % rid, out_id.is_empty() or cat.items.has(out_id), out_id)
 		for iid in r.get("inputs", {}).keys():
-			ctx.check("recipe %s input %s" % [rid, str(iid)], cat.items.has(str(iid)) or str(iid) == "scrap")
+			ctx.check("recipe %s input %s" % [rid, str(iid)], cat.items.has(str(iid)))
 		for iid in r.get("key_items", {}).keys():
 			ctx.check("recipe %s key %s" % [rid, str(iid)], cat.items.has(str(iid)))
 		var need := str(r.get("requires_skill", "")) if r.get("requires_skill", null) != null else ""
@@ -63,7 +64,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("legacy voltage exists", kg.nodes.has("voltage"))
 
 	ctx.eq("chapter id", ch.id(), "ch01")
-	ctx.eq("start scrap", ch.start_scrap(), 120)
+	ctx.eq("start gold", ch.start_gold(), 120)
 	ctx.eq("labs", ch.lab_order.size(), 6)
 	ctx.eq("objectives", ch.objectives.size(), 6)
 	ctx.eq("start items", ch.start_items().size(), 2)

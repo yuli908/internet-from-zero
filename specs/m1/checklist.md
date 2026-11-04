@@ -9,7 +9,7 @@
 
 ## B. 数据驱动
 - [x] B1 `data/manifest.json` 列出 8 个数据文件、version=2（`tests/test_data.gd`）。
-- [x] B2 物品 85 项（77 正式 + 7 旧别名 + scrap），价格/配方引用的物品全部存在（`tests/test_data/test_economy.gd`）。
+- [x] B2 物品 86 项（77 正式 + 7 旧别名 + gold 货币 + scrap 材料），价格/配方引用的物品全部存在（`tests/test_data/test_economy.gd`）。
 - [x] B3 技能/知识树 36 节点（里程碑 7 / 知识卡 19 / 技能 10）（`tests/test_data.gd`）。
 - [x] B4 第一章 6 实验、24 条 gate、每节 4 条且与 `gate_ids` 一致（`tests/test_data.gd`）。
 - [x] B5 价格与奖励均从 JSON 读取（`Catalog.buy_price/sell_price`、`ch01_levels.json` 的 `reward`）。
