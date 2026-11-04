@@ -1,5 +1,30 @@
 extends RefCounted
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 120
+const EXPECT_GROUPS := {
+	"encode_decode": 4, "payload_roundtrip": 7, "tamper": 2, "broken_envelope": 2,
+	"legacy_v1": 8, "newer_version": 2, "v2_migration": 8, "v2_progress": 8,
+	"migration_registry": 4, "migration_chain": 8, "fixture_v1": 25,
+	"fixture_v2": 23, "store_slot": 17, "determinism": 2,
+}
+const GROUP_DESCRIPTIONS := {
+	"encode_decode": "存档文本非空、解码成功、版本 3、无迁移来源",
+	"payload_roundtrip": "金币/经验/物品/知识/目标/flag/rng 状态往返一致",
+	"tamper": "篡改 payload 后校验和失败并提示校验和",
+	"broken_envelope": "非 JSON 文本被拒并提示 JSON",
+	"legacy_v1": "v1 存档迁移到 v3 后的字段落位与缺省值",
+	"newer_version": "高于当前格式版本的存档被拒并提示",
+	"v2_migration": "v2 的 scrap 键改名 gold、未知字段保留、载入结果",
+	"v2_progress": "v2 存档中的 gate/lab/chapter flag、知识、目标、lab 进度不丢",
+	"migration_registry": "迁移表覆盖且无错、当前版本直接放行",
+	"migration_chain": "旧版本逐级迁移到当前版本且 from 回报正确",
+	"fixture_v1": "legacy_v1.json 夹具经槽位载入后的全部字段与统计",
+	"fixture_v2": "legacy_v2.json 夹具经槽位载入后的全部字段与统计",
+	"store_slot": "槽位存/读/备份/恢复/删除与损坏槽位处理",
+	"determinism": "同种子同掷点、序列化后 rng 状态可续",
+}
+
 func run(ctx: TestContext) -> void:
 	var st := PlayerState.new(42)
 	st.gold = 77
@@ -10,6 +35,7 @@ func run(ctx: TestContext) -> void:
 	st.mark_lab_completed("level")
 	st.set_flag("chapter_reward:ch01", true)
 
+	ctx.begin_group("encode_decode")
 	var text := SaveCodec.encode(st)
 	ctx.check("save text non-empty", text.length() > 100)
 	var dec := SaveCodec.decode(text)
@@ -17,6 +43,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("decoded version", int(dec["version"]), 3)
 	ctx.eq("not migrated", int(dec["migrated_from"]), 0)
 
+	ctx.begin_group("payload_roundtrip")
 	var st2 := PlayerState.from_dict(dec["payload"])
 	ctx.eq("gold roundtrip", st2.gold, 77)
 	ctx.eq("xp roundtrip", st2.xp, 33)
@@ -34,10 +61,12 @@ func run(ctx: TestContext) -> void:
 		"checksum": "deadbeef",
 		"payload": payload_str,
 	}
+	ctx.begin_group("tamper")
 	var tampered := SaveCodec.decode(JSON.stringify(env))
 	ctx.check("tamper detected", not bool(tampered["ok"]))
 	ctx.check("tamper message", str(tampered["error"]).contains("校验和"))
 
+	ctx.begin_group("broken_envelope")
 	var broken := SaveCodec.decode("{this is not json")
 	ctx.check("broken json rejected", not bool(broken["ok"]))
 	ctx.check("broken json message", str(broken["error"]).contains("JSON"))
@@ -51,6 +80,7 @@ func run(ctx: TestContext) -> void:
 			"objectives": {"obj_level": true},
 		},
 	}
+	ctx.begin_group("legacy_v1")
 	var legacy_text := SaveCodec.encode_payload(legacy, 1)
 	var migrated := SaveCodec.decode(legacy_text)
 	ctx.check("legacy decode", bool(migrated["ok"]), str(migrated["error"]))
@@ -63,6 +93,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("legacy defaults labs", lst.labs_completed.is_empty())
 	ctx.eq("legacy rng seed default", lst.rng_seed, 1)
 
+	ctx.begin_group("newer_version")
 	var newer := SaveCodec.encode_payload({"version": 4, "gold": 1}, 4)
 	var nres := SaveCodec.decode(newer)
 	ctx.check("newer version rejected", not bool(nres["ok"]))
@@ -84,6 +115,7 @@ func _test_v2_migration(ctx: TestContext) -> void:
 		"inventory": {"wire": 3},
 		"legacy_extra": 7,
 	}
+	ctx.begin_group("v2_migration")
 	var res := SaveCodec.decode(SaveCodec.encode_payload(v2, 2))
 	ctx.check("v2 decode ok", bool(res["ok"]), str(res["error"]))
 	ctx.eq("v2 migrated_from", int(res["migrated_from"]), 2)
@@ -109,6 +141,7 @@ func _test_v2_migration(ctx: TestContext) -> void:
 	snapshot["version"] = 2
 	snapshot["scrap"] = snapshot.get("gold", 0)
 	snapshot.erase("gold")
+	ctx.begin_group("v2_progress")
 	var kept := SaveCodec.decode(SaveCodec.encode_payload(snapshot, 2))
 	ctx.check("v2 progress decode ok", bool(kept["ok"]), str(kept["error"]))
 	var restored := PlayerState.from_dict(kept["payload"])
@@ -122,15 +155,18 @@ func _test_v2_migration(ctx: TestContext) -> void:
 
 func _test_registry(ctx: TestContext) -> void:
 	# 契约：注册表必须覆盖 1..FORMAT_VERSION-1，且链路能把任意旧版本推到当前版本。
+	ctx.begin_group("migration_registry")
 	ctx.eq("registry errors", SaveCodec.registry_errors().size(), 0)
 	ctx.eq("registry entries", SaveCodec.MIGRATIONS.size(), SaveCodec.FORMAT_VERSION - 1)
 	for v in range(1, SaveCodec.FORMAT_VERSION):
+		ctx.begin_group("migration_chain")
 		ctx.check("registry has v%d" % v, SaveCodec.MIGRATIONS.has(v))
 		var res := SaveCodec.migrate({"version": v})
 		ctx.check("chain from v%d ok" % v, bool(res["ok"]), str(res["error"]))
 		if bool(res["ok"]):
 			ctx.eq("chain from v%d version" % v, int(res["payload"]["version"]), SaveCodec.FORMAT_VERSION)
 			ctx.eq("chain from v%d from" % v, int(res["from"]), v)
+	ctx.begin_group("migration_registry")
 	var fresh := SaveCodec.migrate({"version": SaveCodec.FORMAT_VERSION})
 	ctx.check("migrate latest ok", bool(fresh["ok"]), str(fresh["error"]))
 	ctx.eq("migrate latest from", int(fresh["from"]), SaveCodec.FORMAT_VERSION)
@@ -140,6 +176,7 @@ func _test_fixture_v1(ctx: TestContext) -> void:
 	var res := _load_slot_text(ctx, SaveCodec.encode_payload(fx, 1), 6)
 	if not bool(res.get("ok", false)):
 		return
+	ctx.begin_group("fixture_v1")
 	var p: Dictionary = res["payload"]
 	var st: PlayerState = res["state"]
 	ctx.eq("v1 fixture migrated_from", int(res["migrated_from"]), 1)
@@ -174,6 +211,7 @@ func _test_fixture_v2(ctx: TestContext) -> void:
 	var res := _load_slot_text(ctx, SaveCodec.encode_payload(fx, 2), 7)
 	if not bool(res.get("ok", false)):
 		return
+	ctx.begin_group("fixture_v2")
 	var p: Dictionary = res["payload"]
 	var st: PlayerState = res["state"]
 	ctx.eq("v2 fixture migrated_from", int(res["migrated_from"]), 2)
@@ -224,6 +262,7 @@ func _test_store(ctx: TestContext) -> void:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(p)
 
+	ctx.begin_group("store_slot")
 	var s1 := PlayerState.new()
 	s1.gold = 10
 	s1.add_item("wire", 1)
@@ -263,6 +302,7 @@ func _test_store(ctx: TestContext) -> void:
 	ctx.check("missing slot load fails", not bool(store.load_slot(2)["ok"]))
 
 func _test_determinism(ctx: TestContext) -> void:
+	ctx.begin_group("determinism")
 	var a := PlayerState.new(7)
 	var b := PlayerState.new(7)
 	var same := true

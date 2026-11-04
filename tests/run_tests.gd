@@ -43,20 +43,10 @@ const SUITES := [
 	"res://tests/test_ch02_sections.gd",
 ]
 
-# TODO(迁移中)：期望数正逐个下沉到套件自己的 `const EXPECT`；已迁 3 个（ch01_sections /
-# ch02_sections / ch02_body），其余仍在本表。全部迁完后本表删除，总数改为运行时求和。
+# TODO(迁移中)：期望数正逐个下沉到套件自己的 `const EXPECT`；已迁 13 个，其余仍在本表。
+# 全部迁完后本表删除，总数改为运行时求和。
 # 声明的 check 数（2026-11-04 实测，总数 3226）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
-	"test_bit_math": 27,
-	"test_logic_gates": 24,
-	"test_circuit": 33,
-	"test_economy": 42,
-	"test_knowledge": 32,
-	"test_chapter": 61,
-	"test_tutorial": 12,
-	"test_save": 120,
-	"test_data": 615,
-	"test_sim": 76,
 	"test_l2": 430,
 	"test_black_box": 18,
 	"test_lab_checks": 49,
@@ -153,6 +143,7 @@ func _abort_probe_is_red() -> bool:
 
 ## 逐组比对：组和=EXPECT、每组实际计数=声明、组说明有效、单组不过半、无未声明组。
 func _verify_groups(ctx: TestContext, name: String, consts: Dictionary, expect: int) -> void:
+	ctx.begin_group("")  # guard 自身不得计入上一套件最后一组的计数
 	var groups: Dictionary = consts.get("EXPECT_GROUPS", {})
 	if groups.is_empty():
 		return
@@ -182,6 +173,7 @@ func _verify_groups(ctx: TestContext, name: String, consts: Dictionary, expect: 
 
 ## 期望数下降检查：>10% 必须命中 expect_drops.txt 白名单行（并每次打印该行）；≤10% 必须有非空话理由。
 func _verify_drop(ctx: TestContext, name: String, consts: Dictionary, path: String, expect: int) -> void:
+	ctx.begin_group("")  # guard 自身不得计入上一套件最后一组的计数
 	if expect <= 0:
 		return
 	var prev := _expect_in_head(path)
@@ -211,10 +203,10 @@ func _expect_in_head(path: String) -> int:
 	var txt := _git_show("HEAD:" + rel)
 	if not txt.is_empty():
 		var re := RegEx.new()
-		re.compile("const\\s+EXPECT\\s*:\\s*int\\s*=\\s*(\\d+)")
+		re.compile("const\\s+EXPECT\\s*(?::\\s*int\\s*)?(:?=)\\s*(\\d+)")
 		var m := re.search(txt)
 		if m != null:
-			return int(m.get_string(1))
+			return int(m.get_string(2))
 	var key := str(path).get_file().get_basename()
 	var rt := _git_show("HEAD:tests/run_tests.gd")
 	if rt.is_empty():
