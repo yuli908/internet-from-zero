@@ -155,6 +155,8 @@
 - 语义：
   - 幂等：`PlayerState` 记 `granted:<lab_id>` 标记，重复通过不二次发放；
   - 原子性：任一 `item_id` 不在 `data/items.json` → 整单拒绝、`reward` 金币/XP 也不发，返回错误并记日志；
+    实现为 `PlayerState.grant_items(lab_id, grants, catalog, dry_run=false)`：`complete_lab` 先 `dry_run` 整单校验，
+    校验通过后才在任何状态变更之后入库（见 §3.5 末与 PROGRESS §2.11）；
   - 数量必须为 ≥1 的整数；`once=false` 时不写标记（但仍受"仅首次通过"调用点约束）；
   - 入库后进 `PlayerState.inventory`，随存档 v3 往返（现有 items 字段，无需迁移）。
 - **阻塞项**：策划奖励表未定稿 → M3 用 `tests/data/ch99_reward_fixture.json`（仅测试用）验证机制；

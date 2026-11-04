@@ -1,0 +1,9 @@
+{
+  "note": "M3 T5 奖励机制测试专用夹具；正式数值由策划定稿，data/chapters/ch01_levels.json 一行不改。",
+  "lab_id": "ch99_lab",
+  "grants": {"items": {"M03": 2, "M09": 1}, "once": true},
+  "bad_unknown": {"items": {"M03": 1, "NOPE": 2}, "once": true},
+  "bad_qty_zero": {"items": {"M03": 0}, "once": true},
+  "bad_qty_frac": {"items": {"M03": 1.5}, "once": true},
+  "repeatable": {"items": {"M03": 1}, "once": false}
+}

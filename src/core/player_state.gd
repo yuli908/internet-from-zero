@@ -84,6 +84,34 @@ func remove_item(id: String, n: int = 1) -> bool:
 func item_count(id: String) -> int:
 	return int(inventory.get(id, 0))
 
+func grant_items(lab_id: String, grants: Dictionary, catalog: Catalog, dry_run: bool = false) -> Dictionary:
+	## M3 T5：物品奖励入库（只做机制，数值由策划定稿）。
+	## 幂等：成功入库后写 `granted:<lab_id>` 标记，重复调用返回 already=true 且不二次发放。
+	## 原子校验：任一 item_id 不在 catalog 或数量非 ≥1 整数 → 整单拒绝，一件不发、标记不写。
+	var items: Dictionary = grants.get("items", {})
+	if items.is_empty():
+		return {"ok": true, "error": "", "granted": {}, "already": false}
+	for raw_id in items:
+		var id := str(raw_id)
+		if not catalog.has_item(id):
+			return {"ok": false, "error": "未知物品 %s：整单拒绝" % id, "granted": {}, "already": false}
+		var f := float(items[raw_id])
+		if f < 1.0 or f != floor(f):
+			return {"ok": false, "error": "物品 %s 数量必须是 ≥1 的整数" % id, "granted": {}, "already": false}
+	var once := bool(grants.get("once", true))
+	if once and has_flag("granted:%s" % lab_id):
+		return {"ok": true, "error": "", "granted": {}, "already": true}
+	if dry_run:
+		return {"ok": true, "error": "", "granted": {}, "already": false}
+	for raw_id in items:
+		add_item(str(raw_id), int(items[raw_id]))
+	if once:
+		set_flag("granted:%s" % lab_id, true)
+	var granted := {}
+	for raw_id in items:
+		granted[str(raw_id)] = int(items[raw_id])
+	return {"ok": true, "error": "", "granted": granted, "already": false}
+
 func grant_knowledge(id: String) -> bool:
 	if knowledge.has(id):
 		return false

@@ -16,6 +16,13 @@ func complete_lab(lab_id: String) -> Dictionary:
 	var obj_id := str(lab.get("objective", ""))
 	if p.is_objective_done(obj_id):
 		return {"ok": true, "error": "", "newly": false, "already": true}
+	# M3 T5：物品奖励整单校验先于任何状态变更，避免"目标已记完成、奖励却发不出"。
+	var grants: Dictionary = lab.get("grants", {})
+	if not grants.is_empty():
+		var v := p.grant_items(lab_id, grants, DataDB.catalog, true)
+		if not bool(v.get("ok", false)):
+			EventBus.toast("奖励未发放：%s" % str(v.get("error", "")), "warn")
+			return {"ok": false, "error": str(v.get("error", "")), "newly": false, "grant_rejected": true}
 	p.mark_lab_completed(lab_id)
 	p.set_flag("lab:%s" % lab_id, true)
 	for gid in lab.get("gate_ids", []):
@@ -27,6 +34,15 @@ func complete_lab(lab_id: String) -> Dictionary:
 			p.add_gold(int(reward.get("gold", 0)))
 			p.add_xp(int(reward.get("xp", 0)))
 			p.set_flag("lab_reward:%s" % lab_id, true)
+		if not grants.is_empty():
+			var g := p.grant_items(lab_id, grants, DataDB.catalog)
+			if bool(g.get("ok", false)) and not bool(g.get("already", false)):
+				var granted: Dictionary = g.get("granted", {})
+				var total := 0
+				for id in granted:
+					total += int(granted[id])
+				if total > 0:
+					EventBus.toast("奖励入库：%d 件物品" % total, "ok")
 		var k := str(lab.get("knowledge", ""))
 		if not k.is_empty():
 			Knowledge.unlock(k)

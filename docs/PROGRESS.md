@@ -232,6 +232,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   （新实例建门时的初始求值事件需先 `settle()` 清空，否则 restore 按"队列非空"拒绝——已写入注释）。
 - 全量回归：**1540 checks, 0 failures**（T3 的 1527 + T4 13 项）。
 
+### 2.11 T5 奖励入库机制（2026-11-04）
+
+- `PlayerState.grant_items(lab_id, grants, catalog, dry_run=false)`：只做**机制**，数值不动。
+  - 幂等：成功入库后写 `granted:<lab_id>`，重复调用返回 `already=true` 且不二次发放（跨存档保持）；
+  - 原子校验：任一 `item_id` 不在 `items.json`、或数量非 ≥1 整数 → **整单拒绝**，一件不发、标记不写；
+  - `dry_run=true` 只校验；`once=false` 不写标记（仍由调用点"仅首次通过"约束）。
+- `ChapterFlow.complete_lab`：`grants` 校验放在**任何状态变更之前**（避免目标已记完成、奖励却发不出），
+  通过后才在 `newly` 分支与金币/XP 一起入库，并 toast `奖励入库：N 件物品`。
+- G12 断言（`tests/test_rewards.gd`，夹具 `tests/data/ch99_reward_fixture.json`，仅测试用）全过：
+  首次入库数量正确并写标记、重复完成不二次发（含存档往返后仍判重复）、未知物品整单拒绝（合法项也不发）、
+  数量 0/1.5 拒绝、`once=false` 可重复、`dry_run` 不变更。
+- **`data/chapters/ch01_levels.json` 一行未改**（`git diff --stat -- data/chapters/ch01_levels.json` 为空，
+  验收命令见 §9）。
+- 全量回归：**1568 checks, 0 failures**（T4 的 1540 + T5 28 项）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
