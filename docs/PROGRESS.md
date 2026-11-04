@@ -303,6 +303,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - **实测**：`l2_vectors.json` 实际 **140 行**（`determinism.rows` 同计数）；接口消息与偏差 17 原写的
   "143 行"系笔误，已更正。余下只有 `alu4` 8 行不比对。
 - 全量回归：**1621 checks, 0 failures**（T8 的 1610 + 11 项）。
+- **ALU 宏单元方案**（只写规格、未实现）：ALU 166 门不进可交互门级视图，按参考结构拆 7 个只读页
+  （5/40/9/16/48/32/16，每页 ≤50），三块语义分组算术/逻辑/选择；展开/折叠边界与 `IFZ_E_SCALE` 口径见
+  `specs/m4/spec.md` §3.1。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -328,6 +331,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 18 | 快照 `ifz-sim/2` 示例含 `clocks: [{name, period, duty, phase}]` | 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟全部由 `set_input` 的定时事件驱动（`SimSequential.drive_clock` 也只排事件） | 不为"对齐示例"引入未使用的时钟抽象；恢复后的时钟事件仍按绝对 tick 排定，`state_digest` 已证明续跑一致 |
 | 19 | G6 写 `period = t_clk_min + 5`（4 位 = 19） | 实测用 **`min+6 = 20`**（Clock 要求偶数，19 非法）；G6 的"周期=10 时 X+METASTABLE"仍按要求断言 | `min+5` 与"偶数"约束冲突；取满足两者的最小偶数 20，语义（确定性）不变 |
 | 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **已补齐**：`tests/data/l3_vectors.json` 24 个用例 / 51 条期望，`tests/test_l3_vectors.gd` 逐条比对 tick / Q 值 / 最后一条 L3 trace kind / 亚稳态 reason。补齐过程中发现真实缺陷：`create_register`/`create_shift_register` 先建 EN mux、后建 Q 线网，Q 初值被门输入隐式初始化为 X（移位寄存器首个沿即采样到 X）→ 已改为先建 Q 线网，回归全过 | 先前的"上下文预算"原因已消除；G8 现在是机器可判定的 |
+| 21 | `docs/simulation/10` §6.4 超限错误码写作 `E_L1_SCALE` | 工程内统一为 **`IFZ_E_SCALE`**（`SimDelays`/`SimCircuit`/M3 验收口径一致） | 错误码前缀统一到 `IFZ_E_*`，避免同一约束两个名字；**`docs/simulation/` 不改**，由仿真组据本行统一 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
