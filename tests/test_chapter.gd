@@ -65,28 +65,60 @@ func run(ctx: TestContext) -> void:
 	ctx.check("2.4 deferred 时 2.5 可进入", ch2.lab_unlocked(st2, "power"))
 	ctx.check("2.5 目标可完成", bool(ch2.complete_objective(st2, "obj_power").get("ok", false)))
 
-	# ---- 版本内可完成度：deferred 不计入分母 ----
+	# ---- 版本内可完成度：分母 = requirement==MUST 且 content_status==ready ----
 	var st3 := PlayerState.new()
-	ctx.eq("ch02 分母只算 ready 节", ch2.progress(st3), {"done": 0, "total": 4})
-	ctx.eq("下一目标跳过 deferred", str(ch2.next_objective(st3).get("id", "")), "obj_transistor")
+	ctx.eq("2.4 必修属性", ch2.requirement("replace"), "OPT")
+	ctx.eq("未写的节缺省 MUST", ch2.requirement("power"), "MUST")
+	ctx.eq("分母只算 MUST∧ready", ch2.progress(st3), {"done": 0, "total": 4})
+	ctx.eq("下一目标跳过不进分母的节", str(ch2.next_objective(st3).get("id", "")), "obj_transistor")
 	ctx.check("未完成不可领章末奖", not ch2.chapter_reward_claimable(st3))
 	var rej := ch2.complete_objective(st3, "obj_replace")
 	ctx.check("deferred 不产生任何完成记录",
 		not bool(rej.get("ok", true)) and not st3.is_objective_done("obj_replace"))
 	for oid in ["obj_transistor", "obj_inverter", "obj_nand", "obj_power"]:
-		ctx.check("完成 ready 节: %s" % str(oid),
+		ctx.check("完成 MUST 节: %s" % str(oid),
 			bool(ch2.complete_objective(st3, str(oid)).get("ok", false)))
 	ctx.eq("ch02 完成度 4/4", ch2.progress(st3), {"done": 4, "total": 4})
 	ctx.check("4/4 即全完成", ch2.all_done(st3))
 	ctx.check("章末奖励可发放", ch2.chapter_reward_claimable(st3))
-	# 2.4 转正模拟：分母变 5 → 4/5，且已领奖励不重复发放
-	var ready_doc: Dictionary = TestUtil.read_json("res://data/chapters/ch02_levels.json")
-	for l in (ready_doc["labs"] as Array):
-		if str(l.get("id", "")) == "replace":
-			l.erase("content_status")
-			l.erase("deferred_reason")
-	var ch2r := ChapterRuntime.from_doc(ready_doc)
-	ctx.eq("2.4 转正后分母 5", ch2r.progress(st3), {"done": 4, "total": 5})
-	ctx.check("2.4 转正后仍需补做", not ch2r.all_done(st3))
+	# 两个维度互不推导：content_status × requirement 四种组合各测一遍
+	var combos := [
+		{"status": "ready", "req": "MUST", "total": 5, "enter": true},
+		{"status": "ready", "req": "OPT", "total": 4, "enter": true},
+		{"status": "deferred", "req": "MUST", "total": 4, "enter": false},
+		{"status": "deferred", "req": "OPT", "total": 4, "enter": false},
+	]
+	for combo in combos:
+		var tag := "%s/%s" % [str(combo["status"]), str(combo["req"])]
+		var v := _ch02_variant(str(combo["status"]), str(combo["req"]))
+		ctx.eq("%s 分母" % tag, int((v.progress(st3) as Dictionary).get("total", -1)), int(combo["total"]))
+		ctx.eq("%s requirement 独立读出" % tag, v.requirement("replace"), str(combo["req"]))
+		ctx.eq("%s 可进入" % tag, v.lab_unlocked(st2, "replace"), bool(combo["enter"]))
+	# 转正模拟：OPT 不追补；改成 MUST 才会变 5
+	var ch2r := _ch02_variant("ready", "OPT")
+	ctx.eq("2.4 转正（OPT）分母仍 4", ch2r.progress(st3), {"done": 4, "total": 4})
+	ctx.check("2.4 转正（OPT）不追补", ch2r.all_done(st3))
 	st3.set_flag(ch2r.chapter_reward_key(), true)
 	ctx.check("已领奖励不重复发放", not ch2r.chapter_reward_claimable(st3))
+	var ch2m := _ch02_variant("ready", "MUST")
+	ctx.eq("2.4 若转正为 MUST 分母 5", ch2m.progress(st3), {"done": 4, "total": 5})
+	ctx.check("转正为 MUST 需补做", not ch2m.all_done(st3))
+
+func _ch02_variant(status: String, req: String) -> ChapterRuntime:
+	## 构造 2.4 的变体：同一份 CH02 数据，只改 `content_status` / `requirement`。
+	## 用于证明两个维度独立——任意组合都不能由另一个推导出来。
+	var doc: Dictionary = TestUtil.read_json("res://data/chapters/ch02_levels.json")
+	for raw in doc.get("labs", []):
+		if not (raw is Dictionary):
+			continue
+		var seg: Dictionary = raw
+		if str(seg.get("id", "")) != "replace":
+			continue
+		seg.erase("content_status")
+		seg.erase("deferred_reason")
+		seg.erase("requirement")
+		if not status.is_empty():
+			seg["content_status"] = status
+		if not req.is_empty():
+			seg["requirement"] = req
+	return ChapterRuntime.from_doc(doc)

@@ -432,8 +432,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   2.4 教的是结构优化（更少门实现同样功能），2.5 教的是功耗计算，把 2.4 当 2.5 前置等于把侧枝塞进主链中间。
 - **完成度口径**：`ChapterRuntime.progress/all_done/next_objective` 只统计
   `content_status == "ready"` 的节（`active_objective_ids`/`objective_active`）。
-  当前 CH02 是 **4/4 可完成**，章末 25 g 与 `CH02-CMOS` 可正常发放；2.4 转正后分母变 5，需补做。
-  这是**版本内可完成度**，跨版本会变，不是永久豁免。
+  当前 CH02 是 **4/4 可完成**，章末 25 g 与 `CH02-CMOS` 可正常发放。
+  > 该口径有漏洞（2.4 转正后分母 4→5，会追着玩家补选修课），已由 §2.26 的
+  > `requirement == "MUST"` ∧ `content_status == "ready"` 取代。
 - **拒绝占位通过**：`complete_objective` 对 deferred 节直接返回 `ok=false`（"该实验内容暂未开放"），
   不写任何完成记录。
 - 奖励一次性：新增 `chapter_reward_claimable`（`all_done` 且未领），`ChapterFlow._finish_chapter` 改用之；
@@ -442,6 +443,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   本轮**未自造字段**；UI 目前可用依赖图判定侧枝（2.4 已无后继），正式标注字段缺口见偏差 29。
 - 测试：新增 **22 checks**（2.5 解耦 2 + 完成度 14 + 面积口径 6）；
   全量 **2296 checks / 0 failures**（25 套件）。
+
+### 2.26 lab 级 requirement + 完成度口径替换（2026-11-04）
+
+- **新字段**：lab 条目 `requirement`（`MUST` / `OPT` / `CHAL`，**缺省 `MUST`**，旧数据不写不破坏存档）。
+  读取入口 `ChapterRuntime.requirement(lab_id)`。`ch02_levels.json` 的 `replace`(2.4) 标 `"OPT"`，其余不动。
+  未加显式分支边，侧枝仍由 `requires` 依赖图推断（2.4 已无后继）。
+- **完成度口径（覆盖 §2.25）**：分母 = `requirement == "MUST"` **且** `content_status == "ready"`。
+  `CHAL` 与 `OPT` 只给奖励、不进分母；`deferred` 也不进。
+  - `objective_ready`：只看 `content_status == "ready"`（决定能否进入/记完成）。
+  - `objective_active`：= `objective_ready` ∧ `requirement == "MUST"`（决定是否进分母）。
+  - `active_objective_ids` / `progress` / `all_done` / `next_objective` / `chapter_reward_claimable`
+    全部继承该口径；`complete_objective` 的禁入守卫仍用 `objective_ready`，所以 OPT/CHAL 的 ready 节照样能做，只是不计数。
+  - CH02 恒为 **4/4**：2.4 无论 deferred 还是日后转 ready，都因 `OPT` 不进分母。
+- **两维独立**：`content_status` 只表达"内容做出来没有"，`requirement` 只表达"是否必修"，代码里不存在任一方推导另一方。
+  测试用 `_ch02_variant(status, req)` 构造 `{ready,deferred} × {MUST,OPT}` 四种组合各自断言。
+- 测试：完成度块由 14 checks 扩到 30（四种组合各 3 项、转正/一次性奖励 5 项）；
+  全量 **2312 checks / 0 failures**（25 套件）。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -475,7 +493,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 26 | `bound_first` 首件绑定不可回收 | **已真修（2026-11-04）**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 读取 `granted:<lab>`，已领过的 lab 返回空奖励表，重复刷关不再发放（见 §2.23）；`G01–G04` 与 `M01/M09/G12` 同口径；**售出端已收口**（§2.24：`EconomyCore.sell` 拒卖绑定件，不扣件、不加金币） | 原 `test_economy` 的 "sell M01" 断言与绑定数据冲突，已改用非绑定 `M08` 验证出售路径，check 数不减 |
 | 27 | CH02 技能树 24 个节点 / `start_gold_mode: carry` | 只在 `ch02_levels.json` 引用 `SK-TR…SK-POWER` 与 `milestone CH02-1…5`，**未新增 `skilltree.json` 节点**；`start_gold_mode` 字段已写入但 `ChapterRuntime` 未实现 carry 逻辑，按规格回落 `start_gold 0` | 新增 24 节点会让 `tests/test_data.gd` 的"36 节点"断言退；M5 任务只授权 ch02 两份数据 + manifest |
 | 28 | CH02 `static_current` / `rail_margin` | **`rail_margin` 已落地**（18/20）：`_judge_rail` 按逻辑输出反算 V_high/V_low，落 `E_RAIL_MARGIN`(20)，无器件层依赖；`static_current` 仍 `E_PENDING` + `required=false`（2 条 gate：`T2.2-3`、`T2.4-4`，**不算通过**） | 不写永远通过的假 gate；`rail_margin` 只需离散分压算术，故先落地；稳态电流仍等最小 L1 电流模型 |
-| 29 | 2.4 正式内容延后（等器件级网表），需在配置里标"待解锁" | lab 条目新增 `content_status`（`ready`/`deferred`，缺省 `ready`）与玩家可见 `deferred_reason`；`ChapterRuntime.lab_content_available` 返回 `{available, reason}`，`lab_unlocked`/`lab_lock_reason` 先判内容可用性 → **整节禁入**，不是 gate 全 pending；`replace` 已置 `deferred`，技能树 `SK-REPLACE` 保留（见 §2.24） | 半开的节会让玩家做完看不到分；`deferred_reason` 只写面向玩家的话。**已处置**：`power` 前置改 `["nand"]`，2.4 变侧枝；完成度按 ready 节计（4/4，见 §2.25）。**仍缺字段**：lab 级"必修/选修/挑战"类型（`docs/design/02` 的 MUST/OPT/CHAL 只到章节层），本轮未自造 |
+| 29 | 2.4 正式内容延后（等器件级网表），需在配置里标"待解锁" | lab 条目新增 `content_status`（`ready`/`deferred`，缺省 `ready`）与玩家可见 `deferred_reason`；`ChapterRuntime.lab_content_available` 返回 `{available, reason}`，`lab_unlocked`/`lab_lock_reason` 先判内容可用性 → **整节禁入**，不是 gate 全 pending；`replace` 已置 `deferred`，技能树 `SK-REPLACE` 保留（见 §2.24） | 半开的节会让玩家做完看不到分；`deferred_reason` 只写面向玩家的话。**已处置**：`power` 前置改 `["nand"]`，2.4 变侧枝；已补 lab 级 `requirement`（`MUST`/`OPT`/`CHAL`，缺省 `MUST`），2.4 标 `OPT`，完成度按 `MUST` ∧ `ready` 计（CH02 恒 4/4，见 §2.26） |
 | 30 | 2.5 `build_area` 的 8 门预算 | 门数按**展开后**统计：成品 XOR 记 4 门（`GATE_EXPAND_WEIGHTS`），`BUILD_AREA_GATE_BUDGET = 8` 为唯一来源；槽位（`slots`）与门数（`max_total_gates`）两条约束分开判定 | 顶层件数口径会把成品 XOR 记 1，`4 ≤ 8` 恒真、预算静默失效；已用测试钉死（成品 XOR=4、全用现成门=7 过、4 个成品 XOR=16 落 `E_AREA`） |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）

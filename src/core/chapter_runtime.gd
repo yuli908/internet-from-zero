@@ -92,6 +92,11 @@ func content_status(lab_id: String) -> String:
 	## 内容状态：`ready` / `deferred`；旧数据不写该字段即视为 ready，不破坏现有存档。
 	return str(lab(lab_id).get("content_status", "ready"))
 
+func requirement(lab_id: String) -> String:
+	## 必修属性：`MUST` / `OPT` / `CHAL`；旧数据不写即视为 MUST。
+	## 与 `content_status` 是两个独立维度，不允许互相推导。
+	return str(lab(lab_id).get("requirement", "MUST"))
+
 func lab_content_available(lab_id: String) -> Dictionary:
 	## 内容级可用性（先于前置 lab 判定）：deferred 的节整节禁入，不是让 gate 显示 pending。
 	var lab_data := lab(lab_id)
@@ -144,12 +149,22 @@ static func _opt_string(d: Dictionary, key: String) -> String:
 func is_objective_done(state: PlayerState, obj_id: String) -> bool:
 	return state.is_objective_done(obj_id)
 
-func objective_active(obj_id: String) -> bool:
-	## 版本内可完成度：`content_status == "deferred"` 的节不计入分母（转正后分母会变）。
+func objective_ready(obj_id: String) -> bool:
+	## 内容可玩：`content_status == "ready"`。
 	var lab_id := str(objective(obj_id).get("lab", ""))
 	if lab_id.is_empty():
 		return true
 	return content_status(lab_id) == "ready"
+
+func objective_active(obj_id: String) -> bool:
+	## 计入完成度分母：`requirement == "MUST"` **且** `content_status == "ready"`。
+	## OPT / CHAL 只给奖励、不进分母；deferred 也不进。
+	if not objective_ready(obj_id):
+		return false
+	var lab_id := str(objective(obj_id).get("lab", ""))
+	if lab_id.is_empty():
+		return true
+	return requirement(lab_id) == "MUST"
 
 func active_objective_ids() -> Array:
 	var out := []
@@ -164,7 +179,7 @@ func complete_objective(state: PlayerState, obj_id: String) -> Dictionary:
 	if state.is_objective_done(obj_id):
 		return {"ok": true, "error": "", "newly": false, "all_done": all_done(state)}
 	# 延后节不产生任何完成记录：不是让 gate 显示 pending，而是根本不给记 pass。
-	if not objective_active(obj_id):
+	if not objective_ready(obj_id):
 		return {"ok": false, "error": "该实验内容暂未开放", "newly": false, "all_done": all_done(state)}
 	var newly := state.complete_objective(obj_id)
 	return {"ok": true, "error": "", "newly": newly, "all_done": all_done(state)}
