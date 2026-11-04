@@ -10,11 +10,12 @@ static func read_json(path: String) -> Dictionary:
 		return parsed
 	return {}
 
-static func data_db() -> Node:
+static func data_db(only_chapters: Array = []) -> Node:
 	## `-s` 模式下 autoload 不会走 _ready，这里手动实例化数据层并加载。
+	## `only_chapters` 非空时只装这些章节，用于反向验证"确实在读注册表"。
 	var script: GDScript = load("res://src/autoload/data_db.gd")
 	var db: Node = script.new()
-	db.load_all()
+	db.load_all(only_chapters)
 	return db
 
 static func items_doc() -> Dictionary:

@@ -15,6 +15,7 @@ extends RefCounted
 const FORMAT_VERSION := 3
 const ENVELOPE_FMT := "internet-from-zero.save"
 const ALGO := "sha256"
+const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
 ## 迁移注册表：起点版本 → 迁移函数名。迁移器必须自带推进 version（v1→v2→v3 串联）。
 const MIGRATIONS := {
 	1: "_migrate_v1_to_v2",
@@ -144,7 +145,7 @@ static func _migrate_v1_to_v2(p: Dictionary) -> Dictionary:
 	if not out.has("rng"):
 		out["rng"] = {"seed": 1, "state": 0}
 	if not out.has("chapter_id"):
-		out["chapter_id"] = "ch01"
+		out["chapter_id"] = ChapterRegistry.default_id()
 	if not out.has("scrap"):
 		out["scrap"] = 0
 	if not out.has("xp"):

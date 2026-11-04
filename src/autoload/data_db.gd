@@ -2,6 +2,8 @@ extends Node
 
 ## 数据层：启动时加载并校验所有 JSON 配置。UI 不得硬编码章节/物品/配方。
 
+const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
+
 var ready_ok := false
 var errors: Array = []
 var catalog: Catalog
@@ -10,6 +12,12 @@ var skills: KnowledgeGraph
 var chapter: ChapterRuntime
 var labs: Dictionary = {}
 var labs_doc: Dictionary = {}
+## 章节注册表：`id -> {id, number, title, levels_path, labs_path, has_labs, next_chapter}`，
+## 顺序按章节 `number`（见 `ChapterRegistry`），不依赖文件名。
+var chapters: Dictionary = {}
+var chapter_order: Array = []
+var labs_by_chapter: Dictionary = {}
+var _runtimes: Dictionary = {}
 var tutorial_doc: Dictionary = {}
 var sim_doc: Dictionary = {}
 var manifest: Dictionary = {}
@@ -19,7 +27,7 @@ var loaded_files := 0
 func _ready() -> void:
 	load_all()
 
-func load_all() -> void:
+func load_all(only_chapters: Array = []) -> void:
 	errors.clear()
 	loaded_files = 0
 	manifest = _json("res://data/manifest.json")
@@ -34,19 +42,62 @@ func load_all() -> void:
 	var skill_doc := _json("res://data/skilltree.json")
 	skill_graph = KnowledgeGraph.from_doc(skill_doc)
 	skills = skill_graph
-	var chapter_doc := _json("res://data/chapters/ch01_levels.json")
-	chapter = ChapterRuntime.from_doc(chapter_doc)
-	labs_doc = _json("res://data/labs/ch01_labs.json")
-	labs = labs_doc.get("labs", {})
+	_build_registry(only_chapters)
+	var default_id := default_chapter_id()
+	chapter = runtime_for(default_id) if not default_id.is_empty() else ChapterRuntime.from_doc({})
+	labs_doc = ChapterRegistry.labs_doc(default_id)
+	labs = labs_for(default_id)
 	tutorial_doc = _json("res://data/tutorial.json")
 	sim_doc = _json("res://data/sim/delays.json")
 	SimDelays.configure(sim_doc)
-	data_version = int(chapter_doc.get("version", 0)) if not chapter_doc.is_empty() else 0
+	data_version = int(ChapterRegistry.levels_doc(default_id).get("version", 0))
 	_validate()
 	ready_ok = errors.is_empty()
 	if not ready_ok:
 		for e in errors:
 			printerr("[DATA] ", e)
+
+func _build_registry(only_chapters: Array = []) -> void:
+	chapters.clear()
+	chapter_order.clear()
+	labs_by_chapter.clear()
+	_runtimes.clear()
+	for raw in ChapterRegistry.entries():
+		var e: Dictionary = raw
+		var cid := str(e.get("id", ""))
+		if not only_chapters.is_empty() and not only_chapters.has(cid):
+			continue
+		chapters[cid] = e
+		chapter_order.append(cid)
+		if bool(e.get("has_labs", false)):
+			labs_by_chapter[cid] = ChapterRegistry.labs(cid)
+	if chapter_order.is_empty():
+		errors.append("章节注册表为空（%s 下没有 *_levels.json）" % ChapterRegistry.CHAPTER_DIR)
+
+func chapter_ids() -> Array:
+	## 稳定章节序（按章节 `number`）。
+	return chapter_order.duplicate()
+
+func has_chapter(chapter_id_in: String) -> bool:
+	return chapters.has(chapter_id_in)
+
+func chapter_meta(chapter_id_in: String) -> Dictionary:
+	return chapters.get(chapter_id_in, {})
+
+func default_chapter_id() -> String:
+	## 默认章节来自注册表首个，不写死任何章节 ID。
+	return str(chapter_order[0]) if not chapter_order.is_empty() else ""
+
+func labs_for(chapter_id_in: String) -> Dictionary:
+	## 按章节取实验数据段（`data_key -> 配置`）；未知章节返回空表。
+	return labs_by_chapter.get(chapter_id_in, {})
+
+func runtime_for(chapter_id_in: String) -> ChapterRuntime:
+	if not chapters.has(chapter_id_in):
+		return null
+	if not _runtimes.has(chapter_id_in):
+		_runtimes[chapter_id_in] = ChapterRuntime.from_doc(ChapterRegistry.levels_doc(chapter_id_in))
+	return _runtimes[chapter_id_in]
 
 func _json(path: String) -> Dictionary:
 	var text := FileAccess.get_file_as_string(path)

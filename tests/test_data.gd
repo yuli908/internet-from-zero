@@ -1,4 +1,6 @@
-﻿extends RefCounted
+extends RefCounted
+
+const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
 
 ## 数据完整性：物品、价格、配方、双树、章节、实验配置、gate 用例。
 
@@ -137,6 +139,36 @@ func run(ctx: TestContext) -> void:
 	ctx.check("half adder outputs sum/carry", room.get("outputs", []).size() == 2)
 	ctx.eq("half adder max gates", int(room.get("max_gates", 0)), 8)
 	ctx.eq("gate lab max gates", int(db.lab_data("gate").get("max_gates", 0)), 12)
+
+	# ---- 穿过接缝：从 DataDB 入口直达 CH02，证明章节注册表真的被读 ----
+	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02"])
+	ctx.check("注册表含 ch01", db.has_chapter("ch01"))
+	ctx.check("注册表含 ch02", db.has_chapter("ch02"))
+	ctx.eq("ch02 章号", int(db.chapter_meta("ch02").get("number", 0)), 2)
+	ctx.eq("默认章节来自注册表", db.default_chapter_id(), "ch01")
+	ctx.eq("兼容 labs 指向默认章节", db.labs, db.labs_for("ch01"))
+	var ch02_labs: Dictionary = db.labs_for("ch02")
+	ctx.check("ch02 labs 非空", not ch02_labs.is_empty())
+	ctx.eq("ch02 labs 段数", ch02_labs.size(), 5)
+	var raw_labs: Dictionary = TestUtil.read_json("res://data/labs/ch02_labs.json").get("labs", {})
+	var want_gates := 0
+	for key in raw_labs.keys():
+		var seg: Dictionary = raw_labs[key]
+		want_gates += (seg.get("gate_cases", []) as Array).size()
+	var got_gates := 0
+	for key in ch02_labs.keys():
+		var seg: Dictionary = ch02_labs[key]
+		got_gates += (seg.get("gate_cases", []) as Array).size()
+	ctx.eq("ch02 gate 数与数据一致", got_gates, want_gates)
+	ctx.eq("ch02 gate 数 = 20", want_gates, 20)
+	var ch02_rt: ChapterRuntime = db.runtime_for("ch02")
+	ctx.check("ch02 运行时可达", ch02_rt != null and ch02_rt.lab_order.size() == 5)
+	ctx.check("ch02 章节文档可达", not ChapterRegistry.levels_doc("ch02").is_empty())
+	# 反向验证：注册表里排除 ch02 时，同一入口必须取不到（证明不是恒真）
+	var db_only1: Node = TestUtil.data_db(["ch01"])
+	ctx.check("排除 ch02 后取不到 ch02 labs", db_only1.labs_for("ch02").is_empty())
+	ctx.check("排除 ch02 后注册表不含 ch02", not db_only1.has_chapter("ch02"))
+	ctx.check("仅 ch01 时默认章节仍 ch01", db_only1.default_chapter_id() == "ch01")
 
 	var tut: Array = db.tutorial_doc.get("steps", [])
 	ctx.check("tutorial has steps", tut.size() >= 5)

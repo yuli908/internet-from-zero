@@ -461,6 +461,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - 测试：完成度块由 14 checks 扩到 30（四种组合各 3 项、转正/一次性奖励 5 项）；
   全量 **2312 checks / 0 failures**（25 套件）。
 
+### 2.27 章节注册表：扫目录 + 按章节号排序（2026-11-04）
+
+- 新增 `src/core/chapter_registry.gd`（纯静态、无 autoload 依赖）：扫 `res://data/chapters/*_levels.json`，
+  用文档内的 `id` / `number` / `title` 建条目，按 `number` 升序（缺号排末尾、同号按 ID），**不用文件名字典序**；
+  `data/labs/<id>_labs.json` 存在则记 `has_labs=true` 并缓存 labs 段。
+- `DataDB`：`load_all(only_chapters=[])` 建注册表（`chapters` / `chapter_order` / `labs_by_chapter`），
+  新增 `chapter_ids` / `has_chapter` / `chapter_meta` / `default_chapter_id` / `labs_for` / `runtime_for`。
+  兼容层：`labs` / `labs_doc` / `lab_data` / `gate_cases` 仍指默认章节，既有调用点不改。
+- `PlayerState.chapter_id` 默认值与 `SaveCodec` 迁移补的 `chapter_id` 改为 `ChapterRegistry.default_id()`；
+  首个章节就是 `ch01`，旧档行为不变。
+- 测试：`test_data.gd` 新增 15 checks，从 `DataDB` 入口取到 ch02 的 5 段 labs / 20 条 gate 与 `runtime_for("ch02")`；
+  反向用 `TestUtil.data_db(["ch01"])` 排除 ch02 后同一入口取不到，证明断言真的在读注册表。
+  全量 **2327 checks / 0 failures**（25 套件）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |

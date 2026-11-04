@@ -3,6 +3,8 @@ extends RefCounted
 
 ## 玩家全部可存档状态。不依赖场景树与 autoload，测试可直接构造。
 
+const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
+
 const SAVE_VERSION := 3
 const XP_LEVELS := [0, 60, 160, 300, 520, 800]
 
@@ -10,7 +12,7 @@ var save_version := SAVE_VERSION
 var slot := 1
 var created_at := ""
 var updated_at := ""
-var chapter_id := "ch01"
+var chapter_id := ""
 var gold := 20
 var xp := 0
 var inventory: Dictionary = {}
@@ -29,6 +31,7 @@ func _init(seed_value_in: int = 1) -> void:
 	var now := Time.get_datetime_string_from_system()
 	created_at = now
 	updated_at = now
+	chapter_id = ChapterRegistry.default_id()
 	rng_seed = seed_value_in
 	_rng = DeterministicRng.new(seed_value_in)
 
@@ -211,7 +214,7 @@ static func from_dict(d: Dictionary) -> PlayerState:
 	s.slot = int(d.get("slot", 1))
 	s.created_at = str(d.get("created_at", ""))
 	s.updated_at = str(d.get("updated_at", ""))
-	s.chapter_id = str(d.get("chapter_id", "ch01"))
+	s.chapter_id = str(d.get("chapter_id", ChapterRegistry.default_id()))
 	var raw_gold: Variant = d.get("gold", d.get("scrap", 0))
 	s.gold = int(raw_gold)
 	s.xp = int(d.get("xp", 0))
