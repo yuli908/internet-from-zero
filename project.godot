@@ -1,5 +1,11 @@
 ; Engine configuration file.
-; Internet From Zero - rebuild the internet from a single electron.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
 [application]
@@ -23,9 +29,8 @@ Tutorial="*res://src/autoload/tutorial.gd"
 
 [display]
 
-window/size/viewport_width=1440
-window/size/viewport_height=900
-window/size/mode=0
+window/size/viewport_width=1280
+window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
@@ -33,4 +38,4 @@ window/stretch/aspect="expand"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.035, 0.043, 0.055, 1)
+environment/defaults/default_clear_color=Color(0.031, 0.043, 0.035, 1)
