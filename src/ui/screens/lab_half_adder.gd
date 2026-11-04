@@ -11,9 +11,7 @@ var _enc_btn: Button
 func _build() -> void:
 	# ---- 左栏：任务 / 调色板 / 封装 ----
 	side.add_child(_section("任务"))
-	var body := Ui.wrap(str(lab_data.get("body", "")), UiTheme.F_LABEL, UiTheme.MUTED)
-	body.custom_minimum_size = Vector2(0, 64)
-	side.add_child(body)
+	_add_teaching(side, 12, UiTheme.F_LABEL)
 	side.add_child(_hint_card(str(lab_data.get("hint", ""))))
 	side.add_child(Ui.hline())
 	side.add_child(_section("调色板"))

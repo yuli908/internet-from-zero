@@ -31,7 +31,9 @@ func _init() -> void:
 	max_gates = SimDelays.gdscript_gate_limit()
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(696, 416)
+	# 默认画布 696×416；页面若在加入树前已显式定高（如 gate 让出讲解带），保留页面设置。
+	if custom_minimum_size == Vector2.ZERO:
+		custom_minimum_size = Vector2(696, 416)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_font = UiTheme.cjk_font()
 	_mono = UiTheme.mono_font()

@@ -6,10 +6,14 @@ extends Control
 
 signal solved(lab_id: String)
 
+const Teach = preload("res://src/ui/teaching.gd")
+
 var main: Control
 var lab_id := ""
 var lab_data: Dictionary = {}
 var objective_id := ""
+## 尝试次数跟踪：提示阶梯按 attempt 分级（1→L1、2→L2、≥3→L3）。
+var tracker := GateAttemptTracker.new()
 
 var side: VBoxContainer
 var center: VBoxContainer
@@ -27,6 +31,12 @@ var _result_title: Label
 var _result_detail: Label
 var _result_ok := false
 
+var _attempt := 0
+var _teach_label: Label
+var _hint_box: PanelContainer
+var _hint_label: Label
+var _feedback_label: Label
+
 func setup(main_ref: Control, p_lab_id: String) -> void:
 	main = main_ref
 	lab_id = p_lab_id
@@ -40,6 +50,7 @@ func setup(main_ref: Control, p_lab_id: String) -> void:
 	_build()
 	_finish_shell()
 	refresh_status()
+	_shot_hooks()
 
 func _build_shell(meta: Dictionary) -> void:
 	# 背景 + 6px 木框 + 黑板。左右各 18 内容边距，中心净宽 696。
@@ -146,11 +157,11 @@ func _build_shell(meta: Dictionary) -> void:
 	inspector = Ui.vbox(6)
 	_inspector_card.add_child(inspector)
 
-	# 结果条 58：底边 704。
+	# 结果条 36：单行（验收标题 + 明细），把下方 24 px 让给误区条。
 	_result_strip = Ui.card(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	_result_strip.position = Vector2(0, 622)
-	_result_strip.size = Vector2(1232, 58)
-	_result_strip.custom_minimum_size = Vector2(0, 58)
+	_result_strip.size = Vector2(1232, 36)
+	_result_strip.custom_minimum_size = Vector2(0, 36)
 	var strip_sb: StyleBoxFlat = UiTheme.flat(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	strip_sb.content_margin_top = 5
 	strip_sb.content_margin_bottom = 5
@@ -163,8 +174,9 @@ func _build_shell(meta: Dictionary) -> void:
 	_result_bar.custom_minimum_size = Vector2(3, 0)
 	_result_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rm.add_child(_result_bar)
-	var rc := Ui.vbox(0)
+	var rc := Ui.hbox(12)
 	rc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rm.add_child(rc)
 	_result_title = Ui.label("验收", UiTheme.F_BODY, UiTheme.CHALK)
 	rc.add_child(_result_title)
@@ -173,6 +185,17 @@ func _build_shell(meta: Dictionary) -> void:
 	_result_detail.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_result_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rc.add_child(_result_detail)
+
+	# 误区条：结果条下方专用一行（660–682），只在有 required 失败时出现；不压抬头、不进状态行。
+	_feedback_label = Ui.label("", UiTheme.F_META, UiTheme.RUST)
+	_feedback_label.position = Vector2(0, 660)
+	_feedback_label.size = Vector2(1232, 22)
+	_feedback_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_feedback_label.clip_text = true
+	_feedback_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_feedback_label.tooltip_text = ""
+	_feedback_label.visible = false
+	root.add_child(_feedback_label)
 
 func _build() -> void:
 	pass
@@ -270,6 +293,20 @@ func show_report(report: GateReport) -> void:
 	else:
 		_result_detail.text = "未通过：" + " / ".join(PackedStringArray(fail_details))
 		_result_detail.add_theme_color_override("font_color", UiTheme.RUST)
+	# 提示阶梯读到本次最大 attempt；误区只在 required 失败时出（成功即清空）。
+	_attempt = 0
+	for raw in report.cases:
+		var c: Dictionary = raw
+		_attempt = maxi(_attempt, int(c.get("attempt", 0)))
+	var mis := Teach.misconception_on_report(lab_data, report)
+	if _feedback_label != null:
+		_feedback_label.text = mis
+		_feedback_label.tooltip_text = mis
+		_feedback_label.visible = not mis.is_empty()
+	_on_attempt(_attempt)
+
+func _on_attempt(_a: int) -> void:
+	pass
 
 func _go_back() -> void:
 	if main != null and main.has_method("back_to_hub"):
@@ -310,3 +347,74 @@ func _hint_card(text: String) -> PanelContainer:
 	card.add_child(m)
 	m.add_child(Ui.wrap(text, UiTheme.F_BODY, UiTheme.CYAN))
 	return card
+
+## 教学层正文（body + rules）：常驻正文区，保存引用供验收断言。
+## 手工折行：autowrap 在容器未定宽时按 0 宽计算最小高度（会撑爆布局），这里按字符数固定折行。
+func _add_teaching(parent: Control, chars_per_line: int = 11, font_size: int = UiTheme.F_BODY) -> Label:
+	_teach_label = Ui.label(_flow(Teach.teaching_text(lab_data), chars_per_line), font_size, UiTheme.MUTED)
+	_teach_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(_teach_label)
+	return _teach_label
+
+## 提示层：空卡片挂在正文区，attempt ≥ 1 才显形（不许一开始就全显示）。
+func _add_hint(parent: Control, chars_per_line: int = 11) -> void:
+	_hint_box = Ui.card(UiTheme.alpha(UiTheme.CYAN, 0.05), UiTheme.alpha(UiTheme.CYAN, 0.35))
+	var m := Ui.margin4(12, 8, 12, 8)
+	_hint_label = Ui.label("", UiTheme.F_BODY, UiTheme.CYAN)
+	_hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	m.add_child(_hint_label)
+	_hint_box.add_child(m)
+	_hint_box.visible = false
+	_hint_box.set_meta("chars_per_line", chars_per_line)
+	parent.add_child(_hint_box)
+
+func _apply_hint(attempt: int) -> void:
+	if _hint_label == null:
+		return
+	_hint_label.text = _flow(Teach.hint_for_attempt(lab_data, attempt), int(_hint_box.get_meta("chars_per_line", 11)))
+	_hint_box.visible = not _hint_label.text.is_empty()
+
+static func _flow(text: String, chars_per_line: int) -> String:
+	var out := PackedStringArray()
+	for para in text.split("\n"):
+		var line := ""
+		for ch in para:
+			line += ch
+			if line.length() >= chars_per_line:
+				out.append(line)
+				line = ""
+		if not line.is_empty():
+			out.append(line)
+	return "\n".join(out)
+
+## 折行只加换行、不改字：用于断言「界面上显示的」与数据字段一致（忽略换行/空白差异）。
+static func flat_text(s: String) -> String:
+	return s.replace("\n", "").replace(" ", "").replace("\t", "")
+
+## 渲染证据：截图/走查时打印，用于断言「界面上真的显示了什么」，而不是只看代码存在。
+func teach_probe() -> Dictionary:
+	var t := _teach_label.text if _teach_label != null else ""
+	var h := _hint_label.text if _hint_label != null else ""
+	return {
+		"lab": lab_id,
+		"teach_len": t.length(),
+		"teach_src_len": Teach.teaching_text(lab_data).length(),
+		"teach_match": flat_text(t) == flat_text(Teach.teaching_text(lab_data)),
+		"hint_len": h.length(),
+		"hint_visible": _hint_box != null and _hint_box.visible,
+		"misconception": _feedback_label.text if _feedback_label != null else "",
+	}
+
+func _shot_hooks() -> void:
+	## 仅截图模式：--shot-fail 用真实数据跑一次必然失败的验收，用于拍失败态（含误区条）。
+	if CliArgs.value("shot", "").is_empty():
+		return
+	if CliArgs.has_flag("shot-fail"):
+		if has_method("_reset_for_fail_shot"):
+			call("_reset_for_fail_shot")
+		if has_method("_run_cases"):
+			call("_run_cases")
+	var p := teach_probe()
+	print("IFZ_TEACH lab=%s teach_len=%d src_len=%d match=%s hint_len=%d hint_visible=%s misconception_len=%d" % [
+		str(p["lab"]), int(p["teach_len"]), int(p["teach_src_len"]), str(p["teach_match"]),
+		int(p["hint_len"]), str(p["hint_visible"]), str(p["misconception"]).length()])

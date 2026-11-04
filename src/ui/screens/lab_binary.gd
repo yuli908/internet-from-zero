@@ -17,9 +17,7 @@ var _value := 0
 func _build() -> void:
 	# ---- 左栏：任务 / 8 位开关 / 覆盖进度 ----
 	side.add_child(_section("任务"))
-	var body := Ui.wrap(str(lab_data.get("body", "")), UiTheme.F_LABEL, UiTheme.MUTED)
-	body.custom_minimum_size = Vector2(0, 64)
-	side.add_child(body)
+	_add_teaching(side, 12, UiTheme.F_LABEL)
 	side.add_child(Ui.hline())
 	_switches = BitSwitches.new()
 	_switches.setup(int(lab_data.get("bit_count", 8)), 0)
@@ -97,6 +95,8 @@ func _build() -> void:
 	# ---- 右栏：进度与验收 ----
 	inspector.add_child(_section("验收"))
 	inspector.add_child(Ui.wrap("覆盖 0–15、摆出两个目标、答对辨析题，三条 gate 全过才记账。", UiTheme.F_META, UiTheme.MUTED))
+	# 提示层：attempt ≥ 1 才显形，放右栏。
+	_add_hint(inspector, 11)
 	inspector.add_child(Ui.spacer())
 	inspector.add_child(Ui.button("运行验收 T1.2", func(): _run_cases(), true))
 
@@ -135,13 +135,21 @@ func _pick_quiz(idx: int) -> void:
 		_quiz_status.add_theme_color_override("font_color", UiTheme.DANGER)
 	_save_state()
 
+func _reset_for_fail_shot() -> void:
+	_visited.clear()
+	_achieved.clear()
+	_quiz_answer = -1
+
 func _run_cases() -> void:
-	var rep := LabChecks.binary(lab_data, _visited, _achieved, _quiz_answer)
+	var rep := LabChecks.binary(lab_data, _visited, _achieved, _quiz_answer, tracker)
 	show_report(rep)
 	if pass_report(rep):
 		EventBus.toast("1.2 二进制 gate 全部通过", "ok")
 	else:
 		EventBus.toast("还有 gate 未通过：覆盖 0–15、摆出两个目标、答对辨析题", "warn")
+
+func _on_attempt(a: int) -> void:
+	_apply_hint(a)
 
 func _bin_text(v: int) -> String:
 	var nibbles: Array = []

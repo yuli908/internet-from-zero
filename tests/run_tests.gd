@@ -33,9 +33,10 @@ const SUITES := [
 	"res://tests/test_gate_result.gd",
 	"res://tests/test_ch01_grants.gd",
 	"res://tests/test_ch02.gd",
+	"res://tests/test_teaching.gd",
 ]
 
-# 声明的 check 数（2026-11-04 实测，总数 2368）。少一项即该 suite 判红。
+# 声明的 check 数（2026-11-04 实测，总数 2415）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
 	"test_bit_math": 27,
 	"test_logic_gates": 24,
@@ -62,6 +63,7 @@ const SUITE_EXPECT := {
 	"test_gate_result": 305,
 	"test_ch01_grants": 43,
 	"test_ch02": 100,
+	"test_teaching": 46,
 }
 
 const ABORT_PROBE := "res://tests/_abort_probe.gd"

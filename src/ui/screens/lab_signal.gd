@@ -47,7 +47,9 @@ func _build() -> void:
 	_wave = Waveform.new()
 	wm.add_child(_wave)
 	center.add_child(Ui.wrap("波形只显示 C 变化后的 F 跳变；窄脉冲宽度 ≥1 tick 即视为可观测毛刺。", UiTheme.F_BODY, UiTheme.MUTED))
-	center.add_child(Ui.wrap(str(lab_data.get("body", "")), UiTheme.F_BODY, UiTheme.MUTED))
+	_add_teaching(center, 30)
+	# 提示层：画布下方讲解带，attempt ≥ 1 才显形。
+	_add_hint(center, 30)
 
 	# ---- 右栏：辨析 + 验收 ----
 	var quiz: Dictionary = lab_data.get("quiz", {})
@@ -124,12 +126,15 @@ func _pick_quiz(idx: int) -> void:
 	_save_state()
 
 func _run_cases() -> void:
-	var rep := LabChecks.signal_cases(lab_data, _delay, _width, _clean, _quiz_answer)
+	var rep := LabChecks.signal_cases(lab_data, _delay, _width, _clean, _quiz_answer, tracker)
 	show_report(rep)
 	if pass_report(rep):
 		EventBus.toast("1.5 信号 gate 全部通过", "ok")
 	else:
 		EventBus.toast("仍有 gate 未通过：测延迟、复现毛刺、修复、答题", "warn")
+
+func _on_attempt(a: int) -> void:
+	_apply_hint(a)
 
 func _save_state() -> void:
 	save_state({"delay": _delay, "width": _width, "clean": _clean, "quiz": _quiz_answer})

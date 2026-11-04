@@ -61,10 +61,10 @@ func _build() -> void:
 	var editor_card := Ui.card_tight(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	editor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	editor_card.custom_minimum_size = Vector2(0, 418)
+	editor_card.custom_minimum_size = Vector2(0, 370)
 	center.add_child(editor_card)
 	_editor = CircuitEditor.new()
-	_editor.custom_minimum_size = Vector2(696, 416)
+	_editor.custom_minimum_size = Vector2(696, 370)
 	_editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor.changed.connect(_on_editor_changed)
@@ -83,6 +83,8 @@ func _build() -> void:
 		pal.add_child(b)
 		_pal_buttons[gs] = b
 	pal.add_child(Ui.spacer())
+	# 教学层：画布下方讲解带（这一版此前整段不显示）。
+	_add_teaching(center, 36, UiTheme.F_META)
 	center.add_child(Ui.spacer())
 
 	# ---- 右栏：目标真值表 + 验收 ----
@@ -94,6 +96,8 @@ func _build() -> void:
 	_live = Ui.mono("X", UiTheme.F_BODY_LG, UiTheme.MUTED)
 	inspector.add_child(_live)
 	inspector.add_child(Ui.wrap("黑盒只看 a/b → out 的行为，允许多解。", UiTheme.F_BODY, UiTheme.MUTED))
+	# 提示层：attempt ≥ 1 才显形，放右栏（不占画布高度）。
+	_add_hint(inspector, 11)
 	inspector.add_child(Ui.spacer())
 	inspector.add_child(Ui.button("运行验收 T%d.%d" % [int(DataDB.chapter.data.get("number", 1)), int(DataDB.chapter.lab(lab_id).get("order", 0))], func(): _run_cases(), true))
 
@@ -262,11 +266,20 @@ func _reset_task() -> void:
 	_current_task = ""
 	_switch_task(id)
 
+var _fail_shot := false
+
+func _reset_for_fail_shot() -> void:
+	_fail_shot = true
+
 func _run_cases() -> void:
 	_save_current()
-	var rep := LabChecks.gate(lab_data, _graphs, {"encapsulated": _encapsulated})
+	var graphs := {} if _fail_shot else _graphs
+	var rep := LabChecks.gate(lab_data, graphs, {"encapsulated": _encapsulated}, tracker)
 	show_report(rep)
 	pass_report(rep)
+
+func _on_attempt(a: int) -> void:
+	_apply_hint(a)
 
 func _save_state() -> void:
 	if _editor != null and not _current_task.is_empty():

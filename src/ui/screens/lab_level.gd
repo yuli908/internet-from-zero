@@ -14,9 +14,7 @@ func _build() -> void:
 	var th := VoltageModel.thresholds(lab_data)
 	# ---- 左栏：任务说明 / 电压读数 / 调压 ----
 	side.add_child(_section("任务"))
-	var body := Ui.wrap(str(lab_data.get("body", "")), UiTheme.F_BODY, UiTheme.MUTED)
-	body.custom_minimum_size = Vector2(0, 64)
-	side.add_child(body)
+	_add_teaching(side, 12)
 	side.add_child(Ui.hline())
 	side.add_child(_section("当前电压"))
 	_value_label = Ui.mono("0.00 V", UiTheme.F_H1, UiTheme.AMBER)
