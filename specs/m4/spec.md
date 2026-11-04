@@ -1,6 +1,6 @@
 # M4 规格：宏单元接入 + CH02 判定 kind + 题库接口 + 难度三档预留
 
-- 状态：**待批准（2026-11-04 提出；批准前不写实现代码）**
+- 状态：**已批准（2026-11-04 批准；T0→T5 已实现，回归 1810 checks / 0 failures）**
 - 日期：2026-11-04
 - 作者：技术实现（M3 交付方）
 - 上游依据（**只读，不改不提交**）：
@@ -113,6 +113,23 @@ static func fold(kind: String, prefix: String) -> Dictionary
 三块语义分组（算术 = `ctrl`+`adder`+`flags`，逻辑 = `logic`，选择 = `sel1`+`sel2`+`sel3`）与分页同时存在：
 **玩家看到的是页，不是 166 门整图**。移位是重接线、无门（参考实现明示），不得为它伪造延迟或门。
 
+### 3.1.2 alu4 `t_settle` 结构推导（已锁定，2026-11-04）
+
+alu4 无门级网表、不可实测，按 `components.py::ALU._build()` 的关键路径逐段相加；延迟值取 `SimDelays.delay()`：
+
+| 段 | 路径 | 推导式 | 值 |
+|---|---|---|---|
+| 控制 | `op → nop(not) → sub(and)` | `not + and` | 1 + 3 = **4** |
+| 补码选择 | `sub → b_sel mux2(not+and+or)` | `not + and + or` | 1 + 3 + 3 = **7** |
+| 行波加 | `b_sel → 4 位 FA 链`（与 `SimModule` ripple 同构） | `xor + W*(and+or)`（W=4） | 4 + 4×6 = **28** |
+| 选择数据路径 | `sum → ga mux → y mux`（两级各 `and+or`） | `2*(and+or)` | 2×6 = **12** |
+| V 标志 | `结果 MSB → ns(not) → v.t2(and) → v.or(or) → flagv(and)` | `not+and+or+and` | 10 |
+
+**`t_settle(alu4, W=4) = 4 + 7 + 28 + 12 + 10 = 61` tick。**
+Z 标志（`nor`，2）与 C 标志（`and`，3）都在第 3 段之后，不构成更差路径；移位是重接线，无门。
+测试不硬编码 61：`tests/test_macro.gd` 用 `SimDelays` 重新计算上表公式并断言 `meta("alu4")["t_settle"]` 相等；
+若延迟表变更，推导值随动。与仿真组若日后给出实测值不一致，按 `PROGRESS` 偏差 22 处理。
+
 ### 3.2 8 种 CH02 trace kind（`src/sim/trace_sink.gd`）
 
 **命名规则（零发明）**：trace kind = `docs/design/11` §3 的判定 kind 全大写；`build_area` 是可选语法糖，不计入 8 种。
@@ -209,6 +226,8 @@ static func is_valid(v: String) -> bool
 | `src/core/difficulty.gd` | 新增 |
 | `src/core/player_state.gd` | 修改（难度字段 + 存档读写） |
 | `tests/test_macro.gd` / `test_ch02_kinds.gd` / `test_questions.gd` / `test_difficulty.gd` | 新增 |
+| `tests/fixtures/questions/ch01_exercises.json` | 新增（仅测试 fixture，不进 `data/`） |
+| `specs/m4/ui_contract.md` | 新增（UI 接线契约，≤1 页） |
 | `tests/run_tests.gd` | 修改（注册 4 个套件） |
 | `docs/PROGRESS.md` | 修改（§2.16+、偏差 21+） |
 
@@ -225,7 +244,7 @@ static func is_valid(v: String) -> bool
 | M4-G5 | `tests/test_questions.gd`：合法 fixture 载入/评分确定性；缺字段、非法 `type`、`build` 题无 `solutions` 各报错；未知题 id 返回 `ok=false`；不改 `manifest.json` |
 | M4-G6 | `tests/test_difficulty.gd`：三档合法、未知值归一为 `EXPLAIN`、默认 `EXPLAIN`、存档往返保留、缺失字段读档回落 |
 | M4-G7 | L2 向量回归：`tests/test_l2_vectors.gd` 132/132（`alu4` 8 行仍不比对，偏差 17） |
-| M4-G8 | 全量回归 `RESULT: N checks, 0 failures`（N 由实现时汇总，不得低于 1621） |
+| M4-G8 | 全量回归 `RESULT: N checks, 0 failures`（N 由实现时汇总，不得低于 1621）；**实测 1810** |
 | M4-G9 | `git diff --stat -- project.godot src/ui/ data/chapters/ data/labs/ docs/design/ docs/simulation/ docs/curriculum/` 为空（UI 会话的改动不算本会话） |
 | M4-G10 | 预算同源：所有 `>50` 提示与 `>80` 错误均引用 `SimDelays`，测试断言无硬编码数字 |
 
@@ -257,13 +276,16 @@ static func is_valid(v: String) -> bool
 | R3 | 42 道题库的实际条数与配比 | 已核对口径：42 = 第一章**练习**（`docs/curriculum/03` §2，理解 11/计算 14/搭建 6/调试 5/开放 6）；12 = 每章**小测**（`06` §2）；168 = 14 章小测规划。三者是不同 bank，加载器不假设条数，M4 不写死 |
 | R4 | 8 种 trace kind 的命名 | 采用"判定 kind 全大写"的机械映射（§3.2），避免自造词；如需改名由负责人一次性裁决 |
 | R5 | UI 才能验证的点（视图绘制、难度开关、题库页面） | **待 UI 会话接回**：M4 只交付只读模型与接口，不碰 `src/ui/` |
-| R6 | alu4 的 `t_settle` | 规格不预填；实现时按 §3.1 结构推导并在测试中锁定，若与仿真组实测不符记偏差 |
+| R6 | alu4 的 `t_settle` | **已按 §3.1.2 结构推导锁定为 61 tick**（无门级网表，不可实测）；测试用 `SimDelays` 重算公式断言，不硬编码；若仿真组给实测值不一致，记偏差 22 |
 | R7 | 三档行为差异 | M4 只预留字段；`SYNC/MASK` 的真实语义在 M5 接入，避免"开关存在但不生效"被误读 |
 | R8 | 超限错误码命名 | 工程内统一 `IFZ_E_SCALE`（M3/M4 共用）；`docs/simulation/10` §6.4 写作 `E_L1_SCALE`，语义相同，**不改只读文档**，在偏差表注明 |
 
 ## 9. 验收命令（批准后照此执行）
 
 ```powershell
+# 0) 仅首次：新增 class_name 脚本需刷新全局类缓存（否则 headless 报 Identifier 未声明）
+& "C:\tools\godot-4.4.1\godot.cmd" --headless --path . --editor --quit
+
 # 1) 全量测试（含新增 4 套件）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
 

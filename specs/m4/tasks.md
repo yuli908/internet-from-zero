@@ -1,6 +1,6 @@
 # M4 任务清单（规格批准后执行）
 
-> 状态：**全部待开始**。规格 `spec.md` 未批准前不得写实现代码。
+> 状态：**T0–T5 已全部完成（2026-11-04）**；回归 `RESULT: 1810 checks, 0 failures`。
 > 每完成一个 T 提交一次；提交只 add 本 T 列出的路径。`git index.lock` 出现时等待重试，**不删锁**。
 > 边界：不碰 `project.godot`、`src/ui/**`、`docs/design/`、`docs/simulation/`、`docs/curriculum/`、
 > `data/chapters/**`、`data/labs/**`。需要 UI 才能验证的项标「待 UI 会话接回」。

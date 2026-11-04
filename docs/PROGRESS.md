@@ -1,6 +1,6 @@
 # 进度与偏差（PROGRESS）
 
-- 里程碑：**M1 已验收；M2 已交付（A/B/C/D 全部完成）；M3 规格已批准（2026-11-04，含性能现实约束追加条款，见 `specs/m3/`）**
+- 里程碑：**M1 已验收；M2 已交付（A/B/C/D 全部完成）；M3 已交付（T0→T8 + 验收表）；M4 已交付（T0→T5：宏单元 / 8 种 CH02 kind / 题库接口 / 难度三档）**
 - 基线日期：2026-11-04
 - 口径：只有**跑过、有证据**的项才标"已完成"；没验证的一律标"需人工"或"未完成"，不写成通过。
 - 证据目录：`artifacts/shots/`（11 张截图）、`artifacts/logs/`（导入/测试/冒烟/基准日志）
@@ -8,7 +8,7 @@
 ## 1. 一句话结论
 
 M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 + 24 条 gate + 多解黑盒 + L0a/L0b/L1 仿真；
-`RESULT: 1410 checks, 0 failures`。
+当前基线 `RESULT: 1810 checks, 0 failures`（22 套件，含 M3/M4 追加）。
 
 M2 进度（顺序固定，不跳步）：
 
@@ -40,9 +40,10 @@ M1 **没有**做到：L3–L7、原生 GDExtension、沙箱与真实集成、题
 | UI | 工作台（6 实验卡）、6 个实验页、知识树、商店、档案、诊断；点击式电路编辑器；波形与判读条 | `artifacts/shots/*.png`（workbench/shop/skills/archive/diagnostics + lab_level…lab_half_adder） |
 | 工程化 | `README.md`、5 篇 ADR、本文件、4 个 PowerShell 脚本、CI 草案、`native/` 脚手架 | 本文档与 `scripts/selfcheck.ps1` |
 
-### 2.1 自动测试构成（13 套件，1410 项）
+### 2.1 自动测试构成（22 套件，1810 项）
 
-`bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `l2` / `black_box` / `lab_checks`
+`bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `l2` / `black_box` / `lab_checks` / `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards` / `macro` / `ch02_kinds` / `questions` / `difficulty`
+（M3 追加 `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards`；M4 追加 `macro` / `ch02_kinds` / `questions` / `difficulty`）
 
 ### 2.2 A 性能基准关实测（2026-11-04）
 
@@ -303,9 +304,56 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - **实测**：`l2_vectors.json` 实际 **140 行**（`determinism.rows` 计数同 140，测试逐键对账并断言总数 140、种子 539365636）；
   接口消息与偏差 17 原写的"143 行"系笔误，已更正。余下只有 `alu4` 8 行不比对。
 - 全量回归：**1631 checks, 0 failures**（T8 的 1610 + 21 项）。
-- **ALU 宏单元方案**（只写规格、未实现）：ALU 166 门不进可交互门级视图，按参考结构拆 7 个只读页
+- **ALU 宏单元方案**（M4 准备阶段只写规格；实现见 §2.16）：ALU 166 门不进可交互门级视图，按参考结构拆 7 个只读页
   （5/40/9/16/48/32/16，每页 ≤50），三块语义分组算术/逻辑/选择；展开/折叠边界与 `IFZ_E_SCALE` 口径见
   `specs/m4/spec.md` §3.1。
+
+### 2.16 M4 T0：宏单元接口与 ALU 七页只读视图（2026-11-04）
+
+- 新增 `data/sim/macros.json`（`ifz-macros/1`）：decoder3 **11 门**、comparator4 **33 门**、alu4 **166 门**（`expandable=false`）；
+  alu4 七页 `alu.ctrl/adder/flags/logic/sel1/sel2/sel3` = **5/40/9/16/48/32/16**，合计 **166**，单页最大 **48 ≤ 50**。
+- 新增 `src/sim/sim_macro.gd`：`cells()/meta()/pages()/expand()/expand_page()/fold()`；
+  `expand()` 先查 `c.gate_count()`，`> gdscript_gate_limit()` 返回 `scale_warn`（提示结构级表示），
+  `> gdscript_gate_hard_cap()` 返回 `IFZ_E_SCALE` 且**一个门都不写**（禁止只画一部分）；
+  alu4 整块展开必返 `IFZ_E_SCALE`，只能 `expand_page()` 只读查看。
+- **实测**：decoder3 展开后电路门数 11、comparator4 33；alu4 整块展开被拒后门数仍为 0；
+  预置 45 门 + decoder3 11 = 56 → `ok=true, scale_warn=true`；预置 70 门 + 11 = 81 → `IFZ_E_SCALE` 且门数不变 70；
+  展开→折叠→再展开 `state_digest` 相同；`fold()` 摘要稳定。
+- `alu4 t_settle` 按 `SimDelays` 结构推导锁定 **61 tick**（推导见 `specs/m4/spec.md` §3.1.2），测试用公式重算，不硬编码。
+- 测试：`tests/test_macro.gd`（M4-G1/G2/G10）；回归后 **1810 checks / 0 failures**。
+
+### 2.17 M4 T1：8 种 CH02 判定 trace kind（2026-11-04）
+
+- `TraceSink.KINDS` 7 → **15**：新增 `MOSFET_REGION / X_PROPAGATION / STATIC_CURRENT / RAIL_MARGIN / EQUIV / AREA_MAX / POWER_CALC / POWER_RATIO`，
+  5 字段 schema 与 `digest()` 未改；`LAYERS` 未改。
+- 新增 `TraceSink.REQUIRED_KEYS`：8 种 kind 的固定 payload 键与类型；缺键/类型不符 → `rejected++` 并拒绝；
+  既有 7 种 kind 不受影响。
+- `SimCircuit` 新增 `JUDGEMENT_KINDS`（小写判定 kind → 全大写 trace kind，8 项）与
+  `record_judgement(kind, subject, payload, at_tick=-1)`；`build_area` 不在映射内，不产生事件；
+  `SimCircuit` 另加只读 `gate_count()/dff_count()` 供预算检查。
+- **实测**：8 种 kind 各写 1 条 → 8 条、无拒绝、每条仍恰好 5 字段；缺键与类型不符各拒绝 1 次；
+  1 tick/帧 与 4 tick/帧 的事件流 `digest()` 相同、事件逐条相同；开/关 trace 的末态 `state_digest` 相同。
+- 测试：`tests/test_ch02_kinds.gd`（M4-G3/G4）；`tests/test_trace.gd` 的白名单条数断言由 7 改为 15。
+
+### 2.18 M4 T2：题库接入接口（只接口，不落题目）（2026-11-04）
+
+- 新增 `src/core/question_bank.gd`：`from_doc()/validate()/item()/score()/error_codes()`；
+  校验缺 `id/stem/type`、`type` 非法、`solutions < 2`、`rubric` 权重和 ≠ 100、`build` 题缺"正确性"维、`id` 重复、
+  `answer`/`answer_value` 类型与 `tol` 合法性；条数不假设（`items.size()` 不做断言）。
+- 评分只做确定性比较：`{"choice": int}` 与 `{"value": number}` 满分 100；无自动判分字段的题（含 `build`）
+  返回 `manual=true, score=0`，交人工 rubric；未知题 → `ok=false, error_code=E_UNKNOWN_ITEM`；
+  形状不符 → `E_RESPONSE`。错因码常量 **C1–C9**。
+- **不落数据**：`data/questions/` 未创建、`data/manifest.json` 未改；fixture 仅
+  `tests/fixtures/questions/ch01_exercises.json`（3 条自造样本），正式 42 题等教学组交付。
+- 测试：`tests/test_questions.gd`（M4-G5）。
+
+### 2.19 M4 T3：难度三档预留（2026-11-04）
+
+- 新增 `src/core/difficulty.gd`：`EXPLAIN/SYNC/MASK`、`names()/is_valid()/normalize()`；未知/空串归一 `EXPLAIN`。
+- `PlayerState` 新增 `difficulty`（默认 `EXPLAIN`），写存档 `settings.difficulty`；读档缺失、非法或 `settings` 非字典
+  → 回落 `EXPLAIN`；**不升存档版本**（v1 旧档读档后仍为 v1）。
+- M4 **不改仿真行为**：`SimCircuit` 未引入 `pulse_threshold` / 采样吸收；`SYNC/MASK` 语义留 M5。
+- 测试：`tests/test_difficulty.gd`（M4-G6）。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -332,6 +380,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 19 | G6 写 `period = t_clk_min + 5`（4 位 = 19） | 实测用 **`min+6 = 20`**（Clock 要求偶数，19 非法）；G6 的"周期=10 时 X+METASTABLE"仍按要求断言 | `min+5` 与"偶数"约束冲突；取满足两者的最小偶数 20，语义（确定性）不变 |
 | 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **已补齐**：`tests/data/l3_vectors.json` 24 个用例 / 51 条期望，`tests/test_l3_vectors.gd` 逐条比对 tick / Q 值 / 最后一条 L3 trace kind / 亚稳态 reason。补齐过程中发现真实缺陷：`create_register`/`create_shift_register` 先建 EN mux、后建 Q 线网，Q 初值被门输入隐式初始化为 X（移位寄存器首个沿即采样到 X）→ 已改为先建 Q 线网，回归全过 | 先前的"上下文预算"原因已消除；G8 现在是机器可判定的 |
 | 21 | `docs/simulation/10` §6.4 超限错误码写作 `E_L1_SCALE` | 工程内统一为 **`IFZ_E_SCALE`**（`SimDelays`/`SimCircuit`/M3 验收口径一致） | 错误码前缀统一到 `IFZ_E_*`，避免同一约束两个名字；**`docs/simulation/` 不改**，由仿真组据本行统一 |
+| 22 | alu4（166 门）无门级网表，`t_settle` 没有可实测的对象 | 按 `components.py::ALU._build()` 关键路径结构推导为 **61 tick**（控制 4 + 补码选择 7 + 行波加 28 + 两级选择 12 + V 标志 10），`tests/test_macro.gd` 用 `SimDelays` 公式重算断言、不硬编码 | 80 门硬上限决定了 ALU 不能进可交互门级视图；没有网表就没有实测条件。若仿真组日后给出 ALU 实测值，以实测为准并改本行，**`docs/simulation/` 不改** |
+| 23 | `docs/design/11` §3 的 8 种判定 kind 为英文小写（`mosfet_region` … `power_ratio`） | trace kind 取**全大写机械映射**（`MOSFET_REGION` … `POWER_RATIO`），映射表在 `SimCircuit.JUDGEMENT_KINDS`；`build_area` 是语法糖，不产生 trace，也不计入 8 种 | 避免自造词、避免小写/大写两套事件名；映射只有一处（`docs/design/11` → 工程常量），UI 按 `specs/m4/ui_contract.md` 接线 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -353,9 +403,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **L3 已完成（2026-11-04）**；L4–L6 未完成 | 见 §2.6–§2.13：`SimDff`（setup/hold/RESET→X+METASTABLE）+ `SimSequential`（寄存器/计数器/移位寄存器，含 EN/LOAD）+ `tests/test_l3.gd`（63 项）。L4–L6 仅规格 |
 | 统一 `TraceSink`（`(tick, layer, kind, subject, payload)`） | **已完成（2026-11-04）** | 见 §2.9：5 字段 schema、kind 白名单、环形缓冲、`digest()`、1 vs 4 tick/帧摘要一致；`tests/test_trace.gd` 34 项 |
 | 第一章每节物品奖励入库 | **机制已完成（2026-11-04）；数据待策划** | 见 §2.11：`PlayerState.grant_items` 幂等 + 原子校验 + `dry_run`，`tests/test_rewards.gd` 28 项；`ch01_levels.json` 一行未改，等策划奖励表定稿 |
-| 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **未完成** | 当前固定为 EXPLAIN 行为 |
-| 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 |
-| 42 道练习题库与逐题评分表 | **未完成** | 只有第一章 24 条 gate + 多解黑盒 |
+| 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **字段已完成（M4，2026-11-04）；行为与 UI 开关未完成** | 见 §2.19：`Difficulty` + `PlayerState.settings.difficulty` + 存档往返/回落测试；**不改仿真行为**，`SYNC/MASK` 语义留 M5；开关绘制待 UI 会话 |
+| 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 `IFZ_E_*` |
+| 42 道练习题库与逐题评分表 | **接口已完成（M4）；题目未交付** | 见 §2.18：`QuestionBank` 加载/校验/评分 + `tests/test_questions.gd`；`data/questions/` 与 42 题本体等教学组，M4 只用 `tests/fixtures/` 3 条样本锁行为 |
 | 6 节脚本化走查（UI 真实链路 → 验收 → 知识树 → 存档 → 重启读档） | **已完成（2026-11-04）** | 见 §2.5：`--walkthrough` 72 项 0 失败，`--verify-walkthrough` 36 项一致；物品奖励本章未定义，仅断言不变 |
 | 6 节真人鼠标走查（操作 → 验收 → 知识树 completed → 存档 → 重启续玩） | **需人工** | 脚本走查绕过鼠标点击/连线动作，真人交互仍需按 `docs/design/08` 走一遍 |
 | 截图冒烟之外的交互验证（拖拽/撤销不出现在 M1）、引导 6 步真实走查 | **需人工** | 需真人按 `docs/design/08` 走一遍 |
@@ -383,6 +433,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | G14 | 三档 3 次 p95 + `limits` 50/50/80 + 偏差 15 行 | 通过（§2.7） |
 | G15 | `tests/test_circuit.gd` G15 段：上限来自 `SimDelays`、>50 提示结构级、>80 报 `IFZ_E_SCALE` | 通过 |
 
+### 4.2 M4 验收项（G1–G10）
+
+| 关 | 判定方式（机器可跑） | 结果 |
+|---|---|---|
+| M4-G1 | `tests/test_macro.gd`：3 个宏单元、门数 11/33/166、alu4 七页 5/40/9/16/48/32/16 合计 166、每页 ≤ `gdscript_gate_limit()`、`t_settle` 4/11/61 | 通过 |
+| M4-G2 | 同套件：`expand("alu4")` → `IFZ_E_SCALE`；decoder3/comparator4 展开门数 11/33；`fold()` 端口摘要；展开→折叠→再展开 `state_digest` 相同 | 通过 |
+| M4-G3 | `tests/test_ch02_kinds.gd`：8 种 kind 可写、`KINDS.size()==15`、每条 5 字段、未知 kind 拒绝、1 vs 4 tick/帧 `digest()` 相同、开/关 trace 末态相同 | 通过 |
+| M4-G4 | 同套件：8 个判定 kind ↔ trace kind 逐项断言 8/8，`build_area` 显式排除 | 通过 |
+| M4-G5 | `tests/test_questions.gd`：fixture 3 条载入、评分确定性、8 类非法文档报错、未知 id `ok=false`、`manifest.json` 未改 | 通过 |
+| M4-G6 | `tests/test_difficulty.gd`：三档命名/归一/默认/存档往返/缺字段回落（含 v1 旧档不升版本） | 通过 |
+| M4-G7 | `tests/test_l2_vectors.gd` 132/132（`alu4` 8 行不比对，偏差 17） | 通过 |
+| M4-G8 | `RESULT: 1810 checks, 0 failures`（22 套件） | 通过 |
+| M4-G9 | `git diff --stat -- project.godot src/ui/ data/chapters/ data/labs/ docs/design/ docs/simulation/ docs/curriculum/` 为空（仅统计本会话提交；UI 会话改动不计） | 通过（按本会话提交路径核对） |
+| M4-G10 | `test_macro` 预算段：45+11=56 → `scale_warn`；70+11=81 → `IFZ_E_SCALE` 且门数不变；阈值均来自 `SimDelays`，测试无硬编码 50/80 | 通过 |
+
+**待 UI 会话接回**（不计入机器 Gate，M4 只留接口与事件名，见 `specs/m4/ui_contract.md`）：
+宏单元页绘制、ALU 七页只读视图、难度开关、题库页面、错因反馈卡、埋点上报（`item_start/item_submit/hint_open/lab_check/scale_warn/view_page_open/view_fold`）。
+
 ## 5. 已知文档 ↔ 工程冲突（不自行改代码，交负责人裁决）
 
 | 冲突 | 文档侧 | 工程侧 | 建议 |
@@ -397,17 +465,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M3 已交付；M4 准备 A 已闭合 L2 向量）
+## 6. 下一步（M4 已交付；等 CH02 内容与 UI 会话接回）
 
-M3 已按 T0→OPT→T1…T8 交付，验收汇总见 §4.1。2026-11-04 的 M4 准备阶段已补 decoder3/comparator4
-（L2 向量 132/132，见 §2.15）。仍未完成：原生 GDExtension、冒险三档、错误码编号、42 道题库、
-CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）——接口见 `specs/m4/spec.md`（待批准）。
-`alu4` 8 行不比对：按 80 门硬上限走宏单元，M4 只提供 ≤50 门子视图。
+M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页只读视图、8 种 CH02 trace kind、题库接口、
+难度三档字段（§2.16–§2.19）。**未完成且不在本会话范围**：
+
+- CH02 的 gate 与奖励数值：等 `docs/design/11-ch02-content-spec.md` 定稿；
+- 42 题正式题库：等教学组 `docs/curriculum/` 交付（`data/questions/`、`manifest.json` 由交付方登记）；
+- 只读视图绘制、难度开关、题库页面、埋点：**待 UI 会话接回**，接口与事件名见 `specs/m4/ui_contract.md`；
+- `SYNC/MASK` 的实际采样语义：留 M5（M4 只保留字段，不改仿真行为）；
+- 原生 GDExtension、ALU 8 行向量比对（`alu4` 仍只比对 0/8，见偏差 17/22）。
+
+`alu4` 整块展开按 80 门硬上限拒绝（`IFZ_E_SCALE`），只提供 ≤50 门只读页。
 
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1631 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1810 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
