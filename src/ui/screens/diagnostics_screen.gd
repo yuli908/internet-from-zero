@@ -18,7 +18,6 @@ func _build() -> void:
 
 	var head := Ui.hbox(12)
 	page.add_child(head)
-	head.add_child(Ui.title("诊断 · 数据与自检", 22))
 	head.add_child(Ui.spacer())
 	var revalidate := Ui.button("重新校验数据", _on_revalidate)
 	revalidate.custom_minimum_size = Vector2(132, 32)
@@ -61,19 +60,16 @@ func _data_block() -> PanelContainer:
 	var status := Ui.hbox(14)
 	col.add_child(status)
 	status.add_child(Ui.status_dot(UiTheme.OK if DataDB.ready_ok else UiTheme.DANGER, 9))
-	status.add_child(Ui.label("校验通过" if DataDB.ready_ok else "存在问题", 15, UiTheme.OK if DataDB.ready_ok else UiTheme.DANGER))
 	status.add_child(Ui.spacer())
 	status.add_child(Ui.stat("加载文件", str(DataDB.loaded_files)))
 	status.add_child(Ui.stat("数据版本", "v%d" % DataDB.data_version))
 	status.add_child(Ui.stat("清单条目", str(_manifest_count())))
 	status.add_child(Ui.stat("章节", _chapter_id()))
 
-	col.add_child(Ui.label("错误列表", 11, UiTheme.MUTED))
 	var errs: Array = DataDB.errors
 	if errs.is_empty():
-		col.add_child(Ui.label("无（文件与引用关系全部通过校验）", 12, UiTheme.OK))
 		return card
-	col.add_child(Ui.label("%d 个问题" % errs.size(), 12, UiTheme.DANGER))
+	col.add_child(Ui.label("%d 个问题" % errs.size(), UiTheme.F_META, UiTheme.DANGER))
 	for raw_err in errs:
 		var row := Ui.hbox(8)
 		row.add_child(Ui.status_dot(UiTheme.DANGER, 6))
@@ -111,7 +107,7 @@ func _lab_header() -> VBoxContainer:
 	row.add_child(_cell("数据键", 96, UiTheme.MUTED, 11))
 	row.add_child(_cell("解锁", 52, UiTheme.MUTED, 11))
 	row.add_child(_cell("目标", 52, UiTheme.MUTED, 11))
-	row.add_child(_cell("锁定原因", 0, UiTheme.MUTED, 11))
+	row.add_child(_cell("原因", 0, UiTheme.MUTED, 11))
 	col.add_child(Ui.hline())
 	return col
 
@@ -137,8 +133,8 @@ func _lab_row(lab_id: String) -> HBoxContainer:
 		title_cell.tooltip_text = obj_title
 	row.add_child(title_cell)
 	row.add_child(_cell(str(lab.get("data_key", "—")), 96, UiTheme.MUTED))
-	row.add_child(_cell("可用" if unlocked else "锁定", 52, UiTheme.OK if unlocked else UiTheme.AMBER))
-	row.add_child(_cell("已完成" if obj_done else "未完成", 52, UiTheme.OK if obj_done else UiTheme.MUTED))
+	row.add_child(_cell("●" if unlocked else "", 52, UiTheme.OK if unlocked else UiTheme.MUTED))
+	row.add_child(_cell("✓" if obj_done else "·", 52, UiTheme.OK if obj_done else UiTheme.MUTED))
 	row.add_child(_cell(reason if not reason.is_empty() else "—", 0, UiTheme.AMBER if not reason.is_empty() else UiTheme.MUTED))
 	return row
 
@@ -180,7 +176,7 @@ func _system_block() -> PanelContainer:
 	col.add_child(stats)
 	stats.add_child(Ui.stat("知识树进度", "%d / %d" % [int(kp.get("done", 0)), int(kp.get("total", 0))], UiTheme.ACCENT))
 	stats.add_child(Ui.stat("节点总数", str(nodes.size())))
-	stats.add_child(Ui.stat("已解锁节点", str(unlocked_count), UiTheme.OK))
+	stats.add_child(Ui.stat("节点", str(unlocked_count), UiTheme.OK))
 	stats.add_child(Ui.stat("技能节点", str(skill_count), UiTheme.AMBER))
 
 	var info: Dictionary = SaveManager.slot_info(1)
@@ -198,11 +194,11 @@ func _system_block() -> PanelContainer:
 
 	var save_row := Ui.hbox(12)
 	col.add_child(save_row)
-	save_row.add_child(Ui.label("当前存档", 11, UiTheme.MUTED))
-	save_row.add_child(Ui.label(slot_text, 13, slot_color))
+	save_row.add_child(Ui.label(slot_text, UiTheme.F_META, slot_color))
 	save_row.add_child(Ui.spacer())
 	var last := SaveManager.last_message
-	save_row.add_child(Ui.label("最近：%s" % (last if not last.is_empty() else "—"), 11, UiTheme.MUTED))
+	if not last.is_empty():
+		save_row.add_child(Ui.label(last, UiTheme.F_META, UiTheme.MUTED))
 
 	var ver: Dictionary = Engine.get_version_info()
 	var env_row := Ui.hbox(18)
@@ -211,19 +207,16 @@ func _system_block() -> PanelContainer:
 	env_row.add_child(Ui.stat("版本号", "%s.%s.%s" % [str(ver.get("major", "?")), str(ver.get("minor", "?")), str(ver.get("patch", "?"))]))
 	env_row.add_child(Ui.stat("平台", OS.get_name()))
 	env_row.add_child(Ui.spacer())
-	env_row.add_child(Ui.label("界面全部由 GDScript 构建 · 无 .tscn", 11, UiTheme.MUTED))
 	return card
 
 func _on_revalidate() -> void:
 	if DataDB.has_method("validate"):
 		DataDB.call("validate")
-		EventBus.toast("已重新校验数据：%d 个问题" % DataDB.errors.size(), "info")
 	elif DataDB.has_method("load_all"):
 		DataDB.call("load_all")
-		var msg := "已重新加载并校验：%d 个问题" % DataDB.errors.size()
-		EventBus.toast(msg, ("ok" if DataDB.errors.is_empty() else "warn"))
-	else:
-		EventBus.toast("数据服务没有校验接口，当前记录 %d 个问题，已刷新显示" % DataDB.errors.size(), "warn")
+	# 只有出现问题时才提示（出错原因走结果通道）；无问题靠状态点转绿。
+	if not DataDB.errors.is_empty():
+		EventBus.toast("校验发现 %d 个问题" % DataDB.errors.size(), "error")
 	call_deferred("on_show")
 
 func _chapter_id() -> String:

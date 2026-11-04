@@ -70,49 +70,61 @@ func _build_shell(meta: Dictionary) -> void:
 	grain.offset_bottom = -6
 	add_child(grain)
 
-	var content := Ui.margin4(18, 10, 18, 10)
+	var content := Ui.margin4(18, 18, 18, 10)
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	content.offset_left = 6
 	content.offset_top = 6
 	content.offset_right = -6
 	content.offset_bottom = -6
 	add_child(content)
-	var root := Ui.vbox(10)
+	var root := Control.new()
 	content.add_child(root)
 
-	# 返回条 66
-	var header := Ui.hbox(14)
-	header.custom_minimum_size = Vector2(0, 66)
-	root.add_child(header)
-	var back := Ui.ghost("← 返回黑板", func(): _go_back())
-	back.custom_minimum_size = Vector2(140, UiTheme.CONTROL_H)
-	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(back)
-	var title_col := Ui.vbox(0)
-	title_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(title_col)
+	# 抬头 44：返回 44×44 @ (24,24)，标题 (86,24) 26 号，内容从 y=92 起。
+	var back := Ui.back_icon(func(): _go_back())
+	back.position = Vector2(0, 0)
+	back.size = Vector2(44, 44)
+	root.add_child(back)
+
 	_header_title = Ui.label(str(lab_data.get("title", meta.get("title", lab_id))), UiTheme.F_H2, UiTheme.CHALK)
-	title_col.add_child(_header_title)
-	_header_code = Ui.label(_code_text(meta), UiTheme.F_LABEL, UiTheme.MUTED)
+	_header_title.position = Vector2(62, 0)
+	_header_title.size = Vector2(600, 34)
+	_header_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_header_title.clip_text = true
+	root.add_child(_header_title)
+
+	_header_code = Ui.label(_code_text(meta), UiTheme.F_META, UiTheme.MUTED)
 	_header_code.add_theme_font_override("font", UiTheme.mono_font())
-	title_col.add_child(_header_code)
-	header.add_child(Ui.spacer())
-	_status_badge = Ui.label("进行中", UiTheme.F_META, UiTheme.AMBER)
-	_status_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(_status_badge)
+	_header_code.position = Vector2(62, 34)
+	_header_code.size = Vector2(820, 20)
+	_header_code.clip_text = true
+	root.add_child(_header_code)
+
+	_status_badge = Ui.label("●", UiTheme.F_META, UiTheme.AMBER)
+	_status_badge.position = Vector2(1000, 0)
+	_status_badge.size = Vector2(40, 44)
+	_status_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(_status_badge)
+
 	var gold_dot := ColorRect.new()
 	gold_dot.color = UiTheme.AMBER
-	gold_dot.custom_minimum_size = Vector2(6, 6)
-	gold_dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gold_dot.position = Vector2(1064, 19)
+	gold_dot.size = Vector2(6, 6)
 	gold_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	header.add_child(gold_dot)
+	root.add_child(gold_dot)
 	_gold_label = Ui.label("金币 --", UiTheme.F_BODY, UiTheme.AMBER)
-	_gold_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(_gold_label)
+	_gold_label.position = Vector2(1080, 0)
+	_gold_label.size = Vector2(152, 44)
+	_gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(_gold_label)
 
-	# 三栏
+	# 三栏：内容区 (24,92,1232,544)。
 	var body := Ui.hbox(18)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.position = Vector2(0, 68)
+	body.size = Vector2(1232, 544)
+	body.custom_minimum_size = Vector2(1232, 544)
 	root.add_child(body)
 
 	_side_card = Ui.card(UiTheme.alpha(UiTheme.CHALK, 0.04), UiTheme.LINE)
@@ -134,8 +146,10 @@ func _build_shell(meta: Dictionary) -> void:
 	inspector = Ui.vbox(6)
 	_inspector_card.add_child(inspector)
 
-	# 结果条 58（上下内边距收紧到 5，保证 58 而不是 62）
+	# 结果条 58：底边 704。
 	_result_strip = Ui.card(UiTheme.BOARD_SUNK, UiTheme.LINE)
+	_result_strip.position = Vector2(0, 622)
+	_result_strip.size = Vector2(1232, 58)
 	_result_strip.custom_minimum_size = Vector2(0, 58)
 	var strip_sb: StyleBoxFlat = UiTheme.flat(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	strip_sb.content_margin_top = 5
@@ -152,9 +166,9 @@ func _build_shell(meta: Dictionary) -> void:
 	var rc := Ui.vbox(0)
 	rc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	rm.add_child(rc)
-	_result_title = Ui.label("等待验收", UiTheme.F_BODY, UiTheme.CHALK)
+	_result_title = Ui.label("验收", UiTheme.F_BODY, UiTheme.CHALK)
 	rc.add_child(_result_title)
-	_result_detail = Ui.label("按右侧按钮运行；结果会直接写回存档。", UiTheme.F_BODY, UiTheme.MUTED)
+	_result_detail = Ui.label("", UiTheme.F_BODY, UiTheme.MUTED)
 	_result_detail.clip_text = true
 	_result_detail.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_result_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -178,7 +192,6 @@ func refresh_status() -> void:
 	if GameState.player == null:
 		return
 	if _status_badge != null:
-		_status_badge.text = "已完成" if is_done() else "进行中"
 		_status_badge.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if is_done() else UiTheme.AMBER)
 	if _gold_label != null:
 		_gold_label.text = "金币 %d" % GameState.player.gold
@@ -249,8 +262,11 @@ func show_report(report: GateReport) -> void:
 	_result_title.text = "验收 · 通过 %d/%d" % [ok_count, report.cases.size()]
 	_result_title.add_theme_color_override("font_color", color)
 	if fail_details.is_empty():
-		_result_detail.text = "全部通过，结果已写回存档。" if is_done() else "全部通过，正在记账…"
+		_result_detail.text = ""
 		_result_detail.add_theme_color_override("font_color", UiTheme.CHALK)
+		if is_done():
+			var reward: Dictionary = DataDB.chapter.lab(lab_id).get("reward", {})
+			_result_detail.text = "已记账 · 金币 +%d · XP +%d" % [int(reward.get("gold", 0)), int(reward.get("xp", 0))]
 	else:
 		_result_detail.text = "未通过：" + " / ".join(PackedStringArray(fail_details))
 		_result_detail.add_theme_color_override("font_color", UiTheme.RUST)
@@ -268,12 +284,13 @@ func _task_row(text: String) -> Array:
 	name_label.tooltip_text = text
 	row.add_child(name_label)
 	row.add_child(Ui.spacer())
-	var status := Ui.label("待完成", UiTheme.F_META, UiTheme.MUTED)
+	var status := Ui.label("·", UiTheme.F_META, UiTheme.MUTED)
 	row.add_child(status)
 	return [row, status]
 
-func _mark(label: Label, done: bool, done_text: String = "已完成") -> void:
-	label.text = done_text if done else "待完成"
+func _mark(label: Label, done: bool, _done_text: String = "") -> void:
+	## 状态用符号 + 颜色，不再写「已完成 / 待完成」。
+	label.text = "✓" if done else "·"
 	label.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if done else UiTheme.MUTED)
 
 func _section(text: String) -> Label:

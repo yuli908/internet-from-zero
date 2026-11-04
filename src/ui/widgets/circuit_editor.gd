@@ -17,11 +17,12 @@ var palette: Array = ["and", "or", "not"]
 var selected_gate := "and"
 var max_gates := 0
 var delay_per_gate := -1
-var last_status := ""
 
 var _link_from := ""
 var _font: Font
 var _mono: Font
+var _cap_notice := false
+var _flash_t := 0.0
 
 func _init() -> void:
 	# 内容侧硬约束：上限与仿真实测同源，不在此处另行硬编码。
@@ -30,7 +31,6 @@ func _init() -> void:
 func _ready() -> void:
 	custom_minimum_size = Vector2(696, 416)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	tooltip_text = "点 A/B 节点翻转输入；点输出端口再点输入端口连线；右键删门或断线"
 	_font = UiTheme.cjk_font()
 	_mono = UiTheme.mono_font()
 
@@ -98,6 +98,16 @@ func _ensure_layout() -> void:
 			n["pos"] = Vector2(size.x - 132.0, 46.0 + i * 84.0)
 		i += 1
 
+func _process(delta: float) -> void:
+	if _flash_t > 0.0:
+		_flash_t = maxf(0.0, _flash_t - delta)
+		queue_redraw()
+
+func _flash_error() -> void:
+	## 失败不再写字，只在编辑器外框闪 2 px rust。
+	_flash_t = 0.24
+	queue_redraw()
+
 func _draw() -> void:
 	_ensure_layout()
 	draw_rect(Rect2(Vector2.ZERO, size), UiTheme.BOARD_SUNK, true)
@@ -154,11 +164,13 @@ func _draw() -> void:
 		_draw_ports(id)
 
 	if not _link_from.is_empty():
-		draw_string(_font, Vector2(12, size.y - 16), "已选起点 %s，点击目标输入端口完成连线（右键取消）" % _link_from, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.AMBER)
-	elif last_status.is_empty():
-		draw_string(_font, Vector2(12, size.y - 16), "选中门：%s · 左键放门/连线 · 右键断线/删门" % selected_gate, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.MUTED)
-	else:
-		draw_string(_font, Vector2(12, size.y - 16), last_status, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.AMBER)
+		# 起点端口加 2 px 琥珀环，替代「已选起点…」的文字提示。
+		var p0 := _port_center(_link_from, "out")
+		draw_rect(Rect2(p0 - Vector2(9, 9), Vector2(18, 18)), UiTheme.AMBER, false, 2.0)
+	if _cap_notice:
+		draw_string(_font, Vector2(12, size.y - 14), "门数量已达上限 %d：该电路需要结构级表示" % max_gates, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.AMBER)
+	if _flash_t > 0.0:
+		draw_rect(Rect2(Vector2.ZERO, size), UiTheme.alpha(UiTheme.RUST, minf(1.0, _flash_t * 4.0)), false, 2.0)
 
 func _draw_dashed_rect(r: Rect2, color: Color) -> void:
 	var step := 7.0
@@ -256,7 +268,7 @@ func _gui_input(event: InputEvent) -> void:
 		_on_right(mb.position)
 
 func _on_left(p: Vector2) -> void:
-	last_status = ""
+	_cap_notice = false
 	var port := _port_hit(p)
 	if not port.is_empty():
 		var pid := str(port["id"])
@@ -268,15 +280,14 @@ func _on_left(p: Vector2) -> void:
 		if not _link_from.is_empty():
 			var res := graph.link(_link_from, pid, int(which))
 			if bool(res.get("ok", false)):
-				last_status = "已连线 %s → %s" % [_link_from, pid]
 				_link_from = ""
 				changed.emit()
 			else:
-				last_status = str(res.get("error", "连线失败"))
 				_link_from = ""
+				_flash_error()
 			queue_redraw()
 			return
-		last_status = "先点一个输出端口作为起点"
+		_flash_error()
 		queue_redraw()
 		return
 
@@ -293,17 +304,16 @@ func _on_left(p: Vector2) -> void:
 				var idx := palette.find(cur)
 				var next := str(palette[(idx + 1) % palette.size()])
 				graph.set_gate_type(nid, LogicGates.from_string(next))
-				last_status = "门 %s → %s" % [nid, next]
 				changed.emit()
 		queue_redraw()
 		return
 
 	if selected_gate.is_empty():
-		last_status = "请先在调色板选择门类型"
+		_flash_error()
 		queue_redraw()
 		return
 	if gate_count() >= max_gates:
-		last_status = "门数量已达上限 %d：该电路需要结构级表示" % max_gates
+		_cap_notice = true
 		queue_redraw()
 		return
 	var gid := _next_gate_id()
@@ -315,28 +325,27 @@ func _on_left(p: Vector2) -> void:
 	if gate_count() == 0 and slot.has_point(p):
 		pos = slot.position + Vector2(21, 24)
 	graph.add_gate(gid, LogicGates.from_string(selected_gate), selected_gate.to_upper(), pos)
-	last_status = "放置 %s（%s）" % [selected_gate.to_upper(), gid]
 	changed.emit()
 	queue_redraw()
 
 func _on_right(p: Vector2) -> void:
+	_cap_notice = false
 	if not _link_from.is_empty():
 		_link_from = ""
-		last_status = "已取消连线"
 		queue_redraw()
 		return
 	var port := _port_hit(p)
 	if not port.is_empty() and str(port["port"]) != "out":
 		var ok := graph.unlink(str(port["id"]), int(port["port"]))
-		last_status = "已断线" if ok else "该端口没有连线"
 		if ok:
 			changed.emit()
+		else:
+			_flash_error()
 		queue_redraw()
 		return
 	var nid := _node_hit(p)
 	if not nid.is_empty() and str(graph.nodes[nid]["kind"]) == CircuitGraph.KIND_GATE:
 		graph.remove_node(nid)
-		last_status = "已删除 %s" % nid
 		changed.emit()
 		queue_redraw()
 

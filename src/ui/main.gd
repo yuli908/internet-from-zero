@@ -97,7 +97,9 @@ func _build_sub_frame() -> void:
 	_sub_frame.visible = false
 	add_child(_sub_frame)
 
-	var board := Ui.card(UiTheme.BOARD, UiTheme.FRAME, 0, UiTheme.BORDER_FRAME)
+	# board 用 Panel（不是 PanelContainer）：容器会接管子节点坐标，绝对布局会被内边距改写。
+	var board := Panel.new()
+	board.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.BOARD, UiTheme.FRAME, 0, UiTheme.BORDER_FRAME))
 	board.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	board.offset_left = 12
 	board.offset_top = 12
@@ -105,28 +107,29 @@ func _build_sub_frame() -> void:
 	board.offset_bottom = -12
 	_sub_frame.add_child(board)
 
-	var col := Ui.vbox(0)
-	board.add_child(col)
+	# 三级页抬头：返回 44×44 @ (24,30)，标题 (86,30) 26 号；内容从 y=92 起。
+	# layer 反向偏移 12 px（board 自身内缩 12），让这里的坐标等于窗口绝对坐标。
+	var layer := Control.new()
+	layer.position = Vector2(-12, -12)
+	layer.size = Vector2(1280, 720)
+	board.add_child(layer)
 
-	var header := Ui.hbox(14)
-	header.custom_minimum_size = Vector2(0, 66)
-	var hm := Ui.margin4(16, 8, 20, 8)
-	col.add_child(hm)
-	hm.add_child(header)
-	var back := Ui.ghost("← 返回黑板", func(): _show_screen("workbench"))
-	back.custom_minimum_size = Vector2(140, UiTheme.CONTROL_H)
-	header.add_child(back)
+	var back := Ui.back_icon(func(): _show_screen("workbench"))
+	back.position = Vector2(24, 30)
+	back.size = Vector2(44, 44)
+	layer.add_child(back)
+
 	_sub_title = Ui.label("", UiTheme.F_H2, UiTheme.CHALK)
-	_sub_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(_sub_title)
-	header.add_child(Ui.spacer())
+	_sub_title.position = Vector2(86, 30)
+	_sub_title.size = Vector2(600, 44)
+	_sub_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_sub_title.clip_text = true
+	layer.add_child(_sub_title)
 
-	var body := Ui.margin4(18, 6, 18, 18)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(body)
-	_sub_host = Ui.vbox(0)
-	_sub_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(_sub_host)
+	_sub_host = Control.new()
+	_sub_host.position = Vector2(24, 92)
+	_sub_host.size = Vector2(1232, 612)
+	layer.add_child(_sub_host)
 
 func _show_start() -> void:
 	_current = "start"

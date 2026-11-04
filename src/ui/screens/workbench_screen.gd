@@ -1,7 +1,7 @@
 class_name WorkbenchScreen
 extends GameScreen
 
-## 黑板 Hub：左栏 5 入口 + 抬头进度/金币/当前任务 + 36 节点树视口。
+## 黑板 Hub：左栏 5 入口 + 抬头进度/金币 + 章节树视口。
 ## 实验页以整屏叠层打开；Esc 一次回到黑板。
 
 signal lab_selected(lab_id)
@@ -38,7 +38,6 @@ var _rail: VBoxContainer
 var _rail_buttons: Dictionary = {}
 var _header_task: Label
 var _header_sub: Label
-var _header_kicker: Label
 var _progress_label: Label
 var _progress_bar: ProgressBar
 var _gold_label: Label
@@ -54,7 +53,6 @@ var _footer_zoom: Label
 
 var _lab_layer: Control
 var _pages: Dictionary = {}
-var _kicker_label: Label
 var _lab_open := false
 var _current_lab := ""
 var _current_obj := ""
@@ -132,8 +130,6 @@ func _build() -> void:
 	_rail = Ui.vbox(0)
 	rail_margin.add_child(_rail)
 
-	_kicker_label = Ui.mono(_chapter_kicker(), UiTheme.F_META, UiTheme.MUTED)
-	_rail.add_child(_kicker_label)
 	_chapter_label = Ui.label(_chapter_name(), 22, UiTheme.CHALK)
 	_rail.add_child(_chapter_label)
 	_rail.add_child(Ui.gap(12))
@@ -141,7 +137,7 @@ func _build() -> void:
 	var stat_row := Ui.hbox(10)
 	stat_row.custom_minimum_size = Vector2(0, 28)
 	_rail.add_child(stat_row)
-	stat_row.add_child(Ui.label("节点进度", UiTheme.F_LABEL, UiTheme.MUTED))
+	stat_row.add_child(Ui.label("节点", UiTheme.F_LABEL, UiTheme.MUTED))
 	_rail_progress = Ui.label("0 / 36", UiTheme.F_H3, UiTheme.CHALK)
 	stat_row.add_child(_rail_progress)
 
@@ -170,9 +166,6 @@ func _build() -> void:
 	_rail.add_child(Ui.spacer())
 	_rail.add_child(Ui.hline(UiTheme.LINE))
 	_rail.add_child(Ui.gap(10))
-	_rail.add_child(Ui.label("单存档 · 自动写入", UiTheme.F_META, UiTheme.MUTED))
-	_rail.add_child(Ui.label("F5 存档 · F9 读档", UiTheme.F_META, UiTheme.MUTED))
-	_rail.add_child(Ui.label("ESC 返回开始", UiTheme.F_META, UiTheme.MUTED))
 
 	# ---- 右侧主区 ----
 	var main_col := Ui.vbox(0)
@@ -191,8 +184,6 @@ func _build() -> void:
 	task_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	task_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(task_col)
-	_header_kicker = Ui.label("当前任务", UiTheme.F_META, UiTheme.MUTED)
-	task_col.add_child(_header_kicker)
 	_header_task = Ui.label("—", UiTheme.F_H2, UiTheme.CHALK)
 	_header_task.clip_text = true
 	_header_task.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -249,10 +240,8 @@ func _build() -> void:
 	fm.size_flags_vertical = Control.SIZE_FILL
 	main_col.add_child(fm)
 	fm.add_child(footer)
-	_footer_zoom = Ui.label("滚轮缩放 · 拖拽平移 · 100%", UiTheme.F_BODY, UiTheme.MUTED)
+	_footer_zoom = Ui.label("100%", UiTheme.F_BODY, UiTheme.MUTED)
 	footer.add_child(_footer_zoom)
-	footer.add_child(Ui.spacer())
-	footer.add_child(Ui.label("点击当前节点进入实验　ESC 一次回黑板", UiTheme.F_BODY, UiTheme.CHALK))
 
 	# 实验页叠层
 	_lab_layer = Control.new()
@@ -292,9 +281,10 @@ func _rail_item(text: String, tone: Color, cb: Callable, locked: bool) -> Button
 	tl.name = "Caption"
 	h.add_child(tl)
 	h.add_child(Ui.spacer())
-	var lock := Ui.label("未解锁" if locked else "", UiTheme.F_META, UiTheme.MUTED_DIM)
+	var lock := Ui.glyph("lock", UiTheme.MUTED_DIM, 16)
 	lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	lock.name = "Lock"
+	lock.name = "LockIcon"
+	lock.visible = locked
 	h.add_child(lock)
 	return b
 
@@ -478,14 +468,6 @@ func _node_title(node_id: String) -> String:
 func _chapter_number() -> int:
 	return int(DataDB.chapter.data.get("number", 0))
 
-func _chapter_kicker() -> String:
-	## 抬头章节号：CHAPTER 02 · 第二章（章号与章名都来自章节数据）。
-	var num := _chapter_number()
-	var t := DataDB.chapter.title()
-	var parts := t.split("·")
-	var name := parts[0].strip_edges() if parts.size() > 1 else "第%d章" % num
-	return "CHAPTER %02d · %s" % [num, name]
-
 func _node_state(rec: Dictionary) -> String:
 	var id := str(rec["id"])
 	var kind := str(rec["kind"])
@@ -553,12 +535,18 @@ func _update_node_states() -> void:
 		elif st == "deferred":
 			ink = UiTheme.RUST
 		b.modulate.a = 0.56 if st == "locked" else 1.0
+		## 未开放不写字：标题保留数据里的节名，状态由虚线边 + 45° 斜纹 + 锁标表达。
 		if title_l != null:
-			## 未开放的节不写失败态：标题直接换成"暂未开放"，原因走点击提示。
-			title_l.text = "暂未开放" if st == "deferred" else str(rec["title"])
+			title_l.text = str(rec["title"])
 			title_l.add_theme_color_override("font_color", ink)
 		if code_l != null:
 			code_l.add_theme_color_override("font_color", UiTheme.alpha(ink, 0.72))
+		if st == "deferred":
+			var lab := str(rec["lab"])
+			if not lab.is_empty():
+				b.tooltip_text = DataDB.chapter.lab_lock_reason(GameState.player, lab)
+		else:
+			b.tooltip_text = ""
 		if st == "current":
 			_halo.position = Vector2(rec["pos"]) - Vector2(6, 6)
 			_halo.size = Vector2(rec["size"]) + Vector2(12, 12)
@@ -616,11 +604,9 @@ func _on_node(rec: Dictionary) -> void:
 	var kind := str(rec["kind"])
 	var lab := str(rec["lab"])
 	if st == "locked":
-		EventBus.toast("还没解锁：先完成前置节点", "warn")
 		return
 	if st == "deferred":
-		## 未开放的原因直接取数据里的 deferred_reason，不在 UI 里另写一套。
-		EventBus.toast(DataDB.chapter.lab_lock_reason(GameState.player, lab), "warn")
+		## 未开放：点不进，原因只在 hover tooltip 出现（来自数据 deferred_reason）。
 		return
 	if kind == "knowledge" or kind == "skill":
 		_go("skills")
@@ -629,10 +615,6 @@ func _on_node(rec: Dictionary) -> void:
 		_advance_chapter()
 		return
 	if kind == "final":
-		if ChapterFlow.chapter_complete():
-			EventBus.toast("%s已完成；可重跑任一实验或查看档案" % _chapter_name(), "ok")
-		else:
-			EventBus.toast("完成 %d 节实验后自动结算%s" % [_labs.size(), _chapter_name()], "warn")
 		return
 	if not lab.is_empty():
 		select_lab(lab, true)
@@ -640,11 +622,10 @@ func _on_node(rec: Dictionary) -> void:
 func _advance_chapter() -> void:
 	## 进度推进式切章：章末节点（或抬头按钮）完成本章后进入下一章，不弹窗。
 	if not ChapterFlow.chapter_complete():
-		EventBus.toast("完成 %d 节实验后自动结算%s" % [_labs.size(), _chapter_name()], "warn")
 		return
 	var nxt := str(DataDB.chapter.next_chapter())
 	if nxt.is_empty() or nxt == DataDB.chapter.id():
-		EventBus.toast("%s已完成；已是最后一章" % _chapter_name(), "ok")
+		# 已到最后一章：静默返回，不写状态 toast。
 		return
 	switch_chapter(nxt)
 
@@ -701,7 +682,7 @@ func _layout_tree() -> void:
 	_tree_canvas.scale = Vector2(_zoom, _zoom)
 	_tree_canvas.position = (vp - Vector2(w, h)) * 0.5 + _pan
 	if _footer_zoom != null:
-		_footer_zoom.text = "滚轮缩放 · 拖拽平移 · %d%%" % int(round(_zoom * 100.0))
+		_footer_zoom.text = "%d%%" % int(round(_zoom * 100.0))
 
 func _chapter_name() -> String:
 	var t := DataDB.chapter.title()
@@ -740,36 +721,32 @@ func _refresh() -> void:
 		var meta := DataDB.chapter.lab(_current_lab)
 		_header_task.text = str(nxt.get("title", meta.get("title", "")))
 		_header_sub.text = "%s · %s" % [str(meta.get("title", "")), str(meta.get("subtitle", ""))]
-		_header_kicker.text = "当前任务"
 	elif ChapterFlow.chapter_complete():
-		_header_task.text = "%s已完成" % _chapter_name()
-		_header_sub.text = "可重跑任一实验；档案与诊断已解锁"
-		_header_kicker.text = "章节状态"
+		_header_task.text = _chapter_name()
+		_header_sub.text = ""
 	else:
-		_header_task.text = "选择节点继续"
-		_header_sub.text = "点击当前节点进入实验"
-		_header_kicker.text = "当前任务"
+		_header_task.text = _chapter_name()
+		_header_sub.text = ""
 	_set_rail_active("labs", true)
 	var archive_on := done >= 3
 	_rail_buttons["archive"].disabled = not archive_on
 	var diag_on := p.has_flag("gate:T%d.1-1" % _chapter_number())
 	_rail_buttons["diagnostics"].disabled = not diag_on
-	_update_rail_lock("archive", not archive_on, "完成 3 节后解锁")
-	_update_rail_lock("diagnostics", not diag_on, "首次通过门实验")
-	_kicker_label.text = _chapter_kicker()
+	_update_rail_lock("archive", not archive_on)
+	_update_rail_lock("diagnostics", not diag_on)
 	_chapter_label.text = _chapter_name()
 	_update_node_states()
 	refresh_status_for_pages()
 
-func _update_rail_lock(key: String, locked: bool, reason: String) -> void:
+func _update_rail_lock(key: String, locked: bool) -> void:
 	var b: Button = _rail_buttons.get(key, null)
 	if b == null:
 		return
 	b.disabled = locked
 	b.add_theme_stylebox_override("normal", _rail_style(false, locked))
-	var lock := b.find_child("Lock", true, false) as Label
+	var lock := b.find_child("LockIcon", true, false) as Control
 	if lock != null:
-		lock.text = reason if locked else ""
+		lock.visible = locked
 	var cap := b.find_child("Caption", true, false) as Label
 	if cap != null:
 		cap.add_theme_color_override("font_color", UiTheme.MUTED_DIM if locked else UiTheme.CHALK)
@@ -780,10 +757,8 @@ func _go(id: String) -> void:
 
 func _enter_current_lab() -> void:
 	if _current_lab.is_empty():
-		EventBus.toast("本章已全部完成；可从挑战节点重跑", "ok")
 		return
 	if not ChapterFlow.is_lab_unlocked(_current_lab):
-		EventBus.toast("当前实验室尚未解锁", "warn")
 		return
 	select_lab(_current_lab, true)
 

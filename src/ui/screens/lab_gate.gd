@@ -12,7 +12,7 @@ var _task_hint: Label
 var _target_label: Label
 var _truth_box: VBoxContainer
 var _enc_btn: Button
-var _enc_label: Label
+var _pal_buttons: Dictionary = {}
 
 func _build() -> void:
 	# ---- 左栏：任务与封装 ----
@@ -37,9 +37,7 @@ func _build() -> void:
 	_enc_btn = Ui.button("封装 MY-XOR", func(): _encapsulate(), false)
 	_enc_btn.custom_minimum_size = Vector2(0, UiTheme.CONTROL_H)
 	side.add_child(_enc_btn)
-	_enc_label = Ui.muted("未封装", UiTheme.F_META)
-	side.add_child(_enc_label)
-	side.add_child(Ui.ghost("重置当前任务", func(): _reset_task()))
+	side.add_child(Ui.ghost("重置任务", func(): _reset_task()))
 
 	# ---- 中栏：目标条 + 696×416 编辑器 + 调色板 ----
 	var target_card := Ui.card(UiTheme.BOARD_HIGH, UiTheme.LINE)
@@ -80,14 +78,11 @@ func _build() -> void:
 	pal.add_child(pal_tag)
 	for g in ["not", "and", "or"]:
 		var gs := str(g)
-		var b := Ui.ghost(gs.to_upper(), func(): _editor.set_selected_gate(gs))
+		var b := Ui.ghost(gs.to_upper(), func(): _pick_gate(gs))
 		b.custom_minimum_size = Vector2(76, UiTheme.CONTROL_H)
 		pal.add_child(b)
+		_pal_buttons[gs] = b
 	pal.add_child(Ui.spacer())
-	var hint := Ui.muted("点调色板 → 点门槽/空白放门 → 点输出端口再点输入端口连线", UiTheme.F_BODY)
-	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hint.clip_text = true
-	pal.add_child(hint)
 	center.add_child(Ui.spacer())
 
 	# ---- 右栏：目标真值表 + 验收 ----
@@ -95,15 +90,16 @@ func _build() -> void:
 	_truth_box = Ui.vbox(2)
 	inspector.add_child(_truth_box)
 	inspector.add_child(Ui.hline())
-	inspector.add_child(_section("OUT 当前值"))
+	inspector.add_child(_section("OUT"))
 	_live = Ui.mono("X", UiTheme.F_BODY_LG, UiTheme.MUTED)
 	inspector.add_child(_live)
 	inspector.add_child(Ui.wrap("黑盒只看 a/b → out 的行为，允许多解。", UiTheme.F_BODY, UiTheme.MUTED))
 	inspector.add_child(Ui.spacer())
-	inspector.add_child(Ui.button("运行验收 T1.4", func(): _run_cases(), true))
+	inspector.add_child(Ui.button("运行验收 T%d.%d" % [int(DataDB.chapter.data.get("number", 1)), int(DataDB.chapter.lab(lab_id).get("order", 0))], func(): _run_cases(), true))
 
 	_load_state()
 	_switch_task(_current_task if not _current_task.is_empty() else str(_all_tasks()[0].get("id", "")))
+	_pick_gate("not")
 	_finish_shell()
 
 func _all_tasks() -> Array:
@@ -156,7 +152,7 @@ func _switch_task(id: String) -> void:
 	_editor.setup(inputs, [{"id": "out", "label": "OUT"}], task.get("palette", ["not", "and", "or"]), int(lab_data.get("max_gates", 12)))
 	if doc is Dictionary:
 		_editor.load_dict(doc)
-	_task_hint.text = "%s\n目标：%s。验收只看 a/b → out 的行为。" % [str(task.get("title", id)), str(task.get("target", ""))]
+	_task_hint.text = str(task.get("title", id))
 	_target_label.text = "OUT = %s" % _target_expr(str(task.get("target", "")))
 	_rebuild_truth(task)
 	for key in _task_buttons.keys():
@@ -166,6 +162,14 @@ func _switch_task(id: String) -> void:
 		b.add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.CHALK)
 	_on_editor_changed()
 	_update_enc_label()
+
+func _pick_gate(gs: String) -> void:
+	_editor.set_selected_gate(gs)
+	for key in _pal_buttons.keys():
+		var b: Button = _pal_buttons[key]
+		var on := str(key) == gs
+		b.add_theme_stylebox_override("normal", UiTheme.flat(UiTheme.CHALK if on else UiTheme.BOARD_HIGH, UiTheme.CHALK if on else UiTheme.LINE))
+		b.add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.CHALK)
 
 func _target_expr(target: String) -> String:
 	match target:
@@ -231,7 +235,6 @@ func _encapsulate() -> void:
 	_save_current()
 	var g: CircuitGraph = _graphs.get("t_xor", null)
 	if g == null:
-		EventBus.toast("先完成任务 D（XOR）再封装", "warn")
 		return
 	var res := BlackBox.check_target(g, "xor", ["a", "b"], ["out"])
 	if not bool(res.get("ok", false)):
@@ -243,12 +246,13 @@ func _encapsulate() -> void:
 	EventBus.toast("已封装 MY-XOR（端口 a/b/out）；M1 只复核行为，不产出复用资源", "ok")
 
 func _update_enc_label() -> void:
-	if _enc_label == null:
+	if _enc_btn == null:
 		return
-	_enc_label.text = "已封装 MY-XOR" if _encapsulated else "未封装"
-	_enc_label.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if _encapsulated else UiTheme.MUTED)
-	if _enc_btn != null:
-		_enc_btn.disabled = _encapsulated
+	_enc_btn.disabled = _encapsulated
+	_enc_btn.add_theme_stylebox_override("normal", UiTheme.flat(UiTheme.CHALK if _encapsulated else UiTheme.BOARD_HIGH, UiTheme.CHALK if _encapsulated else UiTheme.LINE))
+	_enc_btn.add_theme_stylebox_override("hover", UiTheme.flat(UiTheme.CHALK, UiTheme.CHALK))
+	_enc_btn.add_theme_color_override("font_color", UiTheme.INK if _encapsulated else UiTheme.CHALK)
+	_enc_btn.add_theme_color_override("font_disabled_color", UiTheme.INK)
 
 func _reset_task() -> void:
 	if _current_task.is_empty():
@@ -262,10 +266,7 @@ func _run_cases() -> void:
 	_save_current()
 	var rep := LabChecks.gate(lab_data, _graphs, {"encapsulated": _encapsulated})
 	show_report(rep)
-	if pass_report(rep):
-		EventBus.toast("1.4 门级 gate 全部通过", "ok")
-	else:
-		EventBus.toast("仍有 gate 未通过：三基础门、XOR 延迟、封装、第二结构", "warn")
+	pass_report(rep)
 
 func _save_state() -> void:
 	if _editor != null and not _current_task.is_empty():

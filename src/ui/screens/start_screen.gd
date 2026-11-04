@@ -18,7 +18,6 @@ var _bases: Array = []
 var _players: Array = []
 var _menu: Control
 var _shards: Array = []
-var _hint: Label
 var _selected := 0
 var _settings: SettingsPanel
 var _sub_label: Label
@@ -133,15 +132,6 @@ func _build() -> void:
 	_menu.add_child(shard_settings)
 	_shards.append(shard_settings)
 
-	_hint = Ui.label("↑ ↓ 切换　ENTER 确认　当前：开始游戏", UiTheme.F_BODY, Color("#AAB6AF"))
-	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_hint.offset_left = 15
-	_hint.offset_right = -15
-	_hint.offset_top = -36
-	_hint.offset_bottom = -10
-	right.add_child(_hint)
-
 	var foot := MarginContainer.new()
 	foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	foot.offset_top = -46
@@ -151,8 +141,36 @@ func _build() -> void:
 	add_child(foot)
 	var foot_row := Ui.hbox(20)
 	foot.add_child(foot_row)
-	for text in ["↑ ↓ 选择", "ENTER 确认", "ESC 设置", "单存档 · 36 节点"]:
-		foot_row.add_child(Ui.label(text, UiTheme.F_BODY, UiTheme.MUTED))
+	foot_row.add_child(Ui.label("单存档 · %d 节点" % _chapter_node_count(), UiTheme.F_BODY, UiTheme.MUTED))
+
+func _chapter_node_count() -> int:
+	## 数据计数：本章进度/知识/技能节点 + 实验挑战 + 章末。
+	var c: ChapterRuntime = DataDB.chapter
+	if c == null:
+		return 0
+	var graph: KnowledgeGraph = DataDB.skill_graph
+	if graph == null:
+		return 0
+	var chid := c.id().to_upper()
+	var gate_prefix := "T%d." % int(c.data.get("number", 1))
+	var ids := {}
+	for id in graph.nodes.keys():
+		if str(id).begins_with(chid):
+			ids[id] = true
+	var changed := true
+	while changed:
+		changed = false
+		for id in graph.nodes.keys():
+			if ids.has(id):
+				continue
+			var n: Dictionary = graph.nodes[id]
+			for req in n.get("requires", {}).get("all", []):
+				var rid := str(req.get("id", ""))
+				if ids.has(rid) or rid.begins_with(gate_prefix):
+					ids[id] = true
+					changed = true
+					break
+	return ids.size() + c.lab_order.size() + 1
 
 func _build_title() -> void:
 	# 叠加顺序：Ghost3 → Ghost2 → Ghost1 → Solid。
@@ -220,8 +238,6 @@ func _select(idx: int) -> void:
 	_selected = clampi(idx, 0, _shards.size() - 1)
 	for i in _shards.size():
 		(_shards[i] as ShardButton).set_selected(i == _selected)
-	if _hint != null:
-		_hint.text = "↑ ↓ 切换　ENTER 确认　当前：%s" % ("开始游戏" if _selected == 0 else "设置")
 
 func open_settings_panel() -> void:
 	if _settings != null:

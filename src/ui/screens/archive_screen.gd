@@ -5,7 +5,6 @@ extends GameScreen
 const SLOT_COUNT = 3
 
 var _slots_host: VBoxContainer
-var _last_label: Label
 
 func setup(main_ref: Control) -> void:
 	super.setup(main_ref)
@@ -13,21 +12,12 @@ func setup(main_ref: Control) -> void:
 
 func on_show() -> void:
 	_refresh_slots()
-	_refresh_last()
 
 func _build() -> void:
+	# 抬头（标题 / 返回）由 main 统一绘制；本页只放三槽位列表，内容从 y92 起。
 	var page := Ui.vbox(10)
 	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(page)
-
-	var head := Ui.hbox(12)
-	page.add_child(head)
-	head.add_child(Ui.title("档案 · 存档管理", 22))
-	head.add_child(Ui.spacer())
-	head.add_child(Ui.label("存档目录 user://saves", 11, UiTheme.MUTED))
-	head.add_child(Ui.badge("自动存档开启", UiTheme.OK))
-
-	page.add_child(Ui.wrap("自动存档写入槽位 1；手动保存可覆盖任意槽位。读取会替换当前进度，删除不可恢复。", 12, UiTheme.MUTED))
 
 	var scroll := Ui.scroll()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -36,20 +26,6 @@ func _build() -> void:
 	_slots_host = Ui.vbox(8)
 	_slots_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_slots_host)
-
-	page.add_child(_build_notes())
-
-func _build_notes() -> PanelContainer:
-	var card := Ui.card(UiTheme.alpha(UiTheme.ACCENT, 0.05), UiTheme.alpha(UiTheme.ACCENT, 0.30), 8)
-	var m := Ui.margin4(12, 8, 12, 8)
-	card.add_child(m)
-	var col := Ui.vbox(3)
-	m.add_child(col)
-	col.add_child(Ui.label("存档机制", 12, UiTheme.ACCENT))
-	col.add_child(Ui.wrap("每个槽位带 SHA-256 校验与版本迁移；写入采用临时文件 + 原子替换。主文件损坏或校验失败时会自动回退 .bak 备份。", 12, UiTheme.MUTED))
-	_last_label = Ui.label("最近操作：—", 11, UiTheme.MUTED)
-	col.add_child(_last_label)
-	return card
 
 func _clear(container: Node) -> void:
 	for c in container.get_children():
@@ -62,15 +38,6 @@ func _refresh_slots() -> void:
 	_clear(_slots_host)
 	for i in SLOT_COUNT:
 		_slots_host.add_child(_slot_card(i + 1))
-
-func _refresh_last() -> void:
-	if _last_label == null:
-		return
-	var msg := SaveManager.last_message
-	if msg.is_empty():
-		_last_label.text = "最近操作：—"
-	else:
-		_last_label.text = "最近操作：%s" % msg
 
 func _slot_card(slot: int) -> PanelContainer:
 	var info: Dictionary = SaveManager.slot_info(slot)
@@ -90,22 +57,17 @@ func _slot_card(slot: int) -> PanelContainer:
 	var head := Ui.hbox(10)
 	col.add_child(head)
 	head.add_child(Ui.mono("槽 %d" % slot, 18, UiTheme.ACCENT))
-	if slot == 1:
-		head.add_child(Ui.badge("自动存档", UiTheme.OK))
 
-	var state_text := "有存档"
-	var state_color := UiTheme.OK
+	var dot_color := UiTheme.OK
 	if not exists:
-		if err == "空槽位" or err.is_empty():
-			state_text = "空槽位"
-			state_color = UiTheme.MUTED
-		else:
-			state_text = "损坏"
-			state_color = UiTheme.DANGER
-	head.add_child(Ui.status_dot(state_color if exists else UiTheme.MUTED, 8))
-	head.add_child(Ui.label(state_text, 12, state_color))
+		dot_color = UiTheme.MUTED if (err == "空槽位" or err.is_empty()) else UiTheme.DANGER
+	# 槽位状态只用圆点：绿=可读，灰=空，锈红=损坏；损坏原因走 tooltip，不常驻成句。
+	var dot := Ui.status_dot(dot_color, 8)
+	if not exists and dot_color == UiTheme.DANGER:
+		dot.tooltip_text = "校验失败：%s" % err
+	head.add_child(dot)
 	head.add_child(Ui.spacer())
-	head.add_child(Ui.label(_fmt_time(info) if exists else "—", 11, UiTheme.MUTED))
+	head.add_child(Ui.label(_fmt_time(info) if exists else "—", UiTheme.F_META, UiTheme.MUTED))
 
 	var lv_text := "—"
 	var gold_text := "—"
@@ -127,14 +89,8 @@ func _slot_card(slot: int) -> PanelContainer:
 	stats.add_child(Ui.stat("等级", lv_text, UiTheme.ACCENT))
 	stats.add_child(Ui.stat("金币", gold_text, UiTheme.AMBER))
 	stats.add_child(Ui.stat("章节", chapter_text))
-	stats.add_child(Ui.stat("目标进度", obj_text))
+	stats.add_child(Ui.stat("目标", obj_text))
 	stats.add_child(Ui.stat("知识", know_text))
-
-	if not exists:
-		var tip := "空槽位：按「保存到此槽」写入当前进度。"
-		if state_text == "损坏":
-			tip = "校验失败：%s。可尝试读取以回退 .bak 备份。" % err
-		col.add_child(Ui.wrap(tip, 11, state_color))
 
 	var actions := Ui.hbox(8)
 	col.add_child(actions)

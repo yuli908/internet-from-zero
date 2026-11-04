@@ -188,3 +188,52 @@ static func status_dot(color: Color, size: int = 8) -> Control:
 	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
+
+static func back_icon(cb: Callable) -> Button:
+	## 44×44 返回热区：只有箭头，没有文字；Esc 与它等价。
+	var b := Button.new()
+	b.text = "←"
+	b.focus_mode = Control.FOCUS_ALL
+	b.custom_minimum_size = Vector2(44, 44)
+	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_color_override("font_color", UiTheme.MUTED)
+	b.add_theme_color_override("font_hover_color", UiTheme.CHALK_BRIGHT)
+	b.add_theme_color_override("font_pressed_color", UiTheme.CHALK_BRIGHT)
+	b.add_theme_stylebox_override("normal", UiTheme.flat(Color(0, 0, 0, 0), UiTheme.alpha(UiTheme.CHALK, 0.12)))
+	b.add_theme_stylebox_override("hover", UiTheme.flat(UiTheme.alpha(UiTheme.CHALK, 0.06), UiTheme.alpha(UiTheme.CHALK, 0.40)))
+	b.add_theme_stylebox_override("pressed", UiTheme.flat(UiTheme.alpha(UiTheme.CHALK, 0.10), UiTheme.CHALK))
+	b.add_theme_stylebox_override("focus", UiTheme.flat(Color(0, 0, 0, 0), UiTheme.alpha(UiTheme.CHALK, 0.55)))
+	b.pressed.connect(cb)
+	return b
+
+class Glyph extends Control:
+	## 极简图标：锁 / 对勾。用绘图而非字形，避免字体缺字。
+	var kind := ""
+	var color := Color(1, 1, 1)
+
+	func _init(p_kind: String, p_color: Color, px: int) -> void:
+		kind = p_kind
+		color = p_color
+		custom_minimum_size = Vector2(px, px)
+		size = Vector2(px, px)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		if kind == "lock":
+			var bw := w * 0.70
+			var bh := h * 0.44
+			draw_rect(Rect2(w * 0.15, h * 0.50, bw, bh), color, true)
+			draw_arc(Vector2(w * 0.5, h * 0.50), w * 0.26, PI, TAU, 10, color, maxf(1.5, w * 0.09))
+			draw_circle(Vector2(w * 0.5, h * 0.72), w * 0.08, UiTheme.BG)
+		elif kind == "check":
+			var pts := PackedVector2Array([
+				Vector2(w * 0.16, h * 0.52),
+				Vector2(w * 0.40, h * 0.78),
+				Vector2(w * 0.84, h * 0.22),
+			])
+			draw_polyline(pts, color, maxf(1.5, w * 0.12))
+
+static func glyph(kind: String, color: Color, px: int = 24) -> Control:
+	return Glyph.new(kind, color, px)
