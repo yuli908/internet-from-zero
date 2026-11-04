@@ -8,7 +8,26 @@ extends RefCounted
 
 const FORMAT := "ifz-trace/1"
 const LAYERS := ["L0a", "L1", "L2", "L3", "L4", "L5", "L6"]
-const KINDS := ["CHANGE", "EDGE", "DROP", "SAMPLE", "METASTABLE", "ERR_ADDR", "ERR_METASTABLE"]
+## M4：7 → 15。新增 8 种 CH02 判定 kind（= `docs/design/11` §3 判定 kind 全大写）；
+## `build_area` 是可选语法糖，不产生 trace。schema 与 `digest()` 不变。
+const KINDS := [
+	"CHANGE", "EDGE", "DROP", "SAMPLE", "METASTABLE", "ERR_ADDR", "ERR_METASTABLE",
+	"MOSFET_REGION", "X_PROPAGATION", "STATIC_CURRENT", "RAIL_MARGIN",
+	"EQUIV", "AREA_MAX", "POWER_CALC", "POWER_RATIO",
+]
+
+## 8 种 CH02 kind 的固定 payload 键与类型。缺键/类型不符按拒绝处理（不静默丢弃）。
+## 数值本身来自数据文件，M4 不写入任何阈值。
+const REQUIRED_KEYS := {
+	"MOSFET_REGION": {"region": TYPE_STRING, "vgs": TYPE_FLOAT, "vds": TYPE_FLOAT, "id_ua": TYPE_FLOAT},
+	"X_PROPAGATION": {"expect": TYPE_STRING, "got": TYPE_STRING},
+	"STATIC_CURRENT": {"ua": TYPE_FLOAT, "states": TYPE_INT},
+	"RAIL_MARGIN": {"v_high": TYPE_FLOAT, "v_low": TYPE_FLOAT},
+	"EQUIV": {"ref": TYPE_STRING, "vectors": TYPE_INT, "mismatch": TYPE_INT},
+	"AREA_MAX": {"gates": TYPE_INT, "max": TYPE_INT},
+	"POWER_CALC": {"mw": TYPE_FLOAT, "expect_mw": TYPE_FLOAT, "tol": TYPE_FLOAT},
+	"POWER_RATIO": {"ratio": TYPE_FLOAT, "expect_ratio": TYPE_FLOAT, "tol": TYPE_FLOAT},
+}
 
 var max_events := 20000
 var dropped_old := 0
@@ -54,6 +73,10 @@ func record(tick: int, layer: String, kind: String, subject: String, payload: Di
 	if not _basic(payload):
 		rejected += 1
 		last_error = "payload 含非基础类型"
+		return false
+	if not payload_keys_ok(kind, payload):
+		rejected += 1
+		last_error = "payload 缺少固定键或类型不符：%s" % kind
 		return false
 	_last_tick = tick
 	_buf.append({"tick": tick, "layer": layer, "kind": kind, "subject": subject,
@@ -134,6 +157,21 @@ static func sha256(text: String) -> String:
 	ctx.start(HashingContext.HASH_SHA256)
 	ctx.update(text.to_utf8_buffer())
 	return ctx.finish().hex_encode()
+
+static func payload_keys_ok(kind: String, payload: Dictionary) -> bool:
+	## 只校验 8 种 CH02 kind；既有 7 种 kind 无固定键约束（保持原行为）。
+	var req: Dictionary = REQUIRED_KEYS.get(kind, {})
+	for key in req:
+		if not payload.has(key):
+			return false
+		var want := int(req[key])
+		var got := typeof(payload[key])
+		if want == TYPE_FLOAT:
+			if got != TYPE_FLOAT and got != TYPE_INT:
+				return false
+		elif got != want:
+			return false
+	return true
 
 static func _basic(v: Variant) -> bool:
 	match typeof(v):

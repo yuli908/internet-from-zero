@@ -74,7 +74,7 @@ func _test_monotonic_and_kinds(ctx: TestContext) -> void:
 			whitelisted = false
 	ctx.check("trace: tick 单调不减", mono)
 	ctx.check("trace: kind 全在白名单", whitelisted)
-	ctx.eq("trace: 白名单条数", TraceSink.KINDS.size(), 7)
+	ctx.eq("trace: 白名单条数", TraceSink.KINDS.size(), 15)
 
 func _test_history_match(ctx: TestContext) -> void:
 	## history 每条 CHANGE 对应 sink 一条 CHANGE（G9 第 4 条）。
