@@ -2,7 +2,10 @@ class_name LabCodeEditor
 extends Control
 
 ## 实验室·代码编辑器（三级）：目录树 + 代码区 + 终端，三栏 236/724/236。
-## 只从模块架 W05 右键「编写代码」进入。文件读写走真实文件系统（user://linuxfs 映射 /）。
+## 只从模块架 W05 右键「编写代码」进入。文件读写走宿主真实文件系统：
+##   1) --lab-fs-root=<绝对路径>（用户指定，可指向 WSL 的 \\wsl$\<distro>\home\<user>）
+##   2) 工程内可见目录 res://sandbox/linuxfs（宿主可直接打开）
+##   3) user://linuxfs 仅作最后兜底
 ## 无 P03 时只读 + 顶部 1px 红线 + 运行禁用；运行优先调用真实 gcc，缺失时退回括号结构检查并在终端说明。
 
 const Z_TREE := Rect2(0, 0, 236, 612)
@@ -14,6 +17,7 @@ const LINE_H := 22.0
 const EDITOR_FONT := 14
 const TERM_FONT := 14
 
+const PROJ_REL := "res://sandbox/linuxfs"
 const ROOT_REL := "user://linuxfs"
 const SEED_SUB := "home/user"
 const MAX_TREE_ROWS := 18
@@ -30,6 +34,10 @@ var _current := ""
 var _err_line := 0
 var _gcc_ok := false
 var _gcc_checked := false
+var _root := ""
+var _root_state: Dictionary = {}
+var _root_ok := false
+var _root_label: Label
 
 static func zone_rects() -> Dictionary:
 	return {"tree": Z_TREE, "edit": Z_EDIT, "terminal": Z_TERM}
@@ -37,8 +45,44 @@ static func zone_rects() -> Dictionary:
 static func can_run(has_p03: bool) -> bool:
 	return has_p03
 
+## 运行双门禁：有 P03 且根路径可用；根不可用时绝不跑。
+static func run_allowed(has_p03: bool, root_ok: bool) -> bool:
+	return has_p03 and root_ok
+
+## 解析根路径，返回 {ok, abs, kind, reason}。
+## 顺序：用户指定绝对路径 → 工程内可见目录 → user:// 兜底。
+## kind: override / project / user；失败 reason: empty / relative / unavailable。
+static func resolve_fs_root(override: String = "", project_dir: String = "", fallback: String = "") -> Dictionary:
+	if not override.strip_edges().is_empty():
+		# 用户显式指定：可用就用，不可用直接拒绝，不偷偷退回其它目录。
+		return _check_abs(override, "override")
+	var proj := project_dir
+	if proj.strip_edges().is_empty():
+		proj = ProjectSettings.globalize_path(PROJ_REL)
+	var pr := _check_abs(proj, "project")
+	if bool(pr["ok"]):
+		return pr
+	var fb := fallback
+	if fb.strip_edges().is_empty():
+		fb = ProjectSettings.globalize_path(ROOT_REL)
+	return _check_abs(fb, "user")
+
+static func _check_abs(path: String, kind: String) -> Dictionary:
+	var raw := path.strip_edges()
+	if raw.is_empty():
+		return {"ok": false, "abs": "", "kind": kind, "reason": "empty"}
+	if not raw.is_absolute_path():
+		return {"ok": false, "abs": raw, "kind": kind, "reason": "relative"}
+	var abs := raw.replace("\\", "/").simplify_path()
+	if not DirAccess.dir_exists_absolute(abs):
+		DirAccess.make_dir_recursive_absolute(abs)
+	var d := DirAccess.open(abs)
+	if d == null:
+		return {"ok": false, "abs": abs, "kind": kind, "reason": "unavailable"}
+	return {"ok": true, "abs": abs, "kind": kind, "reason": ""}
+
 static func root_abs() -> String:
-	return ProjectSettings.globalize_path(ROOT_REL)
+	return str(resolve_fs_root()["abs"])
 
 ## 括号结构检查：返回首个出错行（1 起），0 表示平衡。仅用于无 gcc 的退回路径。
 static func first_brace_error(src: String) -> int:
@@ -60,6 +104,7 @@ static func first_brace_error(src: String) -> int:
 
 func build(lab_ref: Control) -> void:
 	_lab = lab_ref
+	apply_root(CliArgs.value("lab-fs-root", ""))
 	_add_zone(Z_TREE, UiTheme.AMBER)
 	_add_zone(Z_EDIT, UiTheme.CYAN)
 	_add_zone(Z_TERM, UiTheme.RUST)
@@ -125,6 +170,15 @@ func build(lab_ref: Control) -> void:
 	_run_btn.pressed.connect(_run)
 	add_child(_run_btn)
 
+	_root_label = Label.new()
+	_root_label.position = Z_TREE.position + Vector2(12, 470)
+	_root_label.size = Vector2(212, 22)
+	_root_label.clip_text = true
+	_root_label.add_theme_font_override("font", UiTheme.mono_font())
+	_root_label.add_theme_font_size_override("font_size", 11)
+	_root_label.add_theme_color_override("font_color", UiTheme.MUTED)
+	add_child(_root_label)
+
 	on_open()
 
 func _text_button(pos: Vector2, label: String) -> Button:
@@ -161,16 +215,37 @@ func _add_zone(r: Rect2, accent: Color) -> void:
 func on_open() -> void:
 	_ensure_fs()
 	refresh_tree()
-	var is_ro := not can_run(_has_p03())
-	_code.editable = not is_ro
-	_run_btn.disabled = is_ro
-	_line_layer.readonly = is_ro
+	var can := run_allowed(_has_p03(), _root_ok)
+	_code.editable = can
+	_run_btn.disabled = not can
+	_save_btn.disabled = not _root_ok
+	_line_layer.readonly = not can
+	_root_label.text = _root
+	_root_label.add_theme_color_override("font_color", UiTheme.MUTED if _root_ok else UiTheme.DANGER)
+	_root_label.tooltip_text = _root
 	if _current.is_empty() and not _files.is_empty():
 		_open_file(str(_files[0]["abs"]))
 	_term_clear()
 	_term_line("user@lab:~$", UiTheme.MUTED)
-	_term_line(ROOT_REL + " -> /", UiTheme.MUTED)
+	if _root_ok:
+		_term_line(_root + " -> /", UiTheme.MUTED)
+	else:
+		_term_line("fs unavailable (%s)" % str(_root_state.get("reason", "?")), UiTheme.DANGER)
+		_term_line(str(_root_state.get("abs", "")), UiTheme.DANGER)
 	_line_layer.queue_redraw()
+
+## 应用根路径（build 时自动调用；测试可显式喂路径）。
+func apply_root(override: String = "") -> Dictionary:
+	_root_state = resolve_fs_root(override)
+	_root = str(_root_state.get("abs", ""))
+	_root_ok = bool(_root_state.get("ok", false))
+	return _root_state
+
+func root_ready() -> bool:
+	return _root_ok
+
+func root_path() -> String:
+	return _root
 
 func _has_p03() -> bool:
 	var p = GameState.player
@@ -179,7 +254,9 @@ func _has_p03() -> bool:
 ## ---------- 文件系统 ----------
 
 func _ensure_fs() -> void:
-	var dir := root_abs() + "/" + SEED_SUB
+	if not _root_ok:
+		return
+	var dir := _root + "/" + SEED_SUB
 	DirAccess.make_dir_recursive_absolute(dir)
 	var main_c := dir + "/main.c"
 	if not FileAccess.file_exists(main_c):
@@ -193,8 +270,8 @@ func _ensure_fs() -> void:
 		if g != null:
 			g.store_string("lab mirror\n")
 			g.close()
-	DirAccess.make_dir_recursive_absolute(root_abs() + "/etc")
-	var host := root_abs() + "/etc/hostname"
+	DirAccess.make_dir_recursive_absolute(_root + "/etc")
+	var host := _root + "/etc/hostname"
 	if not FileAccess.file_exists(host):
 		var h := FileAccess.open(host, FileAccess.WRITE)
 		if h != null:
@@ -206,7 +283,9 @@ func refresh_tree() -> void:
 		_tree_box.remove_child(c)
 		c.queue_free()
 	_files = []
-	var root := root_abs()
+	if not _root_ok:
+		return
+	var root := _root
 	var stack := [{"abs": root, "rel": "", "depth": 0}]
 	while not stack.is_empty():
 		var cur: Dictionary = stack.pop_back()
@@ -257,7 +336,7 @@ func _open_file(abs_path: String) -> void:
 	_code.grab_focus()
 
 func _display(abs_path: String) -> String:
-	var root := root_abs()
+	var root := _root
 	if abs_path.begins_with(root):
 		return abs_path.substr(root.length())
 	return abs_path
@@ -274,7 +353,7 @@ func _save() -> void:
 	_term_line("write %s  %d B" % [_display(_current), _code.text.length()], UiTheme.MUTED)
 
 func _run() -> void:
-	if not can_run(_has_p03()):
+	if not run_allowed(_has_p03(), _root_ok):
 		return
 	if _current.is_empty():
 		return

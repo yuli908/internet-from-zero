@@ -8,10 +8,10 @@ const CraftGd = preload("res://src/ui/screens/lab_craft.gd")
 const RackGd = preload("res://src/ui/screens/lab_rack.gd")
 const CodeGd = preload("res://src/ui/screens/lab_code_editor.gd")
 
-const EXPECT := 110
+const EXPECT := 120
 const EXPECT_GROUPS := {
 	"hub_geometry": 19, "craft_zones": 21, "craft_data": 11, "rack_zones": 15,
-	"rack_menu": 9, "editor_zones": 12, "editor_fs": 5, "entry_regression": 7,
+	"rack_menu": 9, "editor_zones": 12, "editor_fs": 15, "entry_regression": 7,
 	"no_hint_text": 5, "phase1_kept": 6,
 }
 const GROUP_DESCRIPTIONS := {
@@ -20,8 +20,8 @@ const GROUP_DESCRIPTIONS := {
 	"craft_data": "配方行来自目录真实配方，M00 走购买；不自带价格字面量，合成/购买走 Economy",
 	"rack_zones": "模块架 908 + 18 + 306、6×5 槽 144×112 间距 8、共 30 格且不越界",
 	"rack_menu": "只有模块有右键菜单；编写代码只在 W05 出现，菜单高度按项数",
-	"editor_zones": "代码编辑器 236/724/236、行号列 44、行高 22、P03 门禁、真实根目录",
-	"editor_fs": "真实文件系统写入 /home/user 种子文件并读回；括号结构检查边界",
+	"editor_zones": "代码编辑器 236/724/236、行号列 44、行高 22、P03 门禁、根目录可解析且为绝对路径",
+	"editor_fs": "解析到宿主真实目录（非 user:// 兜底）、写入 /home/user 种子文件并读回、相对/不可用路径被拒绝且不降级、界面显示实际路径",
 	"entry_regression": "章末 6/6 完成后实验室按钮不静默 return：回退最后已解锁 lab 或禁用+tooltip",
 	"no_hint_text": "新增四个 UI 文件不含点击/已完成/请先等操作提示句，菜单项不是句子",
 	"phase1_kept": "阶段 1 三区几何与 6 门槽保留，原型台按 110×60 吸附，首屏默认停在 hub",
@@ -183,13 +183,28 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("行高 22", CodeGd.LINE_H, 22.0)
 	ctx.check("有 P03 可运行", CodeGd.can_run(true))
 	ctx.check("无 P03 禁用运行", not CodeGd.can_run(false))
-	ctx.check("根目录是真实 linuxfs", CodeGd.root_abs().ends_with("linuxfs"), CodeGd.root_abs())
+	ctx.check("根目录可解析且绝对", bool(CodeGd.resolve_fs_root()["ok"]) and CodeGd.root_abs().is_absolute_path(), CodeGd.root_abs())
 
-	# ---- 真实文件系统 ----
-	var editor: Control = CodeGd.new()
-	editor.call("_ensure_fs")
-	var root := CodeGd.root_abs()
+	# ---- 真实文件系统（宿主目录，不是 user:// 兜底） ----
 	ctx.begin_group("editor_fs")
+	var rr := CodeGd.resolve_fs_root()
+	ctx.check("默认根解析成功", bool(rr["ok"]), str(rr["reason"]))
+	ctx.check("根是宿主绝对路径", str(rr["abs"]).is_absolute_path(), str(rr["abs"]))
+	ctx.eq("根首选工程内可见目录", str(rr["kind"]), "project")
+	ctx.check("根不是 user:// 兜底", not str(rr["abs"]).begins_with(ProjectSettings.globalize_path("user://")), str(rr["abs"]))
+	var rel := CodeGd.resolve_fs_root("relative/labfs")
+	ctx.check("相对路径被拒", not bool(rel["ok"]) and str(rel["reason"]) == "relative", str(rel["reason"]))
+	ctx.eq("显式指定不可用不降级", str(rel["kind"]), "override")
+	ctx.eq("工程不可用才落 user 兜底", str(CodeGd.resolve_fs_root("", "relative/labfs")["kind"]), "user")
+	ctx.check("根不可用时禁止运行", not CodeGd.run_allowed(true, false))
+	ctx.check("根可用且有 P03 才运行", CodeGd.run_allowed(true, true))
+	var edsrc := FileAccess.get_file_as_string("res://src/ui/screens/lab_code_editor.gd")
+	ctx.check("界面显示实际根路径", edsrc.contains("_root_label.text = _root"))
+
+	var editor: Control = CodeGd.new()
+	editor.call("apply_root")
+	editor.call("_ensure_fs")
+	var root := str(editor.call("root_path"))
 	ctx.check("种子 main.c 存在", FileAccess.file_exists(root + "/home/user/main.c"), root)
 	ctx.check("种子 notes.txt 存在", FileAccess.file_exists(root + "/home/user/notes.txt"), root)
 	ctx.check("种子 /etc/hostname 存在", FileAccess.file_exists(root + "/etc/hostname"), root)
