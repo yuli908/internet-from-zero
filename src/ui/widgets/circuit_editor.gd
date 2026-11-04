@@ -22,6 +22,8 @@ var _link_from := ""
 var _font: Font
 var _mono: Font
 var _cap_notice := false
+# 非渲染诊断字段：只给测试/日志读取，界面不显示任何状态文字（门上限教学句由 _draw 直绘）。
+var last_status := ""
 var _flash_t := 0.0
 
 func _init() -> void:
@@ -269,6 +271,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_left(p: Vector2) -> void:
 	_cap_notice = false
+	last_status = ""
 	var port := _port_hit(p)
 	if not port.is_empty():
 		var pid := str(port["id"])
@@ -314,6 +317,7 @@ func _on_left(p: Vector2) -> void:
 		return
 	if gate_count() >= max_gates:
 		_cap_notice = true
+		last_status = "该电路需要结构级表示"
 		queue_redraw()
 		return
 	var gid := _next_gate_id()

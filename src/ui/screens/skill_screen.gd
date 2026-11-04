@@ -274,6 +274,10 @@ class NodeCell extends Control:
 				out.append(p + dir.normalized() * by)
 		return out
 
+	# 五通道：挑战「已走过」态的三角必须实心（填充与轮廓同时变化，不能只靠颜色）。
+	func challenge_tri_filled() -> bool:
+		return kind == "challenge" and state == "done"
+
 	func _draw_marks() -> void:
 		var m := _mark()
 		match kind:
@@ -284,7 +288,12 @@ class NodeCell extends Control:
 				draw_rect(Rect2(0, 0, 3, H), _faint(0.28), true)
 				draw_polyline(PackedVector2Array([Vector2(76, 29), Vector2(81, 36), Vector2(86, 29)]), m, 1.5)
 			"challenge":
-				draw_polyline(PackedVector2Array([Vector2(81, 28), Vector2(76, 38), Vector2(86, 38), Vector2(81, 28)]), m, 1.5)
+				var tri := PackedVector2Array([Vector2(81, 28), Vector2(76, 38), Vector2(86, 38)])
+				if challenge_tri_filled():
+					draw_colored_polygon(tri, UiTheme.alpha(m, 0.40))
+				var tri_line := tri.duplicate()
+				tri_line.append(tri[0])
+				draw_polyline(tri_line, m, 1.5)
 			"final":
 				draw_rect(Rect2(0, 0, 3, H), m, true)
 				draw_rect(Rect2(91, 0, 3, H), m, true)
@@ -640,7 +649,7 @@ func _refresh() -> void:
 		var n: Dictionary = DataDB.skill_graph.node(terminal_id)
 		final_entry = {
 			"kind": "final", "x": COL_STEP * float(lab_ids.size() + 1), "y": float(CHALLENGE_Y),
-			"code": "END", "short": _short(str(n.get("title", terminal_id))),
+			"code": "END", "short": "终章",
 			"title": str(n.get("title", terminal_id)), "detail": str(n.get("desc", "")),
 			"node_id": terminal_id, "lab_id": "", "key": "n:" + terminal_id,
 			"state": _graph_state(terminal_id), "act": -1,
@@ -771,6 +780,17 @@ func _report(chapter_id: String, entries: Array) -> void:
 		wanted = 31
 	if wanted > 0:
 		print("IFZ_TREE_CHECK chapter=%s want=%d got=%d ok=%s" % [chapter_id, wanted, entries.size(), str(entries.size() == wanted)])
+	var done_ch := 0
+	var filled_ch := 0
+	for raw in _cells:
+		var c = raw
+		if c.kind == "challenge" and c.state == "done":
+			done_ch += 1
+			if c.challenge_tri_filled():
+				filled_ch += 1
+	if done_ch > 0:
+		# 断言：已走过的挑战节点三角必须实心（填充通道）。
+		print("IFZ_TREE_CHECK challenge_done_fill=%s (%d/%d)" % [str(filled_ch == done_ch), filled_ch, done_ch])
 
 
 # ---------------------------------------------------------------- 数据装配
@@ -981,12 +1001,8 @@ func _show_tip(cell: NodeCell) -> void:
 	if cell == null or not is_instance_valid(cell):
 		return
 	var at := cell.position
-	if cell.kind == "branch":
-		at.y -= 32.0
-	else:
-		at.y += 50.0
-		if at.y + TIP_H > CANVAS_H:
-			at.y = cell.position.y - 32.0
+	# 统一在节点上方 32 px：下方 y+50 在挑战行会到 647，溢出画布底边 641。
+	at.y -= 32.0
 	at.x = clampf(at.x, 0.0, CANVAS_W - TIP_W)
 	_tip_cell = cell
 	_tip_label.text = _tip_text(cell.detail)
