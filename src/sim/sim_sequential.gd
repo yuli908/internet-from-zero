@@ -13,20 +13,23 @@ static func create_register(sim: SimCircuit, p: String, width: int, clk: String,
 	var w := maxi(1, width)
 	var q: Array = []
 	var ins: Array = []
+	# 先建 Q 线网：EN mux 在 DFF attach 之前创建，若此时 Q 尚不存在会以 X 初始化。
 	for i in w:
 		var qw := "%s.q%d" % [p, i]
+		sim.add_wire(qw, SimValue.ZERO)
+		q.append(qw)
+	for i in w:
 		var dw := "%s.d%d" % [p, i]
 		sim.add_wire(dw, SimValue.ZERO)
 		var dsrc := dw
 		if not en.is_empty():
 			# EN=0 保持（选 Q）、EN=1 装载（选 D）、EN=X → X
 			var mw := "%s.m%d" % [p, i]
-			if sim.add_gate(mw, "mux", [en, qw, dw]).is_empty():
+			if sim.add_gate(mw, "mux", [en, str(q[i]), dw]).is_empty():
 				return {"ok": false, "error": "寄存器 mux 门创建失败", "q": q, "inputs": ins}
 			dsrc = mw
-		sim.dffs.append(SimDff.attach(sim, qw, dsrc, clk, reset, SimDff.SETUP, SimDff.HOLD,
+		sim.dffs.append(SimDff.attach(sim, str(q[i]), dsrc, clk, reset, SimDff.SETUP, SimDff.HOLD,
 			SimDff.CLK_TO_Q, SimValue.ZERO))
-		q.append(qw)
 		ins.append(dw)
 	return {"ok": true, "error": "", "q": q, "inputs": ins}
 
@@ -80,6 +83,11 @@ static func create_shift_register(sim: SimCircuit, p: String, width: int, din: S
 	var w := maxi(1, width)
 	var q: Array = []
 	var prev := din
+	# 先建 Q 线网（同寄存器：EN mux 早于 DFF attach）。
+	for i in w:
+		var qw0 := "%s.q%d" % [p, i]
+		sim.add_wire(qw0, SimValue.ZERO)
+		q.append(qw0)
 	for i in w:
 		var qw := "%s.q%d" % [p, i]
 		var dsrc := prev
@@ -90,7 +98,6 @@ static func create_shift_register(sim: SimCircuit, p: String, width: int, din: S
 			dsrc = mw
 		sim.dffs.append(SimDff.attach(sim, qw, dsrc, clk, reset, SimDff.SETUP, SimDff.HOLD,
 			SimDff.CLK_TO_Q, SimValue.ZERO))
-		q.append(qw)
 		prev = qw
 	return {"ok": true, "error": "", "q": q, "inputs": [din]}
 

@@ -277,7 +277,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   1. `set_input(delay)` 的 delay 是**相对当前 `now`**，分批排事件会错位 → 事件必须一次性按绝对 tick 预排；
   2. `measure_settle()` 内部 `settle()` 会排空**未来已预排**的事件 → 预排场景下改用 `wires[..]["last_change"]` 直接算。
   3. 两级 mux 串联引入 6 tick 延迟，切换 EN/LOAD 需离下一个时钟沿 ≥6 tick，否则触发 hold（这本身是正确语义）。
-- 全量回归：**1606 checks, 0 failures**。
+- 全量回归：**1610 checks, 0 failures**。
+
+### 2.14 T8（G8 补齐）：`l3_vectors.json` 24 用例 / 51 条期望
+
+- `tests/data/l3_vectors.json`（`ifz-l3-vectors/1`）：dff 8 / register 5 / counter 7 / shift 4，
+  含复位 3 条、setup 违例 2 条、hold 违例 1 条；每条期望 = `{tick, Q 值（MSB 在前）, 最后一条 L3 kind, 亚稳态 reason}`。
+- `tests/test_l3_vectors.gd`：按 `kind` 构建器件、按绝对 tick 预排事件、`drive_clock(start)` 定时钟；
+  kind 只认 `EDGE/SAMPLE/METASTABLE`（跳过写线的 CHANGE/DROP），复位/违例另断 `metastable.reason`。
+- **发现并修复缺陷**：`create_register` / `create_shift_register` 先建 EN mux 再 attach DFF，Q 线网被门输入
+  隐式初始化为 X（移位寄存器首个沿就把 X 移入下一级）→ 改为先建 Q 线网（`SimValue.ZERO`），再建 mux 与 DFF。
+  计数器原本就先行建网，未受影响。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -302,7 +312,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 17 | 仿真组 L2 参考向量 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | 已比对 **105/105**（HA/FA/ripple8/mux2/mux4 逐行全等）；`decoder3` 10、`comparator4` 17、`alu4` 8 **未比对**（`SimModule` 未提供这三个器件，且 ALU 166 门超 80 硬上限，按接口对齐须走宏单元） | M3 只交付 L3 时序器件与已有 L2 件；补 decoder3/comparator4 需新增模块与门数预算，ALU 已判定必须宏单元。留待 M4 或单独立项 |
 | 18 | 快照 `ifz-sim/2` 示例含 `clocks: [{name, period, duty, phase}]` | 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟全部由 `set_input` 的定时事件驱动（`SimSequential.drive_clock` 也只排事件） | 不为"对齐示例"引入未使用的时钟抽象；恢复后的时钟事件仍按绝对 tick 排定，`state_digest` 已证明续跑一致 |
 | 19 | G6 写 `period = t_clk_min + 5`（4 位 = 19） | 实测用 **`min+6 = 20`**（Clock 要求偶数，19 非法）；G6 的"周期=10 时 X+METASTABLE"仍按要求断言 | `min+5` 与"偶数"约束冲突；取满足两者的最小偶数 20，语义（确定性）不变 |
-| 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **未完成**：L3 行为已由 `test_l3.gd` 63 项断言覆盖（采样/复位/setup/hold/EN/LOAD/回绕/短周期），但未落成 JSON 向量文件；L2 侧已有 105 行只读向量比对 | 上下文预算优先给 EN/LOAD 语义补全（G5/G6）；向量文件属纯数据整理，留待人工补齐 |
+| 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **已补齐**：`tests/data/l3_vectors.json` 24 个用例 / 51 条期望，`tests/test_l3_vectors.gd` 逐条比对 tick / Q 值 / 最后一条 L3 trace kind / 亚稳态 reason。补齐过程中发现真实缺陷：`create_register`/`create_shift_register` 先建 EN mux、后建 Q 线网，Q 初值被门输入隐式初始化为 X（移位寄存器首个沿即采样到 X）→ 已改为先建 Q 线网，回归全过 | 先前的"上下文预算"原因已消除；G8 现在是机器可判定的 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -345,7 +355,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | G5 | `tests/test_l3.gd::_test_register_en`：EN=0 保持 / EN=1 装载 / EN=X → X，t_settle=2 ≤9 | 通过 |
 | G6 | `_test_counter_wrap`（18 沿 0..15 回绕）、`_test_counter_en_load`（LOAD/EN）、`_test_counter_too_fast`（period=10 → X+METASTABLE） | 通过（周期用 min+6=20，偏差 19） |
 | G7 | `tests/test_l3.gd::_test_shift_register`：串行移入、复位、位宽 | 通过 |
-| G8 | `tests/data/l3_vectors.json` ≥40 条 | **未完成**（偏差 20）；L3 行为由 test_l3 覆盖 |
+| G8 | `tests/data/l3_vectors.json` 24 用例 / 51 条期望（dff 8、register 5、counter 7、shift 4；含复位 3 条、setup 2 条、hold 1 条），`tests/test_l3_vectors.gd` 逐条比对 tick/值/trace kind | 通过（偏差 20 已闭合） |
 | G9 | `tests/test_trace.gd`：5 字段、kind 白名单、tick 单调、`history`==CHANGE 数、1 vs 4 tick/帧 digest 相同 | 通过 |
 | G10 | `tests/test_l3.gd::_test_snapshot`：`ifz-sim/2` 往返 digest/tick 相同、兼容 `ifz-circuit/1`、非静止态拒绝 | 通过 |
 | G11 | `scripts/bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400`，p95 1.78/2.71/3.32 ms ≤5；值回写 `delays.json` 且 `test_data` 断言 | 通过 |
@@ -368,15 +378,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M3 已交付 L3/TraceSink/奖励机制；G8 向量文件待补）
+## 6. 下一步（M3 已交付 L3/TraceSink/奖励机制，G1–G15 已闭合）
 
-M3 已按 T0→OPT→T1…T7 交付，验收汇总见 §4.1。仍未完成：G8 的 `tests/data/l3_vectors.json`（偏差 20）、
-原生 GDExtension、冒险三档、错误码编号、42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）。
+M3 已按 T0→OPT→T1…T8 交付，验收汇总见 §4.1。仍未完成：原生 GDExtension、冒险三档、错误码编号、
+42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）；L2 向量余下 35 行（decoder3/comparator4/alu4，
+偏差 17）留待 M4。
 
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1606 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1610 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）

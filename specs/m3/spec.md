@@ -251,10 +251,10 @@
 
 ## 7. 与参考向量的比对方式
 
-- **来源**（只读运行，不改文件）：在 `docs/simulation/ref/` 下执行 `python -m tests.test_sequential`，
-  7 个用例全 PASS；把其中可观察的 tick/值/事件转写进 `tests/data/l3_vectors.json`，
-  每条带 `source` 字段（例：`ref:test_dff_samples_on_rising_edge`）与 `doc` 字段（例：`03#D16`）。
-- **比对粒度**：每条 case = {器器件, 时钟参数, 输入序列 (tick, wire, value), 观察点 (tick, wire), 期望值/期望 trace kind}。
+- **来源**（只读运行，不改文件）：参考 `docs/simulation/ref/simcore/logic.py` 与 `tests/test_sequential.py` 的
+  可观察语义，转写进 `tests/data/l3_vectors.json`（文件级 `note` 记来源；case 名与参考用例同名，例 `dff_hold_violation`）。
+- **比对粒度**：每条 case = {器件, 时钟参数, 输入序列 (tick, wire, value), 观察点列表 `expects`}，
+  每个观察点 = `{t, value, kind, meta}`（Q 值 MSB 在前、kind 为最后一条 L3 观测事件、meta 为亚稳态 reason）。
   逐条断言；差异时以参考实现为准，记录偏差。
 - **不可转写的部分**：参考实现自报的 `t_settle`（如计数器 31/33）不是行为，只是估算；
   M3 用自己的结构推导 + 实测，§8 R1 说明差异，**不**把 33 当硬阈值。
