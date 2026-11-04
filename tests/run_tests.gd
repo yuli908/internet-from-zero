@@ -43,6 +43,8 @@ const SUITES := [
 	"res://tests/test_ch02_body.gd",
 	"res://tests/test_ch02_sections.gd",
 	"res://tests/test_waveform_align.gd",
+	"res://tests/test_ch05.gd",
+	"res://tests/test_ch06.gd",
 ]
 
 # 期望数已全部下沉到各套件自己的 `const EXPECT`；本文件不再维护任何数字表。

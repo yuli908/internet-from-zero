@@ -1,0 +1,238 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/17-ch05-06-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。gate 号与 lab 名按课文提案写死（提案即定稿）。",
+  "pending_kinds": {
+    "cache_hit_rate": "耗时比 ≥2× 与命中率差阈值均为初值，待技术侧校准后写进 gate_cases；先挂 pending 不进分母",
+    "page_swap_curve": "抖动拐点阈值未校准；单调性不足以下「抖动开始」判定，先挂 pending 不进分母"
+  },
+  "labs": {
+    "charset": {
+      "id": "charset",
+      "title": "6.1 字符编码与显存",
+      "body": "屏幕上的一个字在显存里是一格字节：字符先编码成字节，显示时再按首字节取长度解码。ASCII 只到 127，中文在 UTF-8 里是 3 字节；字节数与字符数不是一回事。验收是单字节与多字节都往返一致。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 屏幕上不是字符", "text": "屏幕上的一个字，在显存里是一格字节。字符必须先编码成字节才能进显存，显示时再解码回字形。这句是 12.5 字符串反转、15.2 传一行文本、终局 `hi, human` 的共同前提——它们都默认「字符等于字节」，这里先把这条拆开。"},
+        {"order": 2, "after": 0, "title": "ASCII · 7 位只到 127", "text": "ASCII 是 7 位，只到 127：可打印的在 32–126，其余是控制符。ASCII 里没有中文，一个字节装不下。所以「把中文写进显存」在 ASCII 下根本不成立——不是编码写错，是没有那一格。这也解释了为什么中文必须换一套编码。"},
+        {"order": 3, "after": 1, "title": "UTF-8 · 变长，靠首字节认长度", "text": "UTF-8 变长：一个字符 1–4 字节，首字节的高位告诉你后面还跟几个。中文常用字 3 字节。所以 `hi, human` 是 9 个字节，「你好」是 6 个字节——字节数和字符数不是一回事。解码必须按首字节往后读，不能按「一字节一字」切。"},
+        {"order": 4, "after": 2, "title": "端序 · 多字节谁在前", "text": "多字节还有一个约定：端序。同一串字节，大端先放高位、小端先放低位，读错就得到完全不同的数。它藏在「把字节拼成字」那一步，而且在读回时才暴露：写入按一种顺序拼、读出按另一种，字符全对、数字全错。12.5 和 15.2 都会再撞上。这里先记一条：写完必须能原样读回。"},
+        {"order": 5, "after": 3, "title": "验收 · 往返一致", "text": "验收是往返：把 `hi, human` 编成 9 个 ASCII 字节写进显存，再解回同样的字符；把「你好」编成 6 个 UTF-8 字节写进去，再解回两个字。单字节和多字节都要过，且「字节数」与「字符数」两个计数都要对。往返不一致，只说明看着像。"}
+      ],
+      "p1": "搭编码器 + 解码器，写显存再读回",
+      "p1_gates": ["T6.1-1", "T6.1-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "编码器：字符→字节；写显存；解码器：字节→字符（按首字节取长度）", "judge": "四条同时：①ASCII 9/9 字节往返一致；②中文 6 字节往返一致；③字节数、字符数两个计数都对；④首字节长度前缀解析正确", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_TABLE_CELL(7)"], "gates": ["T6.1-1", "T6.1-2"]},
+        {"id": "B", "level": "负例", "produce": "解码不读长度前缀", "judge": "中文被切成 3 段乱码；detail 写「长度前缀未按首字节」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.1-2"]},
+        {"id": "C", "level": "P0", "produce": "填 32–126", "judge": "区间对；非唯一 gate", "codes": ["E_TABLE_CELL(7)"], "gates": ["T6.1-3"]},
+        {"id": "D", "level": "quiz", "produce": "选出大端/小端的字节序", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.1-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T6.1-1", "title": "ASCII「hi, human」9 字节往返、9 字符", "kind": "byte_check", "required": true,
+         "expect_text": "hi, human", "expect_bytes": 9, "expect_chars": 9, "expect_prefix": false,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.1-2", "title": "UTF-8「你好」6 字节往返、2 字符、首字节长度前缀", "kind": "byte_check", "required": true,
+         "expect_text": "你好", "expect_bytes": 6, "expect_chars": 2, "expect_prefix": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.1-3", "title": "ASCII 可打印区间 32–126", "kind": "range_cell", "required": true,
+         "expect_lo": 32, "expect_hi": 126, "codes": ["E_TABLE_CELL(7)"]},
+        {"id": "T6.1-4", "title": "端序对照", "kind": "quiz", "required": true,
+         "quiz": {"question": "多字节拼接时先放高位，是哪种端序？", "options": ["大端", "小端", "补码", "反码"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先确认解码器读不读首字节：单字节全过、中文乱码，就是没读长度前缀。",
+      "misconception": "把字节数当字符数；显存列宽会越界写到下一行。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    },
+    "keyboard": {
+      "id": "keyboard",
+      "title": "6.2 键盘与中断",
+      "body": "按键变成地址靠矩阵扫描：行线拉低、列线读回，交叉点就是键码。轮询是主程序每圈问一次，中断是硬件拉线叫停并保存现场。两版都搭，比键码写入显存与响应拍数。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 按键怎么变成地址", "text": "按下一个键，机器要知道两件事：哪个键、它被按下了。键盘是矩阵——行线与列线交叉，按键就是交叉点短路。扫描器逐行拉低、逐列读回，导通的坐标就是键码；键码再查表换成显存里的字符位置。矩阵的好处是 8 根行线加 8 根列线就能扫 64 个键，不用 64 根线。"},
+        {"order": 2, "after": 0, "title": "轮询 · 主程序一直问", "text": "轮询是主程序每圈问一次扫描器：有没有新键？有就取走。它简单、可预测，代价是主程序被拖住——扫描要时间，问得勤就没空算别的；问得稀，一次按两下会漏。这不是「笨办法」，很多简单机器就这么干。"},
+        {"order": 3, "after": 1, "title": "中断 · 让硬件叫停", "text": "中断反过来：扫描器发现按键，拉一根中断线；CPU 做完当前指令就停，把 PC 和寄存器存进栈，跳到中断处理程序取键码，再返回。关键在「保存现场」——不存就回不去，回去也接不上。轮询是程序问，中断是硬件叫。"},
+        {"order": 4, "after": 2, "title": "响应一拍 · 靠相位不靠运气", "text": "响应时间不是「扫一遍的圈数」，是「从按下到取走键码」的拍数。要做到 ≤1 拍，扫描必须硬件化，且中断线一拍内被采到。做不到时先别改程序——看扫描周期与采样相位，多半是采样正好落在两次扫描中间。"},
+        {"order": 5, "after": 3, "title": "验收 · 两版都搭，再对比", "text": "验收要求两版都搭：同一个按键，轮询版与中断版的键码都要正确写进显存；再比响应——中断版 ≤1 拍，轮询版如实报出它的圈数。只搭一版不算过：你要能说清「什么时候用哪个」，而不是「中断一定更好」。"}
+      ],
+      "p1": "轮询版与中断版各搭一次并对比",
+      "p1_gates": ["T6.2-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "接矩阵扫描、键码查表→显存、中断线；两版都跑", "judge": "四条同时：①两版键码→显存正确；②中断版响应 ≤1 拍；③轮询版报出扫描圈数；④对比表两行都有实测值", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_DELAY_EXCEED(8)"], "gates": ["T6.2-1"]},
+        {"id": "B", "level": "负例", "produce": "处理程序里不存 PC/寄存器", "judge": "返回后接不上，程序跑飞；detail 写「返回地址错」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.2-2"]},
+        {"id": "C", "level": "负例", "produce": "两次按键落在同一圈", "judge": "只处理一次，丢失一次", "codes": ["E_COVERAGE(13)"], "gates": ["T6.2-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「中断是异步事件 + 保存现场」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T6.2-4"]}
+      ],
+      "keyboard": {
+        "keycode_note": "示例键取 ASCII 'A'=65；实际键码由扫描器采集，H01 键位表落库后对齐"
+      },
+      "gate_cases": [
+        {"id": "T6.2-1", "title": "两版键码都写进显存；中断 ≤1 拍、轮询报圈数", "kind": "poll_compare", "required": true,
+         "expect_keycode": 65, "max_int_ticks": 1, "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_DELAY_EXCEED(8)"]},
+        {"id": "T6.2-2", "title": "中断保存现场：返回地址对、连按两次都对", "kind": "interrupt_trace", "required": true,
+         "expect_keycode": 65, "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.2-3", "title": "轮询漏键：同圈两次按键不得丢", "kind": "event_coverage", "required": true,
+         "expect_pressed": 2, "codes": ["E_COVERAGE(13)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.2-4", "title": "轮询与中断差在哪", "kind": "quiz", "required": true,
+         "quiz": {"question": "轮询与中断的核心差别？", "options": ["中断是异步事件 + 保存现场", "中断只是扫描更快的轮询", "轮询不需要扫描器", "中断不需要键码"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "只有串行版本、没搭中断，两版对比缺一版；先补第二版再谈响应拍数。",
+      "misconception": "以为中断一定更好；轮询简单可预测，很多简单机器就用它。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    },
+    "sound": {
+      "id": "sound",
+      "title": "6.3 声音",
+      "body": "发声就是分频：数到 N 翻一次，输出频率 = 时钟 ÷（2N）。音高随 N 反比变；音阶按每级 1.059 的等比切分，不是加常数。验收看三个音的实测频率、周期随 N 变、音阶比例对。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 一根线怎么发声", "text": "机器只会输出 0 和 1。让一根线按固定节奏翻转，喇叭就听到一个音——这叫方波。音高只由翻转快慢决定：翻得快音就高，翻得慢音就低。所以发声不是新器件，是分频；喇叭只是把电的变化推成空气的振动。"},
+        {"order": 2, "after": 0, "title": "分频 · 数到 N 翻一次", "text": "分频器就是一个计数器：数到 N 翻一次输出，输出频率 = 输入时钟 ÷（2N）。想让音高翻倍，把 N 减半；想低一半，N 加倍。频率与 N 是反比——这条和第 5 章的周期是同一笔账，只是这次账本换成耳朵。"},
+        {"order": 3, "after": 1, "title": "音阶 · 不是等差", "text": "音阶不是等差：八度是频率翻倍，中间十二个半音按等比切开，每级约 1.059 倍。所以 do 到 re 的分频系数不是加一个常数，是乘一个固定比例。按等差调，越高越走音——这是最早被听见的「编码错」。"},
+        {"order": 4, "after": 2, "title": "方波的代价 · 只有奇次谐波", "text": "方波听着「电子」，因为它只含奇次谐波，没有偶次。想要圆润，得滤波或叠加——那是后话，这关的零件库里也没有电感电容，别在这儿找。这里只记住两条：能发声不等于好听；波形决定音色，分频只决定音高。这两件事分开，调参才不会瞎试。"},
+        {"order": 5, "after": 3, "title": "验收 · 音高随分频变", "text": "验收用探针看方波：改 N，周期按 2N 变；三个音（如 440、660、880）实测频率与理论值误差在公差内；再把 do、re 两行的分频系数算对，验证是乘比例不是加常数。音高跟 N 走、音阶按比例走，两条都成立才算过。"}
+      ],
+      "p1": "接分频器驱动喇叭，调 N 出三个音",
+      "p1_gates": ["T6.3-1", "T6.3-2", "T6.3-3"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "计数器分频 + 输出到喇叭；改 N 三次", "judge": "三条同时：①三个目标音实测频率在 ±5%；②周期随 N 线性变；③音阶两行按比例算对", "codes": ["E_OUTPUT_MISMATCH(10)", "E_DELAY_EXCEED(8)", "E_UNCONNECTED(3)"], "gates": ["T6.3-1", "T6.3-2", "T6.3-3"]},
+        {"id": "B", "level": "负例", "produce": "do、re 用「加常数」", "judge": "高音区走音，误差超公差；detail 写「比例误作等差」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.3-3"]},
+        {"id": "C", "level": "P0b", "produce": "代入三档 N", "judge": "与实测 ±5%；不算 P1", "codes": ["E_DELAY_MISMATCH(9)"], "gates": []},
+        {"id": "D", "level": "quiz", "produce": "选「波形定音色，分频定音高」", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.3-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T6.3-1", "title": "三个音实测频率在 ±5%（440/660/880）", "kind": "frequency_check", "required": true,
+         "expect_freqs": [440, 660, 880], "tolerance": 0.05, "codes": ["E_COVERAGE(13)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.3-2", "title": "周期随 N 为 2N（半周期取整不丢拍）", "kind": "divider_ratio", "required": true,
+         "codes": ["E_COVERAGE(13)", "E_DELAY_EXCEED(8)"]},
+        {"id": "T6.3-3", "title": "音阶按比例 1.059，不是加常数", "kind": "scale_check", "required": true,
+         "expect_ratio": 1.05946, "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.3-4", "title": "音色与音高谁决定", "kind": "quiz", "required": true,
+         "quiz": {"question": "音色与音高分别由什么决定？", "options": ["波形定音色，分频定音高", "分频定音色，波形定音高", "都只由喇叭决定", "都只由时钟决定"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看周期是不是 2N：N 取整后少一拍，就是半周期丢拍。",
+      "misconception": "音阶按等差调；只有高音区走音，因为比例被加常数替代了。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    },
+    "loader": {
+      "id": "loader",
+      "title": "6.4 加载器",
+      "body": "程序放在磁带，上电后由加载器整段搬进内存再跳首地址。装入要核对首地址与长度，校验和不对不许跑，断电重载还得再来一次。验收看装入能跑、重载一致、坏字节被拒。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 程序从哪里来", "text": "到目前为止程序都是你拨开关拨进去的，断电就没了。真机要能「装」：程序放在外存（这里是磁带），上电后由一段小程序把它搬进内存，再从第一条开始跑。这段小程序叫加载器——它自己也得先被拨进去，这就是最初的那一小段。"},
+        {"order": 2, "after": 0, "title": "回收 4.4 那句伏笔", "text": "4.4 末段留过一句：寄存器最快最贵、内存中等、外存最慢最便宜。现在用到它了——磁带慢，所以不能边跑边读，必须整段先搬进内存；内存贵，所以只装得下当前这一个程序。加载器就活在这两条约束中间。"},
+        {"order": 3, "after": 1, "title": "装入 · 地址必须对上", "text": "装入不是「复制过去」那么松：磁带上的程序带一个起始地址，加载器要写到内存的同一地址；跳转指令里的目标是绝对地址，所以装载位置错了，程序能进去但一跑就飞。装完要核对首地址与长度两项，两项都不许凭印象。"},
+        {"order": 4, "after": 2, "title": "断电重载 · 还得能再来一次", "text": "断电内存就空。所以加载器必须可重复：上电→从磁带读→校验和→写内存→跳首地址。校验和不对就不许跑，否则你会拿着半截程序去查逻辑错误。这也是 6.4 与 4.4 的分界：4.4 讲「存得下」，这里讲「装得进、验得过」。"},
+        {"order": 5, "after": 3, "title": "验收 · 装入能跑，断电还能跑", "text": "验收三件：①从磁带装入 5.3 那条程序，装入后直接跑出 8 和 15；②清空内存再上电重载，同一程序仍跑出同样结果；③故意改坏磁带上的一个字节，加载器拒跑并报校验错。三件都过，程序才算真的存在机器里。"}
+      ],
+      "p1": "从磁带装入并运行，再做断电重载",
+      "p1_gates": ["T6.4-1", "T6.4-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "接磁带、读入、写内存、跳首地址；清内存后重来一遍", "judge": "三条同时：①装入后输出 8/15；②重载后结果一致；③坏字节被校验拒跑", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"], "gates": ["T6.4-1", "T6.4-2"]},
+        {"id": "B", "level": "负例", "produce": "首地址偏移 1", "judge": "程序跑飞，跳转落到空处；detail 写「首地址错」", "codes": ["5"], "gates": ["T6.4-3"]},
+        {"id": "C", "level": "P0b", "produce": "逐字节相加取和", "judge": "与机器值一致；不算 P1", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.4-2"]},
+        {"id": "D", "level": "quiz", "produce": "选「磁带慢且断电即失，内存必须整段装入」", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.4-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T6.4-1", "title": "装入后跑出 8/15，清内存重载结果一致", "kind": "loader_run", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.4-2", "title": "校验和一致，坏字节被拒跑", "kind": "checksum", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.4-3", "title": "首地址与长度必须对上磁带表头", "kind": "load_address", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_UNKNOWN_TARGET(5)"]},
+        {"id": "T6.4-4", "title": "为什么要先装再跑", "kind": "quiz", "required": true,
+         "quiz": {"question": "为什么程序必须先装进内存再跑？", "options": ["磁带慢且断电即失，内存必须整段装入", "磁带可以直接当内存执行", "内存断电后仍保留内容", "因为外存比内存快"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "装入成功后一跑就飞，先查首地址：装错位置，绝对地址跳转就落到空处。",
+      "misconception": "不清内存直接重载；第二次跑出旧结果，误以为通过。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    },
+    "cache": {
+      "id": "cache",
+      "title": "6.5 缓存与局部性",
+      "body": "CPU 等内存的差叫内存墙，缓存靠局部性才有用。同一段程序步长 1 与 16，命中率从接近满掉到接近零。验收同频各跑一遍，比命中率与耗时；首地址还必须对齐。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 内存墙", "text": "CPU 一拍能算完，内存却要好几拍才回一个字节——这个差叫内存墙。等内存的时间比算的时间长，机器再快也被拖住。所以真机在 CPU 和内存之间塞一层小、快、贵的存储，叫缓存。4.4 的层次表到这里第一次有了非用不可的理由。"},
+        {"order": 2, "after": 0, "title": "局部性 · 缓存为什么有用", "text": "缓存能有用，全靠局部性。时间局部性：刚用过的还会再用（循环变量、计数器）。空间局部性：用了这个，隔壁几个也快要用（数组顺序访问读 a[0]，接着 a[1]、a[2] 大概率也要用）。没有局部性，命中率就接近容量比，塞多贵的缓存都白搭。"},
+        {"order": 3, "after": 1, "title": "步长实验 · 1 与 16", "text": "同一段程序两种走法：步长 1，一个接一个读；步长 16，每次跳过 16 字节。缓存一行只装 16 字节，步长 1 时一行能用 16 次，步长 16 时每次都撞新行——命中率从接近满掉到接近零。程序没改，只改了访问顺序。"},
+        {"order": 4, "after": 2, "title": "两笔账 · 命中率与耗时", "text": "命中率 = 命中次数 ÷ 总访问。耗时要按两档算：命中 h 拍、未命中 m 拍，平均 = 命中率×h +（1−命中率）×m。所以命中率掉一半，耗时不是掉一半，是按 m÷h 的倍数放大——这就是内存墙为什么看着像悬崖，而不是斜坡。"},
+        {"order": 5, "after": 3, "title": "验收 · 同频跑两版", "text": "验收要同频：两种步长在同一时钟下各跑一遍，读命中率与总耗时。要求耗时比 ≥2 倍（初值，技术侧校准）、命中率差 ≥ 阈值。跑不出来常是地址没对齐——缓存行 16 字节一段，从 15 开始读，第一行只用到 1 个字节。"}
+      ],
+      "p1": "步长 1 / 16 两段循环，同频各跑一遍，读命中率与耗时",
+      "p1_gates": ["T6.5-1", "T6.5-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "写两段循环、同一时钟、接计数器读命中与耗时", "judge": "三条同时：①两段都跑满次数；②耗时比 ≥2× 且命中率差 ≥ 阈值；③首地址对齐", "codes": ["E_COVERAGE(13)", "E_OUTPUT_MISMATCH(10)", "E_UNCONNECTED(3)"], "gates": ["T6.5-1", "T6.5-2"]},
+        {"id": "B", "level": "负例", "produce": "从 15 开始读", "judge": "命中率异常低，步长 1 也不占便宜；detail 写「首地址未对齐」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.5-1"]},
+        {"id": "C", "level": "P0b", "produce": "代入 h、m 与命中率", "judge": "与实测 ±5%；不算 P1", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.5-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「局部性让同一行被反复命中」", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.5-4"]}
+      ],
+      "thresholds": {
+        "speedup_ratio": {"status": "pending", "initial": 2.0, "reason": "17 §12-5 初值；待技术侧按实测校准后写进 gate_cases"},
+        "hit_rate_delta": {"status": "pending", "initial": null, "reason": "未校准，先不拍数值"}
+      },
+      "gate_cases": [
+        {"id": "T6.5-1", "title": "步长 1/16 两段都跑满、首地址对齐", "kind": "cache_coverage", "required": true,
+         "codes": ["E_COVERAGE(13)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.5-2", "title": "耗时比与命中率差达阈值（阈值未校准）", "kind": "cache_hit_rate", "required": true,
+         "status": "pending",
+         "thresholds": {"speedup_ratio": null, "hit_rate_delta": null},
+         "pending_reason": "耗时比 ≥2× 与命中率差阈值均为 17 §12-5 初值，待技术侧按实测校准后写进 gate_cases；本项只登记不判定，不进分母",
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.5-3", "title": "平均访问时间 = 命中率×h +（1−命中率）×m（±5%）", "kind": "cache_avg", "required": true,
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.5-4", "title": "缓存为什么不改程序也能快", "kind": "quiz", "required": true,
+         "quiz": {"question": "缓存为什么不改程序也能快？", "options": ["局部性让同一行被反复命中", "因为缓存频率更高", "因为程序被自动重写", "因为内存变大了"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "只跑一组数据不成比；先确认步长 1 与 16 两组都在同一时钟下跑满。",
+      "misconception": "把耗时比当成命中率比；两者按 m÷h 放大，不是一个数。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    },
+    "vm": {
+      "id": "vm",
+      "title": "6.6 地址空间与换页",
+      "body": "程序看到的是地址空间，页表把页号翻成物理页框号。装不下就把页写到磁带做后备，一次换页是上千倍访问代价。超配越多换页越凶；验收 1.5× 全写全读回 100% 一致。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 每个程序都以为独占", "text": "程序里的地址从 0 开始，用到它以为的末尾。可物理内存就那么多，两个程序都想从 0 开始——它们看到的是「地址空间」，不是真内存。中间那层翻译叫页表：程序给的页号，换成物理页框号。4.4 的地址译码在这里第一次被加了一层。"},
+        {"order": 2, "after": 0, "title": "装不下怎么办 · 后备", "text": "物理装不下时，把暂时不用的页写到磁带（后备），需要时再读回来，空出的页框给别人。一次换页 = 一次写 + 一次读，代价是内存访问的上千倍。所以「能跑」不等于「跑得动」——这两句话在 6.6 里必须分开说。"},
+        {"order": 3, "after": 1, "title": "缺页 · 不是崩溃，是停一下", "text": "访问一个不在内存的页，硬件触发缺页：停下当前指令，把那一页从磁带读进空页框，改页表，再重跑这条指令。程序不知道自己停过——这正是「以为自己独占内存」的代价被藏起来的地方。解题时看不到它，性能上跑不掉。"},
+        {"order": 4, "after": 2, "title": "超配越多，换页越凶", "text": "超配 1.5 倍还能跑，超配 3 倍就开始抖动：刚换出去的页马上又要用，换页次数随超配量上升，耗时跟着爆。这条曲线不是线性的——过某个点，机器把时间全花在搬页上，算的活几乎不干。抖动一旦开始不会自己停，解法只有少超配或换更快的后备。"},
+        {"order": 5, "after": 3, "title": "验收 · 全写、全读回", "text": "验收：把总量写到物理容量的 1.5 倍，全部写入；再逐个读回，要求 100% 一致；同时记录换页次数与总耗时，并与 1.0、2.0 倍两档比，曲线必须随超配上升。读回少一个字节都算失败——「丢了却没报错」是最坏的结果。"}
+      ],
+      "p1": "超配 1.5× 全写全读回，记录换页次数与耗时",
+      "p1_gates": ["T6.6-1", "T6.6-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "搭页表 + 缺页处理 + 磁带后备；跑 1.0/1.5/2.0 三档", "judge": "三条同时：①1.5× 总量全部读回一致；②换页次数与耗时随超配上升；③页表项（页号→框号）全对", "codes": ["E_UNCONNECTED(3)", "E_UNKNOWN_TARGET(5)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"], "gates": ["T6.6-1", "T6.6-2"]},
+        {"id": "B", "level": "负例", "produce": "缺页读完不更新页表项", "judge": "同一页反复缺页，换页次数爆表；detail 写「同一页反复缺页」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.6-1"]},
+        {"id": "C", "level": "P0b", "produce": "页框数、页大小、总量", "judge": "与机器值一致；不算 P1", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.6-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「页表把页号翻成框号，程序只看得到地址空间」", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.6-4"]}
+      ],
+      "thresholds": {
+        "thrash_knee_overcommit": {"status": "pending", "initial": null, "reason": "抖动拐点未校准；数据只登记结构，不拍数值"}
+      },
+      "gate_cases": [
+        {"id": "T6.6-1", "title": "1.5× 全写全读回 100% 一致，页表项全对", "kind": "page_map", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T6.6-2", "title": "换页次数与耗时随超配上升（拐点阈值未校准）", "kind": "page_swap_curve", "required": true,
+         "status": "pending", "thresholds": {"thrash_knee_overcommit": null},
+         "pending_reason": "抖动拐点阈值未校准，「曲线随超配上升」不足以下「抖动开始」判定；先挂 pending，不进分母",
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.6-3", "title": "容量与超配量换算：页框×页大小×超配", "kind": "vm_capacity", "required": true,
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T6.6-4", "title": "地址空间与物理内存的差", "kind": "quiz", "required": true,
+         "quiz": {"question": "地址空间与物理内存差在哪？", "options": ["页表把页号翻成框号，程序只看得到地址空间", "程序直接看到物理页框号", "地址空间就是物理内存", "页表只负责换页不管地址"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "只跑 1.0× 没有超配就没有换页；三档都要跑满，且耗时也要记录。",
+      "misconception": "以为能跑就是跑得动；缺页的代价藏在性能里，读回少一字节都算失败。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "奖励待在章节 levels 数据落库后补"
+    }
+  }
+}

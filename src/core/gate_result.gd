@@ -33,6 +33,7 @@ const E_AREA := 22
 const E_POWER_CALC := 23
 const E_POWER_RATIO := 24
 const E_PENDING := 25
+const E_TIMING_MARGIN := 27
 const E_GENERIC := 99
 
 ## 六类错因标签（教学组口径）。
@@ -71,6 +72,7 @@ const NAMES := {
 	E_POWER_CALC: "E_POWER_CALC",
 	E_POWER_RATIO: "E_POWER_RATIO",
 	E_PENDING: "E_PENDING",
+	E_TIMING_MARGIN: "E_TIMING_MARGIN",
 	E_GENERIC: "E_GENERIC",
 }
 
@@ -101,6 +103,7 @@ const TAG_MAP := {
 	E_POWER_CALC: [TAG_C, TAG_K],
 	E_POWER_RATIO: [TAG_C, TAG_K],
 	E_PENDING: [TAG_R],
+	E_TIMING_MARGIN: [TAG_M, TAG_C],
 	E_GENERIC: [TAG_R],
 }
 
@@ -131,6 +134,7 @@ const DESCRIBE := {
 	E_POWER_CALC: "功耗计算不符",
 	E_POWER_RATIO: "功耗比不符",
 	E_PENDING: "仿真层暂不支持（待接入）",
+	E_TIMING_MARGIN: "建立/保持余量为负",
 	E_GENERIC: "未分类失败（已按兜底处理）",
 }
 

@@ -1,0 +1,206 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/17-ch05-06-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。gate 号与 lab 名按课文提案写死（提案即定稿）。",
+  "pending_kinds": {},
+  "labs": {
+    "datapath": {
+      "id": "datapath",
+      "title": "5.1 数据通路与四阶段",
+      "body": "五件东西接成一个圈：PC 给地址、内存取指令、IR 拆控制信号、寄存器堆读写、ALU 运算。单步一条 LDI，按拍记下每根线的值，再把取指、译码、执行、写回标到波形上；终值与阶段拍号都要对得上。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 五个盒子接成一个圈", "text": "一台机器就是五件东西接成一个圈：PC 存「下一条指令在哪」，内存按地址取指令，IR 把取到的指令拆成控制信号，寄存器堆是十几个能读能写的格子，ALU 做运算。圈的意思是：做完一条，PC 前进一格，回到起点。4.3 的控制单元在这里第一次真的开始指挥别人。"},
+        {"order": 2, "after": 0, "title": "取指 · 地址从 PC 来", "text": "第一步取指：PC 的值送到内存地址口，内存把那一格的内容送回来，锁进 IR。这里最容易漏——内存不只放数据，也放指令，两者是同一片格子，只是地址不同。这就是「存储程序」：程序没有专属位置，它躺在数据中间。"},
+        {"order": 3, "after": 1, "title": "译码 · 操作码变控制线", "text": "第二步译码：IR 高 4 位是操作码，送进 4.3 那张控制表，表输出一排控制线——谁读寄存器、谁写寄存器、ALU 做哪种运算、内存读还是写。表里一格写错，整条指令就走偏。所以指令集不是 16 个电路，是那张表里的 16 行。"},
+        {"order": 4, "after": 2, "title": "执行与写回 · LDI 只走两段", "text": "第三步执行、第四步写回。LDI 最简单：它不用 ALU，也不用读寄存器，直接把指令里的 8 位立即数写进目标寄存器。所以四阶段不是每拍都满：LDI 的「执行」是空的，真正发生的只有取指、译码、写回。走完这条，你才知道哪里必经、哪里可绕。"},
+        {"order": 5, "after": 3, "title": "验收 · 波形对齐，不是填表", "text": "验收不看表格：单步跑一条 LDI，把 PC→内存→IR→寄存器堆每根线的值按拍记下来，再在波形上标出四个阶段。标注必须和波形对齐——标在第 5 拍、波形在第 3 拍就换段，说明你背的是流程，不是这台机器。终值、阶段、拍号三样都对才算过。"}
+      ],
+      "p1": "接数据通路并单步跑一条 LDI，波形上标四阶段",
+      "p1_gates": ["T5.1-1", "T5.1-2", "T5.1-3"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "接 PC/IR/寄存器堆/ALU/内存五件，单步执行，在波形上标起止拍", "judge": "三条同时：①目标寄存器终值对；②四阶段标注起止拍与波形逐拍一致（填表不算）；③除应动的控制线外无多余线翻转", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T5.1-1", "T5.1-2", "T5.1-3"]},
+        {"id": "B", "level": "P0", "produce": "填「取指→译码→执行→写回」", "judge": "顺序对；非唯一 gate（17 H4）", "codes": ["E_QUIZ(14)"], "gates": ["T5.1-4"]},
+        {"id": "C", "level": "负例", "produce": "断开 PC+1", "judge": "第二条 LDI 取回同一条，波形整段重复；detail 写「取指地址未前进」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": []},
+        {"id": "D", "level": "P0", "produce": "收成 PC/IR/RF/ALU/MEM 五个端口", "judge": "封装前后同一条 LDI 结果一致", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": []}
+      ],
+      "datapath": {
+        "control_lines": ["PC_WR", "MEM_RD", "IR_WR", "RF_RD", "RF_WR", "ALU_ADD", "MEM_WR"],
+        "lines_note": "线名按 5.1 五件的端口命名；H01 控制表落库后逐条对齐"
+      },
+      "gate_cases": [
+        {"id": "T5.1-1", "title": "LDI 终值：R1=3、R2=5、R3=8", "kind": "register_final", "required": true,
+         "expect": {"R1": 3, "R2": 5, "R3": 8}, "max_ticks": 8, "codes": ["E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"]},
+        {"id": "T5.1-2", "title": "四阶段标注起止拍与波形逐拍一致", "kind": "waveform_align", "required": true,
+         "stage_signals": {"fetch": "mem_rd", "decode": "ir_ld", "execute": "alu_op", "writeback": "rf_wr"},
+         "final_signal": "R3",
+         "waveform": [
+           {"tick": 0, "waves": {"mem_rd": 1, "ir_ld": 0, "alu_op": 0, "rf_wr": 0, "R3": 0}},
+           {"tick": 1, "waves": {"mem_rd": 1, "ir_ld": 0, "alu_op": 0, "rf_wr": 0, "R3": 0}},
+           {"tick": 2, "waves": {"mem_rd": 0, "ir_ld": 1, "alu_op": 0, "rf_wr": 0, "R3": 0}},
+           {"tick": 3, "waves": {"mem_rd": 0, "ir_ld": 0, "alu_op": 0, "rf_wr": 1, "R3": 8}}
+         ],
+         "waveform_note": "5.1 LDI 参考波形：取指两拍、译码一拍、执行空段、写回一拍；H01 仿真落库后替换为实测",
+         "contract": {"impl": "WaveformAlign", "inputs": ["final_value", "spans", "beats"], "fail_code": 10},
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T5.1-3", "title": "除应动的控制线外无多余翻转", "kind": "control_line_audit", "required": true,
+         "expect_lines": ["PC_WR", "MEM_RD", "IR_WR", "RF_WR"], "codes": ["E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"]},
+        {"id": "T5.1-4", "title": "四阶段顺序：取指→译码→执行→写回", "kind": "quiz", "required": true,
+         "quiz": {"question": "四阶段的顺序是？", "options": ["取指→译码→执行→写回", "译码→取指→写回→执行", "取指→执行→译码→写回", "执行→取指→译码→写回"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看 PC 有没有前进：PC→内存那条线空着，波形第一条就空。",
+      "misconception": "把「四阶段标注」当成填表题；标注必须能对上仿真波形的拍号。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "H01/经济奖励待在章节 levels 数据落库后补；本文件不编造"
+    },
+    "isa8": {
+      "id": "isa8",
+      "title": "5.2 MUD-8 指令集",
+      "body": "指令集就是控制表的 16 行：每行一个操作码配一组控制线。16 条分搬运、算术逻辑、跳转、进出四组；空码必须报未知指令并停住，不许默默跳过。逐条单步，任一条错都要能报到拍。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 16 行表，不是 16 个电路", "text": "指令集就是 5.1 那张控制表的 16 行：每行一个操作码（高 4 位），配一组控制线。同一套数据通路，换行就是换指令。所以学指令集不是背名字，是看清每行让哪几根线动——背下 16 个名字而不知道动哪根线，等于没学。"},
+        {"order": 2, "after": 0, "title": "四组 · 搬运、算术逻辑、跳转、进出", "text": "16 条分四组：搬运（立即数、取数、存数）、算术逻辑（加、减、与、或、异或、取反）、跳转（无条件、零跳、非零跳）、进出（读入、输出、停机）。四组各占几个操作码，剩下的空码不许当没事发生——末段专门讲它。"},
+        {"order": 3, "after": 1, "title": "微操作 · 一行拆成几拍", "text": "每一行还要拆成微操作：取指是所有指令共用的前两拍，到译码后才分岔。ADD 多两拍（读两个寄存器、过 ALU、写回），LDI 只用一拍写回。所以单步看到的不是 16 种长度，是几种长度重复出现——分岔只在译码之后，这也解释了为什么取指能共用。"},
+        {"order": 4, "after": 2, "title": "空码 · 拒绝，不是忽略", "text": "4.3 说过非法码要拒绝。到指令级，空操作码不许默默当停机：控制表里没有这一行，机器必须报「未知指令」并停在原处，而不是跳过去。跳过去最坏——程序带着错继续跑，最后错在别处，你查三天也查不到源头。"},
+        {"order": 5, "after": 3, "title": "验收 · 16 条各单步一遍", "text": "验收是 16 条各单步一遍：每条看清操作码、动了几根线、终值落在哪；错了要能说出错在哪一拍，不是「结果不对」。再把 4 条空码逐个喂进去，全部被拒并回报操作码。判据是「任何一条错都能报到拍」——做得到，这条指令集才算封住。"}
+      ],
+      "p1": "控制表补一行 + 16 条逐条单步",
+      "p1_gates": ["T5.2-1", "T5.2-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "在控制表里写一行：操作码、控制线组合、拍数", "judge": "①目标寄存器终值对；②该行只动应动的线；③拍数与微操作链一致（不多不少）", "codes": ["E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"], "gates": ["T5.2-1"]},
+        {"id": "B", "level": "P1", "produce": "逐条跑，填「操作码 / 动的线 / 终值 / 拍数」", "judge": "16/16 全对；任一条错须报到拍", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T5.2-2"]},
+        {"id": "C", "level": "负例", "produce": "把空行当停机处理", "judge": "期望「未知指令」并停住，实得静默继续", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T5.2-3"]},
+        {"id": "D", "level": "P0", "produce": "操作码↔助记符配对", "judge": "16/16；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T5.2-4"]}
+      ],
+      "isa": {
+        "source": "docs/design/02-chapter-tree.md §7.5（H01 蓝图未落库，按设计表写死；课文 5.3 的 R1/R2/R3 表述与设计表 A/B 差异登记为待对齐）",
+        "ticks_known": false,
+        "ticks_source": "待 5.1 波形实测落库后逐条写死",
+        "instructions": [
+          {"opcode": 0, "mnemonic": "NOP", "group": "空操作", "semantics": "空操作"},
+          {"opcode": 1, "mnemonic": "LDA", "group": "搬运", "semantics": "A ← MEM[a]"},
+          {"opcode": 2, "mnemonic": "STA", "group": "搬运", "semantics": "MEM[a] ← A"},
+          {"opcode": 3, "mnemonic": "LDI", "group": "搬运", "semantics": "A ← 立即数"},
+          {"opcode": 4, "mnemonic": "ADD", "group": "算术逻辑", "semantics": "A ← A + MEM[a]，置 Z/C"},
+          {"opcode": 5, "mnemonic": "SUB", "group": "算术逻辑", "semantics": "A ← A − MEM[a]，置 Z/C"},
+          {"opcode": 6, "mnemonic": "AND", "group": "算术逻辑", "semantics": "A ← A & MEM[a]"},
+          {"opcode": 7, "mnemonic": "OR", "group": "算术逻辑", "semantics": "A ← A | MEM[a]"},
+          {"opcode": 8, "mnemonic": "XOR", "group": "算术逻辑", "semantics": "A ← A ^ MEM[a]"},
+          {"opcode": 9, "mnemonic": "JMP", "group": "跳转", "semantics": "PC ← a"},
+          {"opcode": 10, "mnemonic": "JZ", "group": "跳转", "semantics": "Z=1 时跳转"},
+          {"opcode": 11, "mnemonic": "JC", "group": "跳转", "semantics": "C=1 时跳转"},
+          {"opcode": 12, "mnemonic": "OUT", "group": "进出", "semantics": "端口 p ← A"},
+          {"opcode": 13, "mnemonic": "IN", "group": "进出", "semantics": "A ← 端口 p"},
+          {"opcode": 14, "mnemonic": "LDB", "group": "搬运", "semantics": "B ← 立即数"},
+          {"opcode": 15, "mnemonic": "HLT", "group": "进出", "semantics": "停机"}
+        ]
+      },
+      "gate_cases": [
+        {"id": "T5.2-1", "title": "控制表补一行 ADD：操作码 0x04、控制线、拍数", "kind": "control_row", "required": true,
+         "expect": {"opcode": 4, "mnemonic": "ADD", "lines": ["RF_RD", "ALU_ADD", "RF_WR", "PC_WR", "MEM_RD", "IR_WR"]},
+         "expect_final": {"A": 8}, "expect_ticks": null,
+         "codes": ["E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"]},
+        {"id": "T5.2-2", "title": "16 条逐条单步并报到拍", "kind": "isa_sweep", "required": true,
+         "isa": [
+           {"opcode": 0, "mnemonic": "NOP"}, {"opcode": 1, "mnemonic": "LDA"}, {"opcode": 2, "mnemonic": "STA"},
+           {"opcode": 3, "mnemonic": "LDI"}, {"opcode": 4, "mnemonic": "ADD"}, {"opcode": 5, "mnemonic": "SUB"},
+           {"opcode": 6, "mnemonic": "AND"}, {"opcode": 7, "mnemonic": "OR"}, {"opcode": 8, "mnemonic": "XOR"},
+           {"opcode": 9, "mnemonic": "JMP"}, {"opcode": 10, "mnemonic": "JZ"}, {"opcode": 11, "mnemonic": "JC"},
+           {"opcode": 12, "mnemonic": "OUT"}, {"opcode": 13, "mnemonic": "IN"}, {"opcode": 14, "mnemonic": "LDB"},
+           {"opcode": 15, "mnemonic": "HLT"}
+         ], "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T5.2-3", "title": "空码 0x10–0x13 全部被拒并回报", "kind": "illegal_opcode", "required": true,
+         "expect_opcodes": [16, 17, 18, 19], "codes": ["E_COVERAGE(13)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T5.2-4", "title": "操作码↔助记符配对", "kind": "quiz", "required": true,
+         "quiz": {"question": "LDI 做什么？", "options": ["把立即数写进 A", "把 A 存进内存", "把内存读进 A", "跳转到绝对地址"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看操作码：高 4 位错了，后面全错；再看动的线，最后才看终值。",
+      "misconception": "把空码当停机；空码必须报未知指令并停在原处。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "H01 蓝图与奖励待在章节 levels 数据落库后补"
+    },
+    "first_program": {
+      "id": "first_program",
+      "title": "5.3 写第一个程序",
+      "body": "两条程序：A=3、B=5、输出 8；以及 1 加到 5、输出 15。第一条证明能搬数，第二条证明能循环。循环不是新器件，是程序让 PC 往回走；验收看输出，也看回跳次数。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 两条程序", "text": "这一节写两条：A=3、B=5、输出 8；以及从 1 加到 5、输出 15。第一条证明数据通路能搬数，第二条证明它能循环。循环不是新器件——它是「跳回去」，而跳回靠的是 PC 的值被改写。两条都要进程序蓝图，11.1 的手工汇编就从它们起步。"},
+        {"order": 2, "after": 0, "title": "第一条 · 三个寄存器就够", "text": "第一条拆开：LDI 把 3 写进 R1，LDI 把 5 写进 R2，再把 R1、R2 送进 ALU 做加，结果写 R3，然后 OUT。注意「送进 ALU」不是新指令——ADD 自己会读、算、写，这就是 5.2 说的微操作链，程序里看不到它。"},
+        {"order": 3, "after": 1, "title": "第二条 · 循环靠条件跳", "text": "第二条要四件套：一个计数器（从 1 数到 5）、一个累加器、一条比较（零跳/非零跳靠 ALU 的零标志）、一条跳回。循环不在硬件里，在程序里——机器只会按 PC 走，是程序让它往回走。这一点不弄清，后面所有程序都像魔法。"},
+        {"order": 4, "after": 2, "title": "最容易假过的循环", "text": "循环最容易假通过：条件跳的零标志接错，可能一次都不进（输出 0），也可能停不下来。所以验收要三组——正常加到 5 得 15、从 0 加到 5 仍得 15、把上限改 0 得 0。三组都对，才说明跳转真的按条件走，而不是碰巧。"},
+        {"order": 5, "after": 3, "title": "验收 · 输出对，过程也对", "text": "验收看输出，也看过程：两条程序的输出必须是 8 和 15；循环那条还要报回跳次数（5 次），并与单步波形上的拍数对上。输出对而回跳次数不对，说明你是用别的方式凑出来的。程序要用机器的方式跑出来，不是算出来。"}
+      ],
+      "p1": "写 A=3、B=5、输出 8；写 1 加到 5 的循环（课文标 P2，P1 级以上）",
+      "p1_gates": ["T5.3-1", "T5.3-2", "T5.3-3"],
+      "practice": [
+        {"id": "A", "level": "P2", "level_note": "P1 级以上，按 17 §2 语言章起点", "produce": "5 条左右指令，输出 8", "judge": "①输出 8；②R1/R2/R3 终值对；③执行拍数不多于应有拍数", "codes": ["E_UNCONNECTED(3)", "E_UNKNOWN_TARGET(5)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T5.3-1"]},
+        {"id": "B", "level": "P2", "produce": "循环体 + 条件跳 + 停机", "judge": "①输出 15；②回跳 5 次；③上限改 0 输出 0；④程序能停机（不撞拍数上限）", "codes": ["E_OUTPUT_MISMATCH(10)", "E_TARGET_UNREACHED(15)", "E_UNCONNECTED(3)"], "gates": ["T5.3-2", "T5.3-3"]},
+        {"id": "C", "level": "负例", "produce": "条件跳永远不成立", "judge": "循环一次不进，输出 0；detail 写「一次未进」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T5.3-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「跳回改的是 PC，不是新增一条指令」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T5.3-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T5.3-1", "title": "A=3、B=5、输出 8", "kind": "program_run", "required": true,
+         "expect_out": 8, "expect_regs": {"R1": 3, "R2": 5, "R3": 8}, "max_ticks": 8,
+         "codes": ["E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"]},
+        {"id": "T5.3-2", "title": "1 加到 5：输出 15、回跳 5 次、能停机", "kind": "loop_run", "required": true,
+         "expect_out": 15, "expect_jumps": 5, "codes": ["E_OUTPUT_MISMATCH(10)", "E_TARGET_UNREACHED(15)"]},
+        {"id": "T5.3-3", "title": "上限改 0：输出 0、一次未进", "kind": "loop_boundary", "required": true,
+         "codes": ["E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T5.3-4", "title": "为什么循环要跳回", "kind": "quiz", "required": true,
+         "quiz": {"question": "循环靠什么成立？", "options": ["跳回改的是 PC，不是新增一条指令", "新增一条循环指令", "把时钟调慢", "把内存扩容"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "少写一条 LDI，R2 会残留旧值，8 就变成别的数；先查寄存器初值。",
+      "misconception": "输出对就算过；回跳次数与拍数对不上，说明结果是凑出来的。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "程序蓝图待 11.1 手工汇编数据落库后补"
+    },
+    "clock_limit": {
+      "id": "clock_limit",
+      "title": "5.4 时钟上限",
+      "body": "100 Hz 就崩不是逻辑错，是拍太短。上限是周期 T ≥ 级数 × 单级延迟；级数来自 3.2 报告，单级延迟来自 1.6 实测，只许引用不许手填。先找首个坏拍，再缩短最长链，最后在原频复测。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 100 Hz 就开始崩", "text": "5.3 的程序在每秒 100 拍时开始出错：不是逻辑写错，是拍太短——信号还没走完，下一拍就来取样了。这一节要找「最快能多快」，并且把上限抬高。注意：不是换更好的时钟，是**把路缩短**；时钟只是量尺。"},
+        {"order": 2, "after": 0, "title": "上限怎么算 · 级数乘单级延迟", "text": "3.2 报过进位链 8 级，3.3 又加了沿上采样 1 级，一拍要走 9 级。周期 T ≥ 级数 × 单级延迟；反过来 f 上限 = 1 ÷（9 × 单级延迟）。这两个数都不是拍出来的：级数来自 3.2 的报告，单级延迟来自 1.6 的实测，只许引用、不许手填。"},
+        {"order": 3, "after": 1, "title": "还有窗口 · 建立与保持", "text": "光算路程还不够，还有窗口：数据必须在沿前稳定（建立时间）、沿后保持一会儿（保持时间）。3.4 提过这条，到 5.4 它变成硬账——频率越高，一拍越短，窗口占比越大；越过某条线，寄存器抓到的既不是 0 也不是 1，是亚稳态。"},
+        {"order": 4, "after": 2, "title": "先别改 · 找到第一个坏拍", "text": "先别改结构，先拉频率：从能跑的那档往上加，找到第一个出错的拍号。那一刻波形通常长这样——某根线在沿附近还在爬，前后两拍的值打架。记下三样：拍号、哪根线、它离沿有多近。这三样是后面改结构的依据。"},
+        {"order": 5, "after": 2, "title": "再改 · 缩短最长那条链", "text": "两条路：①把最长链缩短——进位链换超前进位，8 级降到 3 级上下，周期立刻松；②把一条指令切成两拍（流水），每拍只走一半路。两条都动结构，不能只动频率。改完重新报一次级数，别凭感觉说「应该快了」。"},
+        {"order": 6, "after": 3, "title": "验收 · 同频复测过才算修", "text": "验收两条：①能指认首个失败拍、那根线和它的余量；②改结构后，在原先把机器搞崩的那档频率上复测通过，且级数报告比改前小。只做到①是诊断，不是修；把频率调低让它不崩是回避，也不是修。这一笔账到这里才结。"}
+      ],
+      "p1": "拉频率定位首个失败拍，改结构后同频复测",
+      "p1_gates": ["T5.4-1", "T5.4-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "①扫频记录首个失败拍；②改超前进位或切拍；③同频复测", "judge": "四条同时：①失败拍号与仿真一致；②改后同一档频率通过；③级数报告比改前小；④建立/保持余量为正", "codes": ["E_DELAY_EXCEED(8)", "E_TIMING_MARGIN(27)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T5.4-1", "T5.4-2"]},
+        {"id": "B", "level": "负例", "produce": "改频率不改结构", "judge": "判「回避」：级数报告与改前一致；detail 写「未改结构」", "codes": ["E_DELAY_EXCEED(8)"], "gates": ["T5.4-2"]},
+        {"id": "C", "level": "负例", "produce": "不扫频，直接填数", "judge": "9 拒绝；手填一律不过（接缝 1）", "codes": ["E_DELAY_MISMATCH(9)"], "gates": ["T5.4-3"]},
+        {"id": "D", "level": "P0b", "produce": "代入 9 级与实测单级延迟", "judge": "与实测比值 ±5%；不算 P1（17 §3）", "codes": ["E_DELAY_MISMATCH(9)"], "gates": ["T5.4-4"]},
+        {"id": "E", "level": "quiz", "produce": "选「一拍必须走完最长路径，否则抓到亚稳态」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T5.4-5"]}
+      ],
+      "timing": {
+        "stages_source": "T3.2 的 delay_report（级数）",
+        "stage_delay_source": "T1.6 实测（单级延迟）",
+        "setup_hold_source": "T3.4 建立/保持窗口",
+        "formula": "T ≥ 级数 × 单级延迟；f 上限 = 1 ÷ (级数 × 单级延迟)",
+        "note": "数据不存数值；判定时从 inputs.delay_report 取，缺报告一律 E_DELAY_MISMATCH(9)"
+      },
+      "gate_cases": [
+        {"id": "T5.4-1", "title": "首个失败拍：拍号 / 线 / 余量与报告一致", "kind": "first_fail_tick", "required": true,
+         "codes": ["E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)", "E_TIMING_MARGIN(27)"]},
+        {"id": "T5.4-2", "title": "改结构后同频复测通过且级数下降", "kind": "retest_after_change", "required": true,
+         "codes": ["E_DELAY_EXCEED(8)", "E_OUTPUT_MISMATCH(10)", "E_TIMING_MARGIN(27)"]},
+        {"id": "T5.4-3", "title": "手填最高频率一律拒（必须引用报告）", "kind": "derived_number", "required": true,
+         "codes": ["E_DELAY_MISMATCH(9)"]},
+        {"id": "T5.4-4", "title": "计算 T ≥ 级数 × 单级延迟（±5%）", "kind": "timing_calc", "required": true,
+         "codes": ["E_DELAY_MISMATCH(9)"]},
+        {"id": "T5.4-5", "title": "为什么加时钟不会自动变快", "kind": "quiz", "required": false,
+         "quiz": {"question": "为什么只加时钟不会自动变快？", "options": ["一拍必须走完最长路径，否则抓到亚稳态", "时钟越快机器自然越快", "换更贵的晶振就行", "把频率调低就不崩"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先确认两个数是引用来的：级数查 3.2 报告，单级延迟查 1.6 实测；手填的数先按 9 拒掉。",
+      "misconception": "把调低频率当成修复；没改结构、级数没降，只是回避。",
+      "grants": {"items": {}, "blueprint": []},
+      "grants_note": "计时奖励待章节 levels 数据落库后补"
+    }
+  }
+}
