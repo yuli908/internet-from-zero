@@ -36,3 +36,8 @@ func report() -> bool:
 		for msg in failure_messages:
 			print("  - ", msg)
 	return failures == 0
+
+# 声明数与实际执行数比较：少执行即红。未声明的 suite（-1）同样判红。
+static func verdict(expected: int, actual: int) -> Dictionary:
+	var ok: bool = expected > 0 and actual >= expected
+	return {"ok": ok, "expected": expected, "actual": actual}

@@ -997,12 +997,18 @@ func _on_tip_hide_timeout() -> void:
 	_hide_tip()
 	_tip_cell = null
 
+# 浮条纵向偏移：分支行恒在上方 y−32；其余优先下方 y+50，底边溢出（y+76 > 画布 504）再翻上方。
+# 第一幕 y0 → 下方（屏幕 187，避开抬头底边 141）；挑战 y460 → 上方（屏幕 565，避开画布底边 641）。
+func _tip_dy(kind: String, y: float) -> float:
+	if kind == "branch" or y + 76.0 > CANVAS_H:
+		return -32.0
+	return 50.0
+
 func _show_tip(cell: NodeCell) -> void:
 	if cell == null or not is_instance_valid(cell):
 		return
 	var at := cell.position
-	# 统一在节点上方 32 px：下方 y+50 在挑战行会到 647，溢出画布底边 641。
-	at.y -= 32.0
+	at.y += _tip_dy(cell.kind, at.y)
 	at.x = clampf(at.x, 0.0, CANVAS_W - TIP_W)
 	_tip_cell = cell
 	_tip_label.text = _tip_text(cell.detail)
