@@ -73,8 +73,11 @@ static func boolean(cfg: Dictionary, filled: Dictionary, tracker: GateAttemptTra
 				var bad_row := -1
 				var exp_cell: Variant = null
 				var got_cell: Variant = null
+				var correct := 0
 				for i in expected.size():
-					if i >= got.size() or str(got[i]) != str(int(expected[i])):
+					if i < got.size() and str(got[i]) == str(int(expected[i])):
+						correct += 1
+					else:
 						ok = false
 						if bad_row < 0:
 							bad_row = i
@@ -82,7 +85,7 @@ static func boolean(cfg: Dictionary, filled: Dictionary, tracker: GateAttemptTra
 							got_cell = "(缺)" if i >= got.size() else str(got[i])
 				_emit(rep, tracker, GateResult.E_TABLE_CELL, cid, title, ok,
 					{"gate": gid, "row": bad_row}, exp_cell, got_cell,
-					"%d/%d 行正确" % [mini(got.size(), expected.size()), expected.size()], required)
+					"%d/%d 行正确" % [correct, expected.size()], required)
 			"demorgan":
 				var rows: Array = cfg.get("demorgan", {}).get("rows", [])
 				var got: Array = filled.get("demorgan", [])
@@ -90,6 +93,7 @@ static func boolean(cfg: Dictionary, filled: Dictionary, tracker: GateAttemptTra
 				var bad_row := -1
 				var exp_cell: Variant = null
 				var got_cell: Variant = null
+				var correct := 0
 				for i in rows.size():
 					var pair: Array = rows[i]
 					var a := str(int(pair[0]))
@@ -97,7 +101,9 @@ static func boolean(cfg: Dictionary, filled: Dictionary, tracker: GateAttemptTra
 					var left := SimValue.not3(SimValue.bin3("and", a, b))
 					var right := SimValue.bin3("or", SimValue.not3(a), SimValue.not3(b))
 					var eq := left == right
-					if not eq or i >= got.size() or str(got[i]) != left:
+					if eq and i < got.size() and str(got[i]) == left:
+						correct += 1
+					else:
 						ok = false
 						if bad_row < 0:
 							bad_row = i
@@ -105,7 +111,7 @@ static func boolean(cfg: Dictionary, filled: Dictionary, tracker: GateAttemptTra
 							got_cell = "(缺)" if i >= got.size() else str(got[i])
 				_emit(rep, tracker, GateResult.E_TABLE_CELL, cid, title, ok,
 					{"gate": "demorgan", "row": bad_row}, exp_cell, got_cell,
-					"填表 %d/%d，等价成立=%s" % [got.size(), rows.size(), str(ok)], required)
+					"正确 %d/%d，等价成立=%s" % [correct, rows.size(), str(ok)], required)
 			_:
 				_emit(rep, tracker, GateResult.E_UNKNOWN_KIND, cid, title, false,
 					{"kind": kind}, "已知 gate kind", kind,

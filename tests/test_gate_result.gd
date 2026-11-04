@@ -186,6 +186,7 @@ func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.eq("boolean cell row", int(f2.get("input", {}).get("row", -1)), 2)
 	ctx.eq("boolean cell expected", int(f2.get("expected", -1)), 0)
 	ctx.eq("boolean cell actual", str(f2.get("actual", "")), "1")
+	ctx.check("boolean 3/4 detail", str(f2.get("detail", "")).contains("3/4"), str(f2.get("detail", "")))
 
 	var short := filled.duplicate(true)
 	short["and"] = ["0", "0", "0"]
@@ -195,6 +196,20 @@ func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.eq("boolean missing expected", int(f3.get("expected", -1)), 1)
 	ctx.eq("boolean missing actual", str(f3.get("actual", "")), "(缺)")
 
+	var partial := filled.duplicate(true)
+	partial["and"] = ["1", "0"]
+	var r3b := LabChecks.boolean(cfg, partial)
+	var f3b := _case_of(r3b, "T1.3-1")
+	ctx.check("boolean partial fill detail counts correct", str(f3b.get("detail", "")).contains("1/4"), str(f3b.get("detail", "")))
+	ctx.check("boolean partial fill not filled-count", not str(f3b.get("detail", "")).contains("2/4"), str(f3b.get("detail", "")))
+
+	var all_wrong := filled.duplicate(true)
+	all_wrong["and"] = ["1", "1", "1", "0"]
+	var r3c := LabChecks.boolean(cfg, all_wrong)
+	var f3c := _case_of(r3c, "T1.3-1")
+	ctx.check("boolean all wrong fails", not bool(f3c.get("ok", true)))
+	ctx.check("boolean all wrong detail 0/4", str(f3c.get("detail", "")).contains("0/4"), str(f3c.get("detail", "")))
+
 	var bad2 := filled.duplicate(true)
 	bad2["demorgan"] = ["1", "0", "0", "1"]
 	var r4 := LabChecks.boolean(cfg, bad2)
@@ -203,6 +218,14 @@ func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.eq("demorgan row", int(f4.get("input", {}).get("row", -1)), 1)
 	ctx.eq("demorgan expected", str(f4.get("expected", "")), "1")
 	ctx.eq("demorgan actual", str(f4.get("actual", "")), "0")
+	ctx.check("demorgan partial detail 1/4", str(f4.get("detail", "")).contains("1/4"), str(f4.get("detail", "")))
+
+	var dm_wrong := filled.duplicate(true)
+	dm_wrong["demorgan"] = ["0", "0", "0", "1"]
+	var r4b := LabChecks.boolean(cfg, dm_wrong)
+	var f4b := _case_of(r4b, "T1.3-4")
+	ctx.check("demorgan all wrong fails", not bool(f4b.get("ok", true)))
+	ctx.check("demorgan all wrong detail 0/4", str(f4b.get("detail", "")).contains("0/4"), str(f4b.get("detail", "")))
 
 	var unknown := cfg.duplicate(true)
 	(unknown.get("gate_cases", [])[0] as Dictionary)["kind"] = "bogus"
