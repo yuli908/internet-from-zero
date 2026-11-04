@@ -199,7 +199,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   校验 `format == "ifz-l2-vectors/1"`、行数 9 / 27 / 37 / 27 / 5、`gate_delay` 与本工程 `SimDelays.delay` 一致，
   再逐行比对 **105/105**：HA 9、FA 27、ripple8 37、mux2 27、mux4 5（`mux4` 行字段序为 `[d0..d3, s1, s0, y]`）。
   `decoder3` 10 / `comparator4` 17 / `alu4` 8 **未比对**：对应 `SimModule` 未实现，且 ALU 166 门超 80 硬上限，
-  按接口对齐结论须走宏单元（偏差 17）。
+  按接口对齐结论须走宏单元（偏差 17）。**后续已在 §2.15 补至 132/132（仅剩 alu4 8 行）。**
 - 全量回归：**1493 checks, 0 failures**（比 T1 的 1452 项新增 41 项：器件/周期 + 向量 + 上限对齐断言）。
   `tests/test_data.gd` 同步断言 `limits` 50/50/80 与 `delays.json` 的 `l3.counter4_min_period=14` / `counter8_min_period=26`。
 
@@ -289,6 +289,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   隐式初始化为 X（移位寄存器首个沿就把 X 移入下一级）→ 改为先建 Q 线网（`SimValue.ZERO`），再建 mux 与 DFF。
   计数器原本就先行建网，未受影响。
 
+### 2.15 M4 准备（A）：decoder3 / comparator4 接入与向量闭合（2026-11-04）
+
+- `src/sim/sim_module.gd` 新增 `KIND_DECODER3` / `KIND_COMPARATOR4`（结构化展开，接口与参考实现
+  `docs/simulation/ref/simcore/components.py` 的 `Decoder` / `Comparator` 同构）：
+  - decoder3：3 个共享 not + 8 个多输入 and = **11 门**；`inputs=[en,a0,a1,a2]`、`outputs=[y0..y7]`；
+    `t_settle = not + and = 4`（en 路径仅 3）；
+  - comparator4：4 xor + 8 not + 8 项 and + 6 gtt/ltt + EQ/GT/LT = **33 门**；
+    `inputs=[a0..a3,b0..b3]`、`outputs=[EQ,GT,LT]`；`t_settle = xor+not+and+or = 11`。
+  - 两者均在 50 门交互默认上限内（测试断言），不触发 `IFZ_E_SCALE`；ALU 仍不做（166 门，宏单元）。
+- `tests/test_l2_vectors.gd` 扩展：`decoder3` 10 行 + `comparator4` 17 行逐行比对，
+  **132/132 全等**；另断言 `t_settle` 4/11 与 JSON `t_settle` 一致、门数 11/33 且 ≤ `gdscript_gate_limit()`。
+- **实测**：`l2_vectors.json` 实际 **140 行**（`determinism.rows` 同计数）；接口消息与偏差 17 原写的
+  "143 行"系笔误，已更正。余下只有 `alu4` 8 行不比对。
+- 全量回归：**1621 checks, 0 failures**（T8 的 1610 + 11 项）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -309,7 +324,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限取 **50 门/50 DFF**（p95 3.32–4.03 ms）。细化档 70 门 4.69 ms 仍达标、80 门 5.39 ms 超限；因复跑存在抖动（早先一轮 60 门曾 5.03 ms），限值保守定为 50。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
 | 15 | 仿真文档估算 **200 门**/200 DFF（`docs/simulation/06`） | 实测三档：优化前 100 门 p95 7.6 ms、200 门 17.6 ms；**实现层优化后 100 门 3 次 p95 2.91–3.08 ms**（400 帧）。交互限值按仿真组硬约束取 **50 默认 / 80 绝对**（超 80 → `IFZ_E_SCALE`），编辑器同源卡死并由 `test_data`/`test_circuit` 断言 | 200 是未验证的估算；GDScript 解释执行、无 JIT，优化后 100 档仍有约 1.6× 余量，但**交互上限不再按性能余量抬高**，以仿真组 50/80 硬约束为准。**`docs/simulation/` 不改**，由仿真组据本行修正 |
 | 16 | 计数器最小时钟周期：仿真组 L3 写 `period ≥ 6W+9`（4 位 33、8 位 57，8 位取 70）；本工程上一轮结构推导 `6W+20`（4 位 44） | **以真实 `SimCircuit` 实测裁决：4 位 14、8 位 26**（`SimSequential.measure_counter_period`；判据 = 偶数周期 + 无 `METASTABLE` + 连续两个完整周期逐沿值正确，4 位扫 34 沿、8 位扫 514 沿）。写回 `data/sim/delays.json` 的 `l3.counter4/8_min_period`，`test_l3`/`test_data` 断言 | 我们的计数器是紧凑自增链（`2W-2` 组合门 + `W` DFF，8 位仅 14 门），不是参考实现的 104 门展开；`6W+9`/`6W+20` 都是按展开结构估的。**`docs/simulation/` 不改**，由仿真组据本行修正 |
-| 17 | 仿真组 L2 参考向量 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | 已比对 **105/105**（HA/FA/ripple8/mux2/mux4 逐行全等）；`decoder3` 10、`comparator4` 17、`alu4` 8 **未比对**（`SimModule` 未提供这三个器件，且 ALU 166 门超 80 硬上限，按接口对齐须走宏单元） | M3 只交付 L3 时序器件与已有 L2 件；补 decoder3/comparator4 需新增模块与门数预算，ALU 已判定必须宏单元。留待 M4 或单独立项 |
+| 17 | 仿真组 L2 参考向量声明 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | **实测 JSON 共 140 行**（`determinism.rows` 计数同为 140，"143"为文档笔误）；已比对 **132/132**：HA 9、FA 27、ripple8 37、mux2 27、mux4 5、decoder3 10、comparator4 17（`tests/test_l2_vectors.gd`，另断言 decoder3 11 门 / comparator4 33 门、`t_settle` 4/11）；仅 `alu4` 8 行不比对 | ALU 内部 166 门超 80 绝对上限，按接口对齐必须走宏单元（M4 只给 ≤50 门子视图），不做 166 门可交互网表 |
 | 18 | 快照 `ifz-sim/2` 示例含 `clocks: [{name, period, duty, phase}]` | 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟全部由 `set_input` 的定时事件驱动（`SimSequential.drive_clock` 也只排事件） | 不为"对齐示例"引入未使用的时钟抽象；恢复后的时钟事件仍按绝对 tick 排定，`state_digest` 已证明续跑一致 |
 | 19 | G6 写 `period = t_clk_min + 5`（4 位 = 19） | 实测用 **`min+6 = 20`**（Clock 要求偶数，19 非法）；G6 的"周期=10 时 X+METASTABLE"仍按要求断言 | `min+5` 与"偶数"约束冲突；取满足两者的最小偶数 20，语义（确定性）不变 |
 | 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **已补齐**：`tests/data/l3_vectors.json` 24 个用例 / 51 条期望，`tests/test_l3_vectors.gd` 逐条比对 tick / Q 值 / 最后一条 L3 trace kind / 亚稳态 reason。补齐过程中发现真实缺陷：`create_register`/`create_shift_register` 先建 EN mux、后建 Q 线网，Q 初值被门输入隐式初始化为 X（移位寄存器首个沿即采样到 X）→ 已改为先建 Q 线网，回归全过 | 先前的"上下文预算"原因已消除；G8 现在是机器可判定的 |
@@ -360,7 +375,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | G10 | `tests/test_l3.gd::_test_snapshot`：`ifz-sim/2` 往返 digest/tick 相同、兼容 `ifz-circuit/1`、非静止态拒绝 | 通过 |
 | G11 | `scripts/bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400`，p95 1.78/2.71/3.32 ms ≤5；值回写 `delays.json` 且 `test_data` 断言 | 通过 |
 | G12 | `tests/test_rewards.gd`：重复不二次发、未知物品整单拒绝、存档往返保留 | 通过 |
-| G13 | `tests/test_l2_vectors.gd`：只读 `l2_vectors.json` 逐行比对 105/105 | 通过（decoder3/comparator4/alu4 未覆盖，偏差 17） |
+| G13 | `tests/test_l2_vectors.gd`：只读 `l2_vectors.json` 逐行比对 132/132（decoder3 10 + comparator4 17 已补） | 通过（仅 alu4 8 行走宏单元，偏差 17） |
 | G14 | 三档 3 次 p95 + `limits` 50/50/80 + 偏差 15 行 | 通过（§2.7） |
 | G15 | `tests/test_circuit.gd` G15 段：上限来自 `SimDelays`、>50 提示结构级、>80 报 `IFZ_E_SCALE` | 通过 |
 
@@ -378,16 +393,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M3 已交付 L3/TraceSink/奖励机制，G1–G15 已闭合）
+## 6. 下一步（M3 已交付；M4 准备 A 已闭合 L2 向量）
 
-M3 已按 T0→OPT→T1…T8 交付，验收汇总见 §4.1。仍未完成：原生 GDExtension、冒险三档、错误码编号、
-42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）；L2 向量余下 35 行（decoder3/comparator4/alu4，
-偏差 17）留待 M4。
+M3 已按 T0→OPT→T1…T8 交付，验收汇总见 §4.1。2026-11-04 的 M4 准备阶段已补 decoder3/comparator4
+（L2 向量 132/132，见 §2.15）。仍未完成：原生 GDExtension、冒险三档、错误码编号、42 道题库、
+CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）——接口见 `specs/m4/spec.md`（待批准）。
+`alu4` 8 行不比对：按 80 门硬上限走宏单元，M4 只提供 ≤50 门子视图。
 
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1610 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1621 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）

@@ -1,9 +1,10 @@
 extends RefCounted
 
 ## 与仿真组参考向量 `docs/simulation/ref/vectors/l2_vectors.json`（只读）逐行比对。
-## 覆盖现有 5 个 L2 模块（HA/FA/ripple8/mux2/mux4）；decoder/comparator/ALU 属 L3+，M3 不做。
+## 覆盖 7 个模块（HA/FA/ripple8/mux2/mux4/decoder3/comparator4），共 132/140 行；
+## `alu4` 8 行不比对：ALU 内部 166 门超 80 硬上限，按接口对齐必须走宏单元（见 PROGRESS 偏差 17）。
 ## 字段顺序按该 JSON：HA[a,b,s,co] FA[a,b,cin,s,co] ripple8[a,b,cin,sum,cout,note]
-## mux2[d0,d1,sel,y] mux4[d(4),s1,s0,y]。
+## mux2[d0,d1,sel,y] mux4[d(4),s1,s0,y] decoder3[en,a2,a1,a0,y(8)] comparator4[a(4),b(4),eq,gt,lt]。
 
 const VEC_PATH := "res://docs/simulation/ref/vectors/l2_vectors.json"
 
@@ -24,6 +25,9 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("ripple8 向量行数", (vec.get("ripple8", []) as Array).size(), 37)
 	ctx.eq("mux2 向量行数", (vec.get("mux2", []) as Array).size(), 27)
 	ctx.eq("mux4 向量行数", (vec.get("mux4", []) as Array).size(), 5)
+	ctx.eq("decoder3 向量行数", (vec.get("decoder3", []) as Array).size(), 10)
+	ctx.eq("comparator4 向量行数", (vec.get("comparator4", []) as Array).size(), 17)
+	ctx.eq("alu4 向量行数（宏单元，不比对）", (vec.get("alu4", []) as Array).size(), 8)
 	# 延迟表必须与向量生成器同源
 	var gd: Dictionary = vec.get("gate_delay", {})
 	ctx.eq("延迟表 and", int(gd.get("and", 0)), SimDelays.delay("and"))
@@ -36,6 +40,13 @@ func run(ctx: TestContext) -> void:
 	_check_ripple8(ctx, vec.get("ripple8", []))
 	_check_mux2(ctx, vec.get("mux2", []))
 	_check_mux4(ctx, vec.get("mux4", []))
+	_check_decoder3(ctx, vec.get("decoder3", []))
+	_check_comparator4(ctx, vec.get("comparator4", []))
+
+	# 声明延迟必须与向量生成器实测值一致（t_settle 由延迟表推导）
+	var ts: Dictionary = vec.get("t_settle", {})
+	ctx.eq("decoder3 t_settle", SimModule.declared_settle(SimModule.KIND_DECODER3, 3), int(ts.get("decoder3", -1)))
+	ctx.eq("comparator4 t_settle", SimModule.declared_settle(SimModule.KIND_COMPARATOR4, 4), int(ts.get("comparator4", -1)))
 
 # ---- 各模块逐行比对 ---------------------------------------------------------
 
@@ -151,6 +162,69 @@ func _check_mux4(ctx: TestContext, rows: Array) -> void:
 		else:
 			ctx.check("mux4 向量 %d: 期望 %s 实得 %s" % [i, str(row[3]), got], false, str(row))
 	ctx.check("mux4 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
+
+func _check_decoder3(ctx: TestContext, rows: Array) -> void:
+	var passed := 0
+	for i in rows.size():
+		var row: Array = rows[i]
+		var c := SimCircuit.new("vec_dec")
+		var m := SimModule.create(SimModule.KIND_DECODER3, "u", 3)
+		var b := m.build(c)
+		if not bool(b.get("ok", false)):
+			ctx.check("decoder3 构建 %d" % i, false, str(b.get("error", "")))
+			continue
+		# JSON 列序 en,a2,a1,a0；模块 inputs = [en, a0, a1, a2]
+		c.set_input(m.inputs[0], str(row[0]))
+		c.set_input(m.inputs[1], str(row[3]))
+		c.set_input(m.inputs[2], str(row[2]))
+		c.set_input(m.inputs[3], str(row[1]))
+		c.settle()
+		var got := ""
+		for k in range(7, -1, -1):
+			got += c.probe(m.outputs[k])
+		var exp := str(row[4])
+		if got == exp:
+			passed += 1
+		else:
+			ctx.check("decoder3 向量 %d: 期望 %s 实得 %s" % [i, exp, got], false, str(row))
+	ctx.check("decoder3 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
+	# 宏单元预算：3 not + 8 and = 11 门，≤ 50 默认上限
+	var c2 := SimCircuit.new("vec_dec_gates")
+	var m2 := SimModule.create(SimModule.KIND_DECODER3, "u", 3)
+	var b2 := m2.build(c2)
+	if bool(b2.get("ok", false)):
+		ctx.eq("decoder3 门数", c2._g_op.size(), 11)
+		ctx.check("decoder3 门数 ≤ 交互默认上限", c2._g_op.size() <= SimDelays.gdscript_gate_limit())
+
+func _check_comparator4(ctx: TestContext, rows: Array) -> void:
+	var passed := 0
+	for i in rows.size():
+		var row: Array = rows[i]
+		var c := SimCircuit.new("vec_cmp")
+		var m := SimModule.create(SimModule.KIND_COMPARATOR4, "u", 4)
+		var b := m.build(c)
+		if not bool(b.get("ok", false)):
+			ctx.check("comparator4 构建 %d" % i, false, str(b.get("error", "")))
+			continue
+		var a := str(row[0])
+		var bb := str(row[1])
+		for k in 4:
+			c.set_input(m.inputs[k], _bit(a, k))
+			c.set_input(m.inputs[4 + k], _bit(bb, k))
+		c.settle()
+		var got := "%s%s%s" % [c.probe(m.outputs[0]), c.probe(m.outputs[1]), c.probe(m.outputs[2])]
+		var exp := str(row[2]) + str(row[3]) + str(row[4])
+		if got == exp:
+			passed += 1
+		else:
+			ctx.check("comparator4 向量 %d: 期望 %s 实得 %s" % [i, exp, got], false, str(row))
+	ctx.check("comparator4 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
+	var c2 := SimCircuit.new("vec_cmp_gates")
+	var m2 := SimModule.create(SimModule.KIND_COMPARATOR4, "u", 4)
+	var b2 := m2.build(c2)
+	if bool(b2.get("ok", false)):
+		ctx.eq("comparator4 门数", c2._g_op.size(), 33)
+		ctx.check("comparator4 门数 ≤ 交互默认上限", c2._g_op.size() <= SimDelays.gdscript_gate_limit())
 
 static func _bit(bits: String, i: int) -> String:
 	## JSON 位串按 MSB 在前；下标 0 = 最低位。
