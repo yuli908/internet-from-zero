@@ -1,6 +1,6 @@
 # 进度与偏差（PROGRESS）
 
-- 里程碑：**M1 已验收；M2 进行中**（断点顺序：三处文档裁决 → A 性能基准 → B L2 → C 存档迁移 → D 6 节走查）
+- 里程碑：**M1 已验收；M2 已交付（A/B/C/D 全部完成）；M3 规格已批准（2026-11-04，含性能现实约束追加条款，见 `specs/m3/`）**
 - 基线日期：2026-11-04
 - 口径：只有**跑过、有证据**的项才标"已完成"；没验证的一律标"需人工"或"未完成"，不写成通过。
 - 证据目录：`artifacts/shots/`（11 张截图）、`artifacts/logs/`（导入/测试/冒烟/基准日志）
@@ -13,8 +13,8 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 M2 进度（顺序固定，不跳步）：
 
 1. 三处文档裁决（77 配方 / `test_gate_cases` 并入 `test_lab_checks` / 货币「金币 g」）——**已完成**（提交 `9807371`）。
-2. **A 性能基准关——已完成**：实测 **200 门/200 DFF p95 = 17.8 ms**，远超 5 ms/帧；
-   GDScript 安全上限实为 **50 门/50 DFF**（p95 4.4 ms），60 门起超预算。
+2. **A 性能基准关——已完成**：实测 **200 门/200 DFF p95 = 15.7–17.8 ms**（两次复跑），远超 5 ms/帧；
+   GDScript 安全上限取 **50 门/50 DFF**（p95 3.6–4.0 ms）；本轮细化档首次超预算在 **80 门**（p95 5.39 ms）。
    `data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 由 200 下调为 50（偏差 2、3、14 见下）。
 3. **B L2 组合层——已完成**：半加器 → 全加器 → 8 位行波加法器 → 2:1 / 4:1 选择器；
    `t_settle` 由延迟表推导并经实测校验（HA 4 / FA 10 / ripple8 52 / mux2 7 / mux4 13 tick），
@@ -59,19 +59,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 
 | 规模（门 / DFF） | p50 ms | p95 ms | p99 ms | max ms | 每帧事件峰值 | 判定（p95 ≤ 5 ms） |
 |---|---|---|---|---|---|---|
-| 50 / 50 | 2.62 | **4.11** | 4.58 | 10.82 | 206 | OK |
-| 100 / 100 | 5.61 | 7.62 | 9.88 | 12.96 | 406 | OVER |
-| 200 / 200 | 12.60 | **17.78** | 23.11 | 32.89 | 806 | OVER |
-| 300 / 300 | 20.14 | 28.49 | 34.38 | 39.33 | 1206 | OVER |
-| 400 / 400 | 28.62 | 38.49 | 47.40 | 53.15 | 1606 | OVER |
+| 50 / 50 | 2.645 | **3.318** | 4.036 | 5.411 | 206 | OK |
+| 100 / 100 | 5.795 | 7.594 | 9.058 | 10.240 | 406 | OVER |
+| 200 / 200 | 13.902 | **17.644** | 20.594 | 23.540 | 806 | OVER |
+| 300 / 300 | 21.434 | 26.012 | 28.811 | 31.657 | 1206 | OVER |
+| 400 / 400 | 29.894 | 37.094 | 41.982 | 48.063 | 1606 | OVER |
 
-细化档位（400 帧）用于定位临界点：50 → p95 4.37 ms（OK）；60 → p95 5.03 ms（首个 OVER）；
-80 → 6.10 ms；100 → 8.28 ms。
+以上为 `artifacts/logs/bench.log` 最后一次 600 帧运行值。同日另有两次复跑：50 门 p95 为 3.32 / 4.03 ms，
+200 门 p95 为 15.66 / 17.64 / 17.78 ms —— 属可观测的机器抖动，结论不变（均远超 5 ms 或稳定低于 5 ms）。
+
+细化档位（400 帧，`artifacts/logs/bench_refine.log`）用于定位临界点：
+50 → p95 **3.463 ms**（OK）；60 → 4.103（OK）；70 → 4.689（OK）；**80 → 5.387（首个 OVER）**；
+90 → 6.201。同日早先一轮曾出现 60 门 5.03 ms 的抖动样本，故安全上限仍保守取 50。
 
 **结论（只陈述实测）**：
 
-- GDScript **守不住** 设计目标 200 门/200 DFF @ 4 tick/帧：p95 为预算的 3.6 倍（17.78 ms vs 5 ms）。
-- 安全边界取 **50 门 / 50 DFF**；首个超限档为 60 门（p95 5.03 ms）。>50 门或 >50 DFF 即触发原生下沉（ADR 0002 §2.1）。
+- GDScript **守不住** 设计目标 200 门/200 DFF @ 4 tick/帧：p95 为预算的 3.1–3.6 倍（15.66–17.78 ms vs 5 ms）。
+- 安全边界取 **50 门 / 50 DFF**；本轮细化档首个超限档为 **80 门**（p95 5.390 ms），70 门仍为 4.723 ms，
+  但两次复跑间存在抖动，故仍按 50 保守设限。>50 门或 >50 DFF 即触发原生下沉（ADR 0002 §2.1）。
 - 成本近似线性：200 规模 806 事件/帧 ≈ 15.6 µs/事件，瓶颈在事件引擎热路径（字典事件对象 + `Callable.callv` + 堆比较 + 每次改值写 `history`），不是单个门函数。
 - 玩法影响：第一章每节网表 ≤12 门、半加器 ≤8 门，均在 50 以内，M1 交互不受影响。
 - 未做：原生 GDExtension（按指令"先测后做"）；也未做引擎热路径重写（预估 1.5–2× 提升，未实测，不作为结论）。
@@ -88,12 +93,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 2:1 选择器 | not + 2×and + or | 7 | 7（选择端） |
 | 4:1 选择器 | 3×2:1 选择器 | 13 | 13（s0 经两级） |
 
-- 等价性：半加器直接用 `tests/data/ref_vectors.json` 的 9 条三值向量；全加器 8 条二进制真值 + 27 条三值
-  （与 `docs/simulation/ref/simcore/components.py` 的 s1/c1/s/c2/cout 同构公式比对）；选择器 8 条二进制 + 27 条三值。
-- 加法器：`a=0..255`、`b=0x5A`、cin 交替共 **256 条**向量，加 **32 条**固定种子随机向量（seed=7），全部与整数加法一致。
+- 等价性（逐向量，全部通过）：
+
+| 模块 | 向量构成 | 通过 / 总数 |
+|---|---|---|
+| 半加器 | `ref_vectors.json` 的 9 条三值向量（0/1/X 组合） | **9 / 9** |
+| 全加器 | 8 条二进制真值 + 27 条三值（3³，与 `simcore/components.py` 的 s1/c1/s/c2/cout 同构公式比对） | **35 / 35** |
+| 8 位行波加法器 | 256 条扫掠（`a=0..255`、`b=0x5A`、cin 交替）+ 32 条 fixed-seed(7) 随机，对整数加法 | **288 / 288** |
+| 2:1 选择器 | 8 条二进制 + 27 条三值（`S=X → Y=X`，禁止默认选 D0） | **35 / 35** |
+| 4:1 选择器 | 4 组数据 × 4 个选择值 = 16 条二进制 | **16 / 16** |
+| 合计 | — | **383 / 383** |
+
+- `tests/test_l2.gd` 共 **430 项**检查（余下为端口声明、`t_settle` 推导式、最坏路径实测、混合仿真）。
 - 进位链：文档原写"cout 延迟 6n=48"，那是从 **cin** 起的路径；从 **a/b** 起经第一级 s1 生成进位多 4 tick，
   故 `t_settle` 上界为 `xor+and+or+(n-1)(and+or)=52`，实测同为 52。声明值由 `SimDelays.delay()` 推导，测试同时断言推导式。
-- L1/L2 混合：半加器输出经 L1 xor 门 → 0 延迟连线 → L2 选择器，4 组输入全部正确；选择端切换后输出恒为 d1。
+- L1/L2 混合验证方式：同一张 `SimCircuit` 里展开 L2 半加器 + L2 2:1 选择器，中间插一个 L1 `xor` 门
+  （输入取半加器的 sum/carry），门的输出用 `bind(delay=0)` 接到选择器的 d0。断言 4 组 a/b 输入下
+  选择器输出等于 `a|b`（半加器 sum/carry 的 XOR 化简），再把选择端切到 d1=1，断言输出恒为 1
+  —— 即 L1 与 L2 在同一事件队列内、同一 tick 语义下互通，不是两套模型拼接。
 
 ### 2.4 C 存档迁移实测（2026-11-04）
 
@@ -105,6 +122,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   `labs_completed`、gate/lab/chapter 三类 flag、教程完成项、`stats`（saves/seconds/ticks）、`rng`（seed/state）；
   未知字段（v1 内嵌、v2 顶层）原样保留，`scrap` 键已消失。
 - 新增 **60 项**检查，总计 **1410 checks / 13 套件 / 0 failures**。
+
+用例与结果（`tests/test_save.gd`，逐条断言）：
+
+| 用例 | 做法 | 结果 |
+|---|---|---|
+| 注册表契约 | `registry_errors()`、`MIGRATIONS.size()`、v1/v2 分别 `migrate()` | errors=0、entries=2（v1→v2、v2→v3），两条链均到 v3 且 `from` 正确 |
+| v2 键改名 | `scrap`→`gold` + 未知字段 `legacy_extra` | gold=45、未知字段保留、`scrap` 键消失（10 项） |
+| v2 进度保留 | 含 gate/lab/chapter 三类 flag、2 个知识、目标、lab 的 v2 档 | 7 项进度全部保留 |
+| v1 fixture 真实落盘 | `legacy_v1.json` 编码后写 `SaveStore` 槽位 6 → `load_slot()` | `migrated_from=1`、gold=120、xp=40、created_at、物品 5/2、知识 2、目标 2、lab 2、3 类 flag、教程、stats(3/99/1234.5)、rng(42/12345)、未知字段保留、`scrap` 消失（25 项） |
+| v2 fixture 真实落盘 | `legacy_v2.json` → 槽位 7 | `migrated_from=2`、gold=88、xp=30、物品 4/1、知识 2、目标 1、lab 1、gate/lab flag、教程、stats(5/111/777)、rng(9/54321)、顶层未知数组保留、`scrap` 消失（23 项） |
+| 未来版本 | v4 存档 | 明确拒绝（“高于当前版本”），不尝试降级 |
+| 旧版 payload 直接解码 | 旧 v1 内嵌 `player` 结构 | gold=12、wire=2、知识保留、rng 默认 seed=1 |
 
 ### 2.5 D 6 节脚本走查实测（2026-11-04）
 
@@ -121,13 +150,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - 走查中发现并修复 3 个真实 UI 缺陷：`LabGate._switch_task` 在 `setup()` 触发 `changed` 时把空图写回当前任务（导致 5 个任务图被覆盖）；
   `_final_snapshot` 误把 `objectives` 字典的键当字典节点；binary 脚本只覆盖 0–15 未摆出 137/0x2F 两个目标值。
 
+### 2.6 M2 A/B/C 数据摘要（一页取数）
+
+| 子系统 | 要回答的问题 | 答案（实测） | 证据 |
+|---|---|---|---|
+| A 性能基准 | p95 多少？200 门/200 DFF 守得住 5 ms 吗？临界门数？ | 50 门/50 DFF：p95 **3.318 ms**（600 帧，另两次 3.46 / 4.03）→ 守住；200 门/200 DFF：p95 **17.644 ms**（另两次 15.66 / 17.78）→ **守不住**，约为预算 3.5 倍；细化档首个超限 **80 门**（5.387 ms），70 门 4.689 ms 仍 OK | `artifacts/logs/bench.log`、`bench_refine.log`、`bench.json`、§2.2 |
+| B L2 组合层 | 四级各多少向量通过？L1/L2 混合怎么验？ | 半加器 9/9、全加器 35/35、8 位行波 288/288、2:1 选择器 35/35、4:1 选择器 16/16，**合计 383/383**；混合验证：同一 `SimCircuit` 内 L2 半加器 → L1 xor 门 → `bind(0)` → L2 选择器，4 组输入 + 选择端切换全对 | `tests/test_l2.gd`、§2.3 |
+| C 存档迁移 | 旧档载入会不会丢进度？ | v1/v2 fixture 经真实 `SaveStore` 落盘再 `load_slot()`：`migrated_from` 正确、金币/XP/槽位/时间戳/物品/知识/目标/lab/三类 flag/教程/stats/rng 逐项保留，未知字段原样保留，`scrap`→`gold` 改名生效，v4 明确拒绝；新增 60 项，总计 1410 项 0 失败 | `tests/test_save.gd`、`tests/data/saves/*.json`、§2.4 |
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
 |---|---|---|---|
 | 1 | L0a 模拟电平：模拟电路求解（RC 固定子步长） | 电压判读带 + 阈值判定（`src/core/voltage_model.gd`、`ui/widgets/level_gauge.gd`），不做连续时间电路求解 | M1 只要求 L0–L1 接口与确定性 tick；连续求解器属后续里程碑 |
 | 2 | 门级仿真宿主允许 C++/Rust GDExtension | 纯 GDScript（`src/sim/`）；2026-11-04 实测后修正口径：GDScript 在 **50 门/50 DFF** 内守 5 ms，200 门 p95 17.8 ms；`native/` 仅有脚手架、未编译 | 先保证可运行与可测；实测证明 200 门必须原生（§2.2、偏差 14） |
-| 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 预算与 tick 已实测（`tests/bench_sim.gd` + `scripts/bench.ps1`）：50/50 规模 p95 4.11 ms 达标，60 门起超预算；"降速不丢事件"仍由 `SimEngine` 的 tick 推进与单 tick 上限保证 | 原 200 门来自 `docs/simulation/06` 估算、从未验证；实测后以数据为准 |
+| 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 预算与 tick 已实测（`tests/bench_sim.gd` + `scripts/bench.ps1`）：50/50 规模 p95 3.32–4.03 ms 达标；细化档 70 门 4.69 ms 仍达标、**80 门 5.39 ms 起超预算**；"降速不丢事件"仍由 `SimEngine` 的 tick 推进与单 tick 上限保证 | 原 200 门来自 `docs/simulation/06` 估算、从未验证；实测后以数据为准 |
 | 4 | 内嵌 Linux、宿主编译器桥接（汇编/C/Java/Python）、沙箱进程隔离与资源限制 | 均未实现，仅有 ADR 设计（0004） | M1 范围克制在 L0–L1 |
 | 5 | 存档版本迁移 | 信封 v3 + **迁移注册表**（`SaveCodec.MIGRATIONS`，v1→v2→v3 串联）；`tests/test_save.gd` 断言 `migrated_from=1/2`、`scrap`→`gold` 改名、未知字段保留；v4+ 存档被明确拒绝而非尝试迁移 | 只有一次结构调整时不做框架是克制；货币改名带来第二次结构变化，遂补注册式迁移器 |
 | 6 | 练习：文档 42 道、每题 ≥2 解 | 第一章 24 条 gate（每节 4 条）+ 黑盒多解验收（XOR 两种结构、半加器）；题库与逐题评分表未落地 | M1 只覆盖第一章 |
@@ -138,7 +175,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 11 | CH01 里程碑额外奖励 | CH01 里程碑不额外给金币（奖励在 lab 的 `reward` 里）；章末 `complete_reward` 为 `gold 0 / xp 50`，另由 `data/skilltree.json` 的 `CH01` 节点发放 `gold_award 25 / xp_award 50` | 里程碑奖励与 lab 奖励分开配置，避免重复发放 |
 | 12 | 首位玩家初始资源 | 初始金币 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_gold/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
 | 13 | 货币单位 | 货币单位曾是 `scrap`（废铁），已按负责人裁决改为 **`gold`（金币，单位 g）**；`scrap` 降级为普通材料/回收物（`kind=material`）；旧档通过存档 v3 迁移（`scrap`→`gold`）兼容 | 与 `docs/design/03` §3「金币 g」口径统一；单字货币让材料与通货语义混淆 |
-| 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限 **50 门/50 DFF**（p95 4.11 ms），60 门即 5.03 ms。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
+| 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限取 **50 门/50 DFF**（p95 3.32–4.03 ms）。细化档 70 门 4.69 ms 仍达标、80 门 5.39 ms 超限；因复跑存在抖动（早先一轮 60 门曾 5.03 ms），限值保守定为 50。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -157,8 +194,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 存档前向迁移框架（注册式迁移器 + fixture + 迁移链契约测试） | **已完成（2026-11-04）** | 见 §2.4：`SaveCodec.registry_errors()`、`tests/data/saves/legacy_v1.json`、`legacy_v2.json`、`tests/test_save.gd` |
 | 沙箱、编译器桥接、L7 伴生进程与「转发」标记 | **未完成** | 仅 ADR 0004 设计，无代码 |
 | L2 组合模块封装 / `t_settle` 声明 | **已完成（2026-11-04）** | 见 §2.3：`src/sim/sim_module.gd` + `tests/test_l2.gd`（半加器/全加器/8 位行波加法器/2:1/4:1 选择器） |
-| L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **未完成** | 仅接口占位（ADR 0005 §2）；`delays.json` 里 `dff` 只是常量 |
-| 统一 `TraceSink`（`(tick, layer, kind, subject, payload)`） | **未完成** | 现为 `SimCircuit.history` + `glitches` 两数组 |
+| L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **未完成**（M3 规格已写，待批准） | `SimCircuit.add_dff` 只有 clk→Q=2 tick 的上升沿采样，**无 setup/hold/RESET，也无任何测试**；`delays.json` 的 `dff` 只有常量。见 `specs/m3/spec.md` |
+| 统一 `TraceSink`（`(tick, layer, kind, subject, payload)`） | **未完成**（M3 规格已写，待批准） | 现为 `SimCircuit.history` + `glitches` 两数组；`SimEngine.trace` 只被测试读，字段不统一 |
+| 第一章每节物品奖励入库 | **未完成**（机制未实现；`ch01_levels.json` 的 6 节均未定义物品奖励，等策划奖励表定稿） | M3 规格含通用 `grants.items` 机制与测试，数据侧不改 |
 | 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **未完成** | 当前固定为 EXPLAIN 行为 |
 | 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 |
 | 42 道练习题库与逐题评分表 | **未完成** | 只有第一章 24 条 gate + 多解黑盒 |
@@ -183,15 +221,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M2 剩余顺序，已完成的打叉）
+## 6. 下一步（M2 已全部交付；M3 规格待批准）
 
-1. ~~性能基准关~~：已完成，见 §2.2（`scripts/bench.ps1`）。
-2. ~~B. L2 组合层~~：已完成，见 §2.3。
-3. ~~C. 存档迁移框架补全~~：已完成，见 §2.4。
-4. ~~D. 6 节脚本走查~~：已完成，见 §2.5（72 项断言 + 重启读档 36 项 + 6 张截图）。
-5. **原生下沉**：基准关已确认超标（200 门 p95 17.8 ms），M3 启动 GDExtension（ADR 0002 §5），目标 >50 门/50 DFF 场景。
-6. **TraceSink 统一**：先把 `history/glitches` 映射进统一流，再谈回放。
-7. **题库接入**：把 `docs/curriculum/03` 的 42 道练习数据化，接 `LabChecks` 同构判定。
+M2 全部完成：A 基准（§2.2）、B L2（§2.3）、C 迁移（§2.4）、D 走查（§2.5）。
+
+M3 规格已写、**未实现**，见 `specs/m3/spec.md` 与 `specs/m3/tasks.md`。建议范围：
+
+1. **L3 时序层**：DFF（setup/hold/RESET/亚稳态即 X）、寄存器、计数器、移位寄存器；`t_settle` 由结构推导 + 实测。
+2. **TraceSink 统一**：`(tick, layer, kind, subject, payload)` 固定 schema，先映射 `history/glitches`，再做回放。
+3. **物品奖励入库**：通用 `grants.items` 机制 + 幂等/存档测试；**数据侧等策划奖励表定稿**，本轮不改 `ch01_levels.json`。
+
+未纳入 M3（另立项）：原生 GDExtension（基准已证明 200 门必须原生）、冒险三档、错误码编号、42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）。
 
 ## 7. 验证命令（当前基线的复现方式）
 
