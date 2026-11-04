@@ -9,12 +9,12 @@ const Reader = preload("res://src/ui/widgets/section_reader.gd")
 const Workbench = preload("res://src/ui/screens/workbench_screen.gd")
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 256
+const EXPECT := 258
 const EXPECT_GROUPS := {
 	"loadable": 1, "sections_present": 6, "first_after_zero": 6, "order_contiguous": 6,
 	"required_gate_alignment": 6, "text_cap": 1, "tier_order": 30, "tier_after": 30,
-	"tier_default_position": 30, "tier_screen_text": 30, "tier_page_label": 30,
-	"duplicate_after": 2, "gap_protection": 6, "all_reachable": 1, "paging": 24,
+	"tier_default_position": 30, "tier_screen_text": 31, "tier_page_label": 30,
+	"duplicate_after": 3, "gap_protection": 6, "all_reachable": 1, "paging": 24,
 	"body_fallback": 18, "rules_dedup": 6, "rules_fallback": 5, "geometry": 5,
 	"gate_band": 2, "reader_slot": 1, "workbench_entry": 6, "shop_meta": 4,
 }
@@ -28,9 +28,9 @@ const GROUP_DESCRIPTIONS := {
 	"tier_order": "done=0..4 五档下阅读器停在哪一段的 order 与数据吻合",
 	"tier_after": "同一五档下停下那一段的 after 与数据吻合",
 	"tier_default_position": "五档默认停在已解锁最后一段、索引=unlocked-1、无未解锁段",
-	"tier_screen_text": "五档屏上正文等于该段原文且不等于整节正文（证明确实分段）",
+	"tier_screen_text": "五档屏上正文等于该段原文；并聚合验证多段 lab 的正文都不等于整节正文",
 	"tier_page_label": "五档翻页标签显示 i/n 且与 index/unlocked 一致",
-	"duplicate_after": "同一 after 档出现两段时默认停后一段、回翻能看到前一段",
+	"duplicate_after": "同一 after 档出现两段时默认停后一段、回翻能看到前一段；数据里确有重复档样本",
 	"gap_protection": "删掉 after=2 整档后仍沿用前一档最后一段，不留白",
 	"all_reachable": "每一段都能往回翻到且屏上文字与数据一致",
 	"paging": "最新段 next 灰化、翻到首段 prev 灰化、首段再往前与未解锁段不可达",
@@ -84,6 +84,8 @@ func run(ctx: TestContext) -> void:
 
 ## 五条主断言之一/二：逐档显示当前段（含 0 gate 首屏与全部完成）。
 func _assert_done_tiers(ctx: TestContext, cfg: Dictionary) -> void:
+	var screen_differs := true
+	var screen_detail := ""
 	for id in LABS:
 		var secs := Teach.section_list(cfg[id])
 		var r = Reader.new()
@@ -99,21 +101,27 @@ func _assert_done_tiers(ctx: TestContext, cfg: Dictionary) -> void:
 			ctx.check("%s done=%d 默认停在已解锁最后一段、无未解锁段" % [id, done],
 				r.index == r.unlocked - 1 and r.unlocked == Teach.unlocked_count_sections(secs, done)
 				and int(r.current().get("after", 999)) <= done, "idx=%d unlocked=%d" % [r.index, r.unlocked])
+			# 只测「显示=该段原文」；「不等于整节正文」单独聚合成一条，避免单段退化被合取掩盖。
 			ctx.begin_group("tier_screen_text")
 			ctx.check("%s done=%d 屏上正文=该段原文" % [id, done],
-				Reader.flat_text(r.text_label.text) == _flat(str(exp.get("text", "")))
-				and Reader.flat_text(r.text_label.text) != _flat(Teach.teaching_text(cfg[id])),
+				Reader.flat_text(r.text_label.text) == _flat(str(exp.get("text", ""))),
 				"显示与数据段不一致")
+			if Reader.flat_text(r.text_label.text) == _flat(Teach.teaching_text(cfg[id])):
+				screen_differs = false
+				screen_detail = "%s done=%d" % [id, done]
 			ctx.begin_group("tier_page_label")
 			ctx.eq("%s done=%d 翻页标签 i/n" % [id, done], r.count_label.text,
 				"%d/%d" % [r.index + 1, r.unlocked])
 		r.free()
+	ctx.begin_group("tier_screen_text")
+	ctx.check("多段 lab 屏上正文都不等于整节正文（证明确实按段显示）", screen_differs, screen_detail)
 
 ## 同一档出现两段时：默认停在已解锁末段（后一段），回翻能看到前一段。
 func _assert_duplicate_after(ctx: TestContext, cfg: Dictionary) -> void:
 	var ok_default := true
 	var ok_back := true
 	var detail := ""
+	var dup_labs := 0
 	for id in LABS:
 		var secs := Teach.section_list(cfg[id])
 		if secs.is_empty():
@@ -127,6 +135,7 @@ func _assert_duplicate_after(ctx: TestContext, cfg: Dictionary) -> void:
 				n_at += 1
 		if n_at < 2:
 			continue
+		dup_labs += 1
 		var r = Reader.new()
 		r.configure(secs, 14, 16)
 		r.set_done(max_after)
@@ -144,6 +153,8 @@ func _assert_duplicate_after(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.begin_group("duplicate_after")
 	ctx.check("after 重复档：done=末档默认显示后一段", ok_default, detail)
 	ctx.check("after 重复档：回翻能看到同一档的前一段", ok_back, detail)
+	# 静默跳过比错误检查更坏：数据里没有重复档样本时，上面两条会「空转通过」。
+	ctx.check("after 重复档样本存在（至少 1 个 lab）", dup_labs >= 1, "重复档 lab 数 %d" % dup_labs)
 
 ## 五条主断言之三：某档无段时必须沿用前一档最后一段，绝不留白。
 func _assert_gap_protection(ctx: TestContext, cfg: Dictionary) -> void:

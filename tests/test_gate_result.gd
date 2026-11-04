@@ -11,7 +11,7 @@ const EXPECT_GROUPS := {
 	"gate": 18, "signal": 14, "half_adder": 15,
 }
 const GROUP_DESCRIPTIONS := {
-	"code_registry": "code 枚举数量 ≥18",
+	"code_registry": "反向完整性：TAG_MAP 的每个键都必须登记在 NAMES 里",
 	"per_code_contract": "每个 code 的名字回读、在 TAG_MAP 里、有 describe 文案，且名字表唯一、OK=0、只有 OK 判成功",
 	"make_record": "make 产出的七个字段齐全且取值正确，负 attempt 夹到 0",
 	"tag_mapping": "各 code 到 K/S/C/P/M/R 标签的定稿映射",
@@ -51,7 +51,12 @@ func _result_contract(ctx: TestContext) -> void:
 	var keys: Array = GateResult.NAMES.keys()
 	keys.sort()
 	ctx.begin_group("code_registry")
-	ctx.check("code names non-empty", keys.size() >= 18, str(keys.size()))
+	# 反向完整性：TAG_MAP 有键而 NAMES 没有 → 说明新码只加了标签没登记名字。
+	var unmapped: Array = []
+	for k in GateResult.TAG_MAP.keys():
+		if not GateResult.NAMES.has(int(k)):
+			unmapped.append(int(k))
+	ctx.check("TAG_MAP 的键都在 NAMES 内", unmapped.is_empty(), str(unmapped))
 	var unique := {}
 	for k in keys:
 		ctx.begin_group("per_code_contract")

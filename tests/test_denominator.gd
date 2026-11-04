@@ -117,9 +117,9 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("缺省兜底等于数据值", Ch02ChecksScript.id_ua_of(3.3, 3.0, {}), float(dev.get("id_sat_ua", -1)))
 	ctx.check("线性 4 mA 不再大于饱和电流", Ch02ChecksScript.id_ua_of(3.3, 0.2, {})
 		< Ch02ChecksScript.id_ua_of(3.3, 3.0, {}))
-	# 物理约束（独立于文件数值）：用数据里的 device 判，饱和电流必须大于线性区最大电流。
-	ctx.check("数据饱和电流 > 线性区最大电流", Ch02ChecksScript.id_ua_of(3.3, 0.2, dev)
-		< Ch02ChecksScript.id_ua_of(3.3, 3.0, dev))
+	# 物理约束：左侧取数据值，右侧线性区实测——不再用同一个函数自己比自己。
+	ctx.check("数据饱和电流 > 线性区最大电流", float(dev.get("id_sat_ua", -1))
+		> Ch02ChecksScript.id_ua_of(3.3, 0.2, dev))
 
 	# ---- 附 2：build_area 槽位分支按真实顶层器件占用，而不是 target 个数 ----
 	var p_cfg: Dictionary = labs.get("power", {})

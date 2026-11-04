@@ -51,7 +51,7 @@ func run(ctx: TestContext) -> void:
 	var ha := _half_adder_graph()
 	var ha_rows := BlackBox.check_outputs(ha, ["a", "b"], ["sum", "carry"], BlackBox.half_adder_rows())
 	ctx.check("half adder 4 rows", bool(ha_rows.get("ok", false)))
-	ctx.eq("half adder passed", int(ha_rows.get("passed", 0)), 4)
+	ctx.eq("half adder total rows", int(ha_rows.get("total", 0)), 4)
 	ctx.begin_group("tri_eval")
 	var tri := BlackBox.tri_eval(ha, {"a": "1", "b": "X"})
 	ctx.check("tri eval ok", bool(tri.get("ok", false)))

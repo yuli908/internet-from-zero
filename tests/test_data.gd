@@ -25,7 +25,7 @@ const GROUP_DESCRIPTIONS := {
 	"price_refs": "买价/卖价表引用的物品都存在于目录",
 	"price_values": "M02/G10/scrap/gate_xor 的具体价格口径",
 	"recipe_count": "配方数不少于 77",
-	"recipe_outputs": "每个配方的 output 存在（空输出允许）",
+	"recipe_outputs": "每个配方的 output 必须存在于目录（空输出判红）",
 	"recipe_inputs": "每个配方 inputs 引用的物品都存在",
 	"recipe_keys": "每个配方 key_items 引用的物品都存在",
 	"recipe_skill_refs": "配方锁定的技能节点都存在",
@@ -106,7 +106,7 @@ func run(ctx: TestContext) -> void:
 		var r: Dictionary = cat.recipe(rid)
 		var out_id := str(r.get("output", ""))
 		ctx.begin_group("recipe_outputs")
-		ctx.check("recipe %s output exists" % rid, out_id.is_empty() or cat.items.has(out_id), out_id)
+		ctx.check("recipe %s output exists" % rid, cat.items.has(out_id), out_id)
 		for iid in r.get("inputs", {}).keys():
 			ctx.begin_group("recipe_inputs")
 			ctx.check("recipe %s input %s" % [rid, str(iid)], cat.items.has(str(iid)))

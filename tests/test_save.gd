@@ -1,14 +1,16 @@
 extends RefCounted
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 120
+const EXPECT := 121
 const EXPECT_GROUPS := {
+	"preflight": 1,
 	"encode_decode": 4, "payload_roundtrip": 7, "tamper": 2, "broken_envelope": 2,
 	"legacy_v1": 8, "newer_version": 2, "v2_migration": 8, "v2_progress": 8,
 	"migration_registry": 4, "migration_chain": 8, "fixture_v1": 25,
 	"fixture_v2": 23, "store_slot": 17, "determinism": 2,
 }
 const GROUP_DESCRIPTIONS := {
+	"preflight": "测试槽位目录可写（不可写时后面所有夹具检查都在测空气）",
 	"encode_decode": "存档文本非空、解码成功、版本 3、无迁移来源",
 	"payload_roundtrip": "金币/经验/物品/知识/目标/flag/rng 状态往返一致",
 	"tamper": "篡改 payload 后校验和失败并提示校验和",
@@ -26,6 +28,17 @@ const GROUP_DESCRIPTIONS := {
 }
 
 func run(ctx: TestContext) -> void:
+	# 前置条件：槽位目录可写。不可写时后面 119 条全在测空气，必须先红。
+	ctx.begin_group("preflight")
+	var probe_store := SaveStore.new("user://test_saves")
+	probe_store.ensure_dir()
+	var probe_path := probe_store.slot_path(9999)
+	var pf := FileAccess.open(probe_path, FileAccess.WRITE)
+	ctx.check("fixture slot writable", pf != null, "无法写 %s" % probe_path)
+	if pf != null:
+		pf.close()
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(probe_path))
+
 	var st := PlayerState.new(42)
 	st.gold = 77
 	st.xp = 33
@@ -245,7 +258,6 @@ func _load_slot_text(ctx: TestContext, text: String, slot_num: int) -> Dictionar
 	var path := store.slot_path(slot_num)
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		ctx.check("fixture slot writable", false, str(slot_num))
 		return {"ok": false, "error": "无法写槽位 %d" % slot_num, "state": null, "used_backup": false}
 	f.store_string(text)
 	f.close()

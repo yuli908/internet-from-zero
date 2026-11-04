@@ -99,7 +99,8 @@ func run(ctx: TestContext) -> void:
 	ctx.begin_group("editor_cap")
 	var ed := CircuitEditor.new()
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"])
-	ctx.eq("editor cap from delays", ed.max_gates, SimDelays.gdscript_gate_limit())
+	# 契约锁：改门级上限须同步改此断言（字面量把 50 钉死，改上限要动两处是故意的）。
+	ctx.eq("editor cap from delays", ed.max_gates, 50)
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 500)
 	ctx.eq("editor cap clamped to hard cap", ed.max_gates, SimDelays.gdscript_gate_hard_cap())
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 8)
