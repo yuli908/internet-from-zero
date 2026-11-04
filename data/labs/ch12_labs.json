@@ -1,0 +1,1010 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/23-ch12-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。表达式初值 a=3/b=4/c=5、数组 base=0x10 char 1 字节、x/y 在 0x20/0x21 与 n 组（fact 3/5、fib 5/6）由数据侧题库定稿；fib 从 F(0)=0 起。中文组口径＝整串字节倒序（课文 §7.5 待裁项由数据侧定稿为字节倒序，只比字节串、不判 UTF-8 合法性）。栈帧布局未定稿，T12.3-1 挂 pending 不进分母。",
+  "pending_kinds": {
+    "table": "12.3 帧内字段偏移与栈增长方向未定稿（仅返回地址 0xF0【假设】）；先挂 pending 不进分母。"
+  },
+  "labs": {
+    "expr_compile": {
+      "id": "expr_compile",
+      "title": "表达式→指令 · 先建树，再摊成指令",
+      "body": "`a*b+c` 不是一条指令，是一棵语法树；每个节点要指回源码，每条指令要指回节点。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 人写表达式，编译器写指令",
+          "text": "CH11 是人手写指令；CH12 换成人手写表达式，让编译器去写指令。`a*b+c` 不是一条指令，是一棵语法树，再按节点的求值顺序摊成一段指令序列。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "中间产物 · 先看树，再看指令",
+          "text": "先看中间产物：AST 的节点类型与父子关系，再逐节点生成指令。栈式求值把中间值压栈，寄存器式求值用寄存器；本课走哪种、节点名怎么叫，以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "3 个表达式 · 节点要指得回源码",
+          "text": "3 个表达式逐个对照：每个 AST 节点要能指回源码片段，生成的指令要能单步跑出同一值。只对上最终结果、对不上节点，等于只验了答案，没验编译器。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 树摆着，编译走旧路径",
+          "text": "负例：AST 面板摆着，编译按钮仍走写死的旧路径。改源码后图变了、指令不变，两边对不上——这种「只摆着不接线」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 3 个表达式逐节点对上且能跑",
+          "text": "验收：3 个表达式逐节点对上且能跑。四条同时——①AST 节点与源码逐段对应；②指令与节点可追溯；③3 个运行结果全对；④P03 编译器落袋。只给静态图，不给过。"
+        }
+      ],
+      "p1": "写 3 个表达式，编译后逐节点对照 AST 与指令，再运行核对结果",
+      "p1_gates": [
+        "T12.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "用 C 子集写 3 个表达式，查看 AST 与生成的指令，逐节点对照后运行",
+          "judge": "四条同时：①AST 节点与源码逐段对应；②指令与节点可追溯；③3 个运行结果全对；④P03 编译器落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T12.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "保留 AST 面板，但编译按钮不读这棵树，仍走写死的旧路径",
+          "judge": "改源码后 AST 变、指令序列不变；detail 写「AST 未接线，指令不由中间产物生成」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T12.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧给的初值 a=3、b=4、c=5，按优先级手算 3 个表达式",
+          "judge": "与机器运行值一致；不算 P1；detail 写「优先级/结合顺序算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T12.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「把表达式建成语法树，再按节点生成指令序列」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T12.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T12.1-1",
+          "title": "3 个表达式逐节点对上、指令可追溯、运行结果全对",
+          "kind": "table",
+          "required": true,
+          "unique_key": "expr",
+          "keys": [
+            "expr",
+            "ast_nodes",
+            "instructions",
+            "run",
+            "span_ok",
+            "trace_ok"
+          ],
+          "expect_rows": [
+            {
+              "expr": "a*b+c",
+              "ast_nodes": 5,
+              "instructions": 5,
+              "run": 17,
+              "span_ok": true,
+              "trace_ok": true
+            },
+            {
+              "expr": "(a+b)*c",
+              "ast_nodes": 5,
+              "instructions": 5,
+              "run": 35,
+              "span_ok": true,
+              "trace_ok": true
+            },
+            {
+              "expr": "a+b*c",
+              "ast_nodes": 5,
+              "instructions": 5,
+              "run": 23,
+              "span_ok": true,
+              "trace_ok": true
+            }
+          ],
+          "expect_meta": {
+            "ast_linked": true,
+            "instructions_traceable": true,
+            "p03_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T12.1-2",
+          "title": "负例：AST 只展示，编译仍走旧硬编码",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "ast",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T12.1-3",
+          "title": "手算 3 个表达式（a=3,b=4,c=5）",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "mul_add": 17,
+            "paren": 35,
+            "prec": 23
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T12.1-4",
+          "title": "编译器在表达式这一步做了什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "编译器在表达式这一步做了什么？",
+            "options": [
+              "把表达式建成语法树，再按节点生成指令序列",
+              "把表达式直接翻成一条机器指令",
+              "把表达式的结果先算好写进内存",
+              "把表达式的字符按顺序搬进寄存器"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先画树：叶子是变量与常量，父节点是运算符；再按后序摊指令，每条指令标回节点。",
+      "misconception": "把「结果跑对」当成编译对了；AST 摆着不接线，改源码后指令不变。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "pointer_array": {
+      "id": "pointer_array",
+      "title": "指针与数组 · 地址加偏移",
+      "body": "指针是存地址的整数；`a[i]` 就是 `*(a+i)`，地址必须落在数组范围内。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 指针就是一个存地址的数",
+          "text": "指针不是新类型，就是一个存地址的整数；`*p` 是「到这个地址取 8 位数据」。地址空间仍是 256 B，指针值落在 0x00–0xFF，不另开宽地址。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "数组 · a[i] 就是 *(a+i)",
+          "text": "`a[i]` 等于 `*(a+i)`：a 是首地址，i 是元素下标，偏移按元素字节数乘。算出的地址必须落在数组范围内；越界要报错，不是悄悄读到隔壁变量。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "交换 · 地址不动，值互换",
+          "text": "指针交换：用两个指针改两个变量的值。交换后两变量互换、两个指针自己的地址不变；要说清哪一步取地址、哪一步解引用，地址与值分开记。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 有越界提示，没有拦截",
+          "text": "负例：数组声明了却不接内存视图，越界只弹提示不阻断。越界读仍返回旧值、程序照跑——「有提示没拦截」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 交换正确，越界被拒",
+          "text": "验收：指针交换正确，越界被拒。四条同时——①两变量值互换且指针地址不变；②`a[i]` 与 `*(a+i)` 结果一致；③越界给可读错误且不崩；④知识卡落袋。只说「指针就是地址」，不给过。"
+        }
+      ],
+      "p1": "用指针交换两变量，用两种写法遍历数组，再故意越界一次",
+      "p1_gates": [
+        "T12.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "用指针实现两变量交换，用 `a[i]` 与 `*(a+i)` 两种写法遍历数组，再故意越界一次",
+          "judge": "四条同时：①两变量值互换且指针地址不变；②两种写法结果一致；③越界给可读错误且程序不崩；④知识卡落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T12.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "保留越界提示弹窗，但读操作照旧返回内存里的旧值",
+          "judge": "越界读成功返回、程序继续跑；detail 写「越界仅提示，未拦截取值」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T12.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "首地址 + i×元素字节数，算 a[2] 与 a[4] 的字节地址",
+          "judge": "与机器算出的地址一致；不算 P1；detail 写「下标偏移/元素字节数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T12.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「数组是连续地址段，下标就是相对首地址的偏移」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T12.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T12.2-1",
+          "title": "交换正确、两种写法一致、越界被拒且不崩",
+          "kind": "table",
+          "required": true,
+          "unique_key": "case",
+          "keys": [
+            "case",
+            "addr",
+            "value",
+            "error"
+          ],
+          "expect_rows": [
+            {
+              "case": "x",
+              "addr": "0x20",
+              "value": 9,
+              "error": ""
+            },
+            {
+              "case": "y",
+              "addr": "0x21",
+              "value": 7,
+              "error": ""
+            },
+            {
+              "case": "a[2]",
+              "addr": "0x12",
+              "value": 42,
+              "error": ""
+            },
+            {
+              "case": "*(a+2)",
+              "addr": "0x12",
+              "value": 42,
+              "error": ""
+            },
+            {
+              "case": "a[4]",
+              "addr": "0x14",
+              "value": 0,
+              "error": "OUT_OF_RANGE"
+            }
+          ],
+          "expect_meta": {
+            "ptr_addr_stable": true,
+            "forms_equal": true,
+            "oob_reported": true,
+            "card": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T12.2-2",
+          "title": "负例：越界只提示不阻断",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "bounds_check",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T12.2-3",
+          "title": "算 a[2] 与 a[4] 的字节地址（base=0x10，char 1 字节）",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "a2_addr": 18,
+            "a4_addr": 20
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T12.2-4",
+          "title": "为什么 a[i] 等于 *(a+i)",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么 `a[i]` 等于 `*(a+i)`？",
+            "options": [
+              "数组是连续地址段，下标就是相对首地址的偏移",
+              "数组会把下标直接存进变量",
+              "指针会自动跳过 i 个元素",
+              "编译器把 a[i] 展开成循环"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先写 a、i、元素字节数三个数，再乘加；读值与指针地址分开记两栏。",
+      "misconception": "把「有越界提示」当成「有越界检测」；提示不拦截，越界照读。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "stack_frame": {
+      "id": "stack_frame",
+      "title": "栈帧 · 一次调用压一层",
+      "body": "返回地址、旧帧指针、参数、局部变量按固定顺序落栈；返回后栈顶复原。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一次调用要保存的不止返回地址",
+          "text": "12.2 只到「地址加偏移」。一次调用要保存的不止返回地址：还有旧帧指针、参数、局部变量。它们按固定顺序落在栈上，这一块就叫栈帧。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "约定 · 照 11.3，布局以数据侧为准",
+          "text": "调用约定照 11.3：A/B 传参、返回地址压 `MEM[0xF0..]`【假设】、Z/C 不跨调用保存。帧内其余字段的偏移与栈的增长方向以数据侧为准，本文件不拍布局。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "核对 · 逐字段看，不逐帧画",
+          "text": "在内存面板逐字段核对：进函数时看返回地址、旧帧指针、参数、局部变量各落在哪；返回后看栈顶是否复原。字段对不上是布局错，不是显示问题。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 有示意图，没有帧",
+          "text": "负例：只画一张栈帧示意图，调用仍直接跳转、不压任何东西。图与内存面板对不上，返回地址根本不在栈上——「有图无帧」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 栈帧逐字段核对通过",
+          "text": "验收：一次调用，栈帧逐字段核对通过。四条同时——①返回地址在 `MEM[0xF0..]` 且与调用前记录一致；②参数/局部变量/旧帧指针位置可指认；③返回后栈顶复原；④知识卡落袋。"
+        }
+      ],
+      "p1": "写一个带参数与局部变量的函数，调用前后逐字段读内存面板",
+      "p1_gates": [
+        "T12.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "写一个带参数与局部变量的函数，调用前后逐字段读内存面板",
+          "judge": "四条同时：①返回地址在 `MEM[0xF0..]` 且与记录一致；②参数/局部变量/旧帧指针位置可指认；③返回后栈顶复原；④知识卡落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T12.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "保留栈帧图，但调用仍直接跳转，不压返回地址与旧帧指针",
+          "judge": "内存面板里没有对应字段；detail 写「栈帧未建立，只有示意图」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T12.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "压入返回地址+旧帧指针+参数+局部，返回后同量弹回，算净变化",
+          "judge": "与机器栈顶计数一致；不算 P1；detail 写「栈顶增减量算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T12.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「返回地址与旧帧指针要按层保存并原样恢复，顺序错了就找不到回来的路」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T12.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T12.3-1",
+          "title": "栈帧逐字段核对：返回地址、旧帧指针、参数、局部、栈顶复原",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "thresholds": {
+            "frame_layout": {
+              "status": "pending",
+              "initial": "ret@0xF0",
+              "reason": "课文标【假设】：返回地址压 MEM[0xF0..]；旧帧指针/参数/局部的偏移与栈增长方向课文写明以数据侧为准，尚未定稿。"
+            }
+          },
+          "pending_reason": "帧内字段偏移与栈增长方向未定稿（02 §7.5 只给 A/B 传参与返回地址 0xF0【假设】），先挂 pending 不进分母，不以假设布局冒充真值。",
+          "keys": [
+            "field",
+            "addr",
+            "value"
+          ],
+          "expect_rows": [
+            {
+              "field": "ret_addr",
+              "addr": "0xF0",
+              "value": "0x0016"
+            },
+            {
+              "field": "old_fp",
+              "addr": "0xEF",
+              "value": "0xF1"
+            },
+            {
+              "field": "param_a",
+              "addr": "0xEE",
+              "value": 7
+            },
+            {
+              "field": "param_b",
+              "addr": "0xED",
+              "value": 3
+            },
+            {
+              "field": "local_t",
+              "addr": "0xEC",
+              "value": 0
+            }
+          ],
+          "expect_meta": {
+            "ret_matches": true,
+            "fields_identified": true,
+            "stack_restored": true,
+            "card": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T12.3-2",
+          "title": "负例：画了栈帧图，调用不压帧",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "frame_push",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T12.3-3",
+          "title": "一次调用返回后栈顶净变化",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "net_change": 0,
+            "pushed_fields": 5
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T12.3-4",
+          "title": "栈帧为什么必须按顺序",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "栈帧为什么必须按顺序？",
+            "options": [
+              "返回地址与旧帧指针要按层保存并原样恢复，顺序错了就找不到回来的路",
+              "顺序只影响显示，不影响返回",
+              "按顺序排能让栈变短",
+              "顺序由编译器随便定，运行时无所谓"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "调用前记返回地址与栈顶，进函数后逐字段认位置，返回后再核对栈顶。",
+      "misconception": "把「画了栈帧图」当成「栈帧建好了」；图与内存面板对不上就是没压帧。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "recursion_baseline": {
+      "id": "recursion_baseline",
+      "title": "阶乘与斐波那契 · 深度看得见",
+      "body": "两个基准把表达式求值、调用、栈帧一次跑穿；结果对，深度也要对。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 两个基准，把三条链跑穿",
+          "text": "两个基准程序：阶乘与斐波那契。它们不是「再写两个例子」，而是把 12.1–12.3 三条链路一次跑穿：表达式求值、函数调用、栈帧。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "深度 · 进一层压一帧",
+          "text": "递归要能看见深度：每进一层压一帧，返回一层弹一帧。深度随 n 增长，超过 `MEM[0xF0..]` 可用层数就撞栈；上限多少以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "跑法 · 记结果，也记最大深度",
+          "text": "跑法固定：同一组 n 各跑一遍，记结果与最大栈深度。阶乘与斐波那契增长不同，深度曲线也不同；两条都要能解释，不能只说「递归就是自己调自己」。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 结果写死，深度恒为 1",
+          "text": "负例：把结果写死成常量返回，测试全过但栈深度恒为 1。改回递归实现后深度应随 n 上升——深度不涨即判红，说明栈帧根本没建。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 两程序全对，深度可解释",
+          "text": "验收：两程序行为全对，递归深度可解释。四条同时——①阶乘与斐波那契结果全对（n 以数据侧题库为准）；②最大栈深度随 n 上升且可复现；③深度与帧字段对得上；④源程序蓝图落袋。"
+        }
+      ],
+      "p1": "写两个递归程序，按 n 组各跑一遍，记结果与最大栈深度",
+      "p1_gates": [
+        "T12.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "写两个递归程序，按数据侧 n 组各跑一遍，读最大栈深度",
+          "judge": "四条同时：①结果全对；②最大深度随 n 上升且可复现；③深度与帧字段对得上；④源程序蓝图落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T12.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "函数不算，直接返回期望值",
+          "judge": "结果全对但最大栈深度恒为 1，改 n 也不变；detail 写「结果写死，递归与栈帧未发生」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T12.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "手算 5!、fib(5)、fib(6)；fib 从 F(0)=0 起（题库定稿）",
+          "judge": "与机器结果一致；不算 P1；detail 写「基准值算错或起点定义用错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T12.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「每层调用都要压一帧，栈空间有限，深度受帧数与帧大小限制」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T12.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T12.4-1",
+          "title": "两程序结果全对、最大深度随 n 上升且可复现、帧字段对得上",
+          "kind": "table",
+          "required": true,
+          "unique_key": "case",
+          "keys": [
+            "case",
+            "prog",
+            "n",
+            "result",
+            "max_depth",
+            "frames_match"
+          ],
+          "expect_rows": [
+            {
+              "case": "fact3",
+              "prog": "fact",
+              "n": 3,
+              "result": 6,
+              "max_depth": 3,
+              "frames_match": true
+            },
+            {
+              "case": "fact5",
+              "prog": "fact",
+              "n": 5,
+              "result": 120,
+              "max_depth": 5,
+              "frames_match": true
+            },
+            {
+              "case": "fib5",
+              "prog": "fib",
+              "n": 5,
+              "result": 5,
+              "max_depth": 5,
+              "frames_match": true
+            },
+            {
+              "case": "fib6",
+              "prog": "fib",
+              "n": 6,
+              "result": 8,
+              "max_depth": 6,
+              "frames_match": true
+            }
+          ],
+          "expect_meta": {
+            "depth_grows": true,
+            "repeatable": true,
+            "blueprint": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T12.4-2",
+          "title": "负例：结果写死常量，深度恒为 1",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "recursion",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T12.4-3",
+          "title": "手算 5!、fib(5)、fib(6)（F(0)=0 起）",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "fact5": 120,
+            "fib5": 5,
+            "fib6": 8
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T12.4-4",
+          "title": "递归深度为什么受内存限制",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "递归深度为什么受内存限制？",
+            "options": [
+              "每层调用都要压一帧，栈空间有限，深度受帧数与帧大小限制",
+              "递归次数由 CPU 时钟决定，与内存无关",
+              "深度只受程序里写的 n 影响",
+              "每层递归只用一个寄存器，不占内存"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "同一 n 跑两遍，结果与峰值都记；峰值不随 n 涨，说明栈帧根本没建。",
+      "misconception": "把「测试全过」当成递归对了；结果写死时深度恒为 1，一条帧都没压。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "string_reverse": {
+      "id": "string_reverse",
+      "title": "字符串反转 · 按字节搬",
+      "body": "字符串是字节加终止符；长度按字节算，反转按字节走。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 字符串是字节加终止符",
+          "text": "字符串在内存里是一串字节加终止符，不是一串「字」。反转要按字节移动，长度按字节数算，不按眼睛看到的字数算。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "编码 · 照 6.1，中文是多字节",
+          "text": "编码照 6.1：ASCII 单字节、中文 UTF-8 多字节。按「字符」反转会把一个中文字拆成三块乱序字节——这是数据坏了，不是显示问题。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "3 组用例 · ASCII / 中文 / 空串",
+          "text": "3 组用例：纯 ASCII、含中文、空串。空串原样返回、不许越界读；中文组的期望输出以数据侧题库为准，不许拿「看着对」判过。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 只翻前 8 字节，或搬走终止符",
+          "text": "负例：只反转前 8 个字节，或把终止符一起搬走。短串看着对，长串与中文串立刻露馅——边界不覆盖即判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 3 组全对（中文按字节处理）",
+          "text": "验收：3 组全对（中文按 UTF-8 字节处理）。四条同时——①ASCII 组正确；②中文组按题库期望逐字节对；③空串不越界；④源程序蓝图落袋。只跑 ASCII 一组，不给过。"
+        }
+      ],
+      "p1": "用指针或下标按字节反转，跑 ASCII / 中文 / 空串 3 组",
+      "p1_gates": [
+        "T12.5-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "用指针或下标按字节反转，3 组各跑一遍，输出逐字节对照",
+          "judge": "四条同时：①ASCII 组正确；②中文组按题库期望逐字节对；③空串不越界；④源程序蓝图落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T12.5-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "循环写死 8 次，不看实际长度",
+          "judge": "短串对、长串截断、空串越界读；detail 写「长度写死，长串与空串错」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T12.5-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "ASCII 1 字节/字符；中文按 UTF-8 字节数，算 3 组字节长度",
+          "judge": "与机器长度一致；不算 P1；detail 写「字节长度算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T12.5-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「内存里存的是字节，字符只是编码后的一段，按字节才能正确搬动」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T12.5-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T12.5-1",
+          "title": "ASCII / 中文 / 空串 3 组逐字节对，空串不越界",
+          "kind": "table",
+          "required": true,
+          "unique_key": "case",
+          "keys": [
+            "case",
+            "input",
+            "in_bytes",
+            "out_hex",
+            "len_ok"
+          ],
+          "expect_rows": [
+            {
+              "case": "ascii",
+              "input": "abcd",
+              "in_bytes": 4,
+              "out_hex": "64636261",
+              "len_ok": true
+            },
+            {
+              "case": "zh",
+              "input": "你好",
+              "in_bytes": 6,
+              "out_hex": "BDA5E5A0BDE4",
+              "len_ok": true
+            },
+            {
+              "case": "empty",
+              "input": "",
+              "in_bytes": 0,
+              "out_hex": "",
+              "len_ok": true
+            }
+          ],
+          "expect_meta": {
+            "ascii_ok": true,
+            "zh_bytes_ok": true,
+            "empty_safe": true,
+            "blueprint": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T12.5-2",
+          "title": "负例：只反转固定 8 字节",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "length",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T12.5-3",
+          "title": "算 3 组的字节长度",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "ascii_len": 4,
+            "zh_len": 6,
+            "empty_len": 0
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T12.5-4",
+          "title": "为什么反转要按字节",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么反转要按字节？",
+            "options": [
+              "内存里存的是字节，字符只是编码后的一段，按字节才能正确搬动",
+              "按字符反转更快",
+              "字节比字符好显示",
+              "终止符也要跟着字符一起搬"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先数终止符前的字节数，再从两端向中间换；空串长度 0 直接返回，不进循环。",
+      "misconception": "把「看着像」当成对；长度写死 8，短串过、长串截断、空串越界。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
