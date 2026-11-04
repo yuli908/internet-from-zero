@@ -17,6 +17,9 @@ var palette: Array = ["and", "or", "not"]
 var selected_gate := "and"
 var max_gates := 0
 var delay_per_gate := -1
+## 原型台格步：节点 94×44，格距 110×60，原点 (18,18)；0 表示沿用自由放置。
+var snap_grid := Vector2.ZERO
+var snap_origin := Vector2.ZERO
 
 var _link_from := ""
 var _font: Font
@@ -326,11 +329,8 @@ func _on_left(p: Vector2) -> void:
 		return
 	var gid := _next_gate_id()
 	var slot := Rect2(Vector2(210, 130), Vector2(136, 92))
-	var pos := Vector2(
-		clampf(p.x - NODE_SIZE.x * 0.5, 8.0, maxf(8.0, size.x - NODE_SIZE.x - 8.0)),
-		clampf(p.y - NODE_SIZE.y * 0.5, 8.0, maxf(8.0, size.y - NODE_SIZE.y - 34.0))
-	)
-	if gate_count() == 0 and slot.has_point(p):
+	var pos := _place_pos(p, 34.0)
+	if snap_grid == Vector2.ZERO and gate_count() == 0 and slot.has_point(p):
 		pos = slot.position + Vector2(21, 24)
 	graph.add_gate(gid, LogicGates.from_string(selected_gate), selected_gate.to_upper(), pos)
 	changed.emit()
@@ -373,14 +373,26 @@ func add_gate_at(kind: String, at: Vector2) -> String:
 		queue_redraw()
 		return ""
 	var gid := _next_gate_id()
-	var pos := Vector2(
-		clampf(at.x - NODE_SIZE.x * 0.5, 8.0, maxf(8.0, size.x - NODE_SIZE.x - 8.0)),
-		clampf(at.y - NODE_SIZE.y * 0.5, 8.0, maxf(8.0, size.y - NODE_SIZE.y - 8.0))
-	)
+	var pos := _place_pos(at)
 	graph.add_gate(gid, LogicGates.from_string(kind), kind.to_upper(), pos)
 	changed.emit()
 	queue_redraw()
 	return gid
+
+## 中心点 → 左上角：有格步时吸附到 110×60 的格位，否则沿用 8 px 夹取。
+func _place_pos(center: Vector2, bottom_margin: float = 8.0) -> Vector2:
+	if snap_grid.x > 0.0 and snap_grid.y > 0.0:
+		var col := int(round((center.x - snap_origin.x - NODE_SIZE.x * 0.5) / snap_grid.x))
+		var row := int(round((center.y - snap_origin.y - NODE_SIZE.y * 0.5) / snap_grid.y))
+		var max_col := int(floor(maxf(0.0, size.x - snap_origin.x - NODE_SIZE.x) / snap_grid.x))
+		var max_row := int(floor(maxf(0.0, size.y - snap_origin.y - NODE_SIZE.y) / snap_grid.y))
+		col = clampi(col, 0, max_col)
+		row = clampi(row, 0, max_row)
+		return snap_origin + Vector2(col * snap_grid.x, row * snap_grid.y)
+	return Vector2(
+		clampf(center.x - NODE_SIZE.x * 0.5, 8.0, maxf(8.0, size.x - NODE_SIZE.x - 8.0)),
+		clampf(center.y - NODE_SIZE.y * 0.5, 8.0, maxf(8.0, size.y - NODE_SIZE.y - bottom_margin))
+	)
 
 func _can_drop_data(_at: Vector2, data: Variant) -> bool:
 	return data is Dictionary and (data as Dictionary).has("bench_gate")

@@ -116,7 +116,10 @@ func _build_sub_frame() -> void:
 	layer.size = Vector2(1280, 720)
 	board.add_child(layer)
 
-	var back := Ui.back_icon(func(): _show_screen("workbench"))
+	var back := Ui.back_icon(func():
+		if not _level_back():
+			_show_screen("workbench")
+	)
 	back.position = Vector2(24, 30)
 	back.size = Vector2(44, 44)
 	layer.add_child(back)
@@ -191,6 +194,13 @@ func back_to_hub() -> void:
 	_hub.close_lab()
 	_show_hub()
 
+## 三级页若支持逐级返回（实验室），先回二级/首屏；否则交给主壳。
+func _level_back() -> bool:
+	var scr = _screens.get(_current)
+	if scr != null and scr.has_method("back_one_level"):
+		return bool(scr.call("back_one_level"))
+	return false
+
 func _on_notify(text: String, kind: String) -> void:
 	var color := UiTheme.CYAN
 	if kind == "ok":
@@ -234,7 +244,8 @@ func _input(event: InputEvent) -> void:
 		else:
 			_show_start()
 	elif _current != "start":
-		_show_hub()
+		if not _level_back():
+			_show_hub()
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:

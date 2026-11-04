@@ -36,6 +36,7 @@ const SUITES := [
 	"res://tests/test_denominator.gd",
 	"res://tests/test_ch02_denominator_ui.gd",
 	"res://tests/test_lab_bench_ui.gd",
+	"res://tests/test_lab_phase2_ui.gd",
 	"res://tests/test_teaching.gd",
 	"res://tests/test_ch01_sections.gd",
 	"res://tests/test_ch01_sections_ui.gd",
