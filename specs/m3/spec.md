@@ -139,6 +139,7 @@
 
 - `restore()` 接受 `ifz-circuit/1`（无 `regs`，按全 X 恢复）与 `ifz-sim/2`；
   未知 `format` 明确报错，不猜测。
+- `clocks` 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟由 `set_input` 事件驱动（偏差记 PROGRESS 第 18 行）。
 - `snapshot()` 仅在**静止态**（事件队列为空且无待写）允许，否则返回 `{ok=false, error="not_quiescent"}`。
 - 快照不进入存档（`SaveStore` v3 不变）；若将来要存，另开 v4 迁移，M3 不动存档格式。
 

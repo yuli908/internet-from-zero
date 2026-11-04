@@ -219,6 +219,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   tick 回退各被拒并计 `rejected`；`ERR_ADDR` 可写入（第二章扩展用，不改 schema）。
 - 全量回归：**1527 checks, 0 failures**（T2 的 1493 + T3 34 项）。
 
+### 2.10 T4 快照 `ifz-sim/2`（2026-11-04）
+
+- `SimCircuit.snapshot()` 升级为 `ifz-sim/2`：在 `ifz-circuit/1` 的 `wires` 之外增加
+  `regs = {dff名: {q, last_edge, meta}}` 与 `clocks`（本引擎时钟由 `set_input` 事件驱动，
+  没有时钟对象，**字段保留但恒为空数组**，偏差 18）；`state_digest()` 同步纳入 `regs`。
+- `restore()` 接受 `ifz-sim/2` 与 `ifz-circuit/1`（后者无 regs，仅恢复 wires/tick），未知格式明确报错；
+  恢复 DFF 状态用"静默写"路径（不触发监听者），保持恢复后队列为空。
+- G10 断言（`tests/test_l3.gd::_test_snapshot`）全过：4 位计数器跑到静止态 → `ifz-sim/2` 快照
+  regs 含 4 个 DFF 且带 q/last_edge/meta → 恢复 → 再快照 **digest/tick 相同**；
+  旧 `ifz-circuit/1` 可恢复；非静止态快照被拒；**新实例恢复后继续跑 与 不中断跑 的 `state_digest` 相同**
+  （新实例建门时的初始求值事件需先 `settle()` 清空，否则 restore 按"队列非空"拒绝——已写入注释）。
+- 全量回归：**1540 checks, 0 failures**（T3 的 1527 + T4 13 项）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -240,6 +253,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 15 | 仿真文档估算 **200 门**/200 DFF（`docs/simulation/06`） | 实测三档：优化前 100 门 p95 7.6 ms、200 门 17.6 ms；**实现层优化后 100 门 3 次 p95 2.91–3.08 ms**（400 帧）。交互限值按仿真组硬约束取 **50 默认 / 80 绝对**（超 80 → `IFZ_E_SCALE`），编辑器同源卡死并由 `test_data`/`test_circuit` 断言 | 200 是未验证的估算；GDScript 解释执行、无 JIT，优化后 100 档仍有约 1.6× 余量，但**交互上限不再按性能余量抬高**，以仿真组 50/80 硬约束为准。**`docs/simulation/` 不改**，由仿真组据本行修正 |
 | 16 | 计数器最小时钟周期：仿真组 L3 写 `period ≥ 6W+9`（4 位 33、8 位 57，8 位取 70）；本工程上一轮结构推导 `6W+20`（4 位 44） | **以真实 `SimCircuit` 实测裁决：4 位 14、8 位 26**（`SimSequential.measure_counter_period`；判据 = 偶数周期 + 无 `METASTABLE` + 连续两个完整周期逐沿值正确，4 位扫 34 沿、8 位扫 514 沿）。写回 `data/sim/delays.json` 的 `l3.counter4/8_min_period`，`test_l3`/`test_data` 断言 | 我们的计数器是紧凑自增链（`2W-2` 组合门 + `W` DFF，8 位仅 14 门），不是参考实现的 104 门展开；`6W+9`/`6W+20` 都是按展开结构估的。**`docs/simulation/` 不改**，由仿真组据本行修正 |
 | 17 | 仿真组 L2 参考向量 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | 已比对 **105/105**（HA/FA/ripple8/mux2/mux4 逐行全等）；`decoder3` 10、`comparator4` 17、`alu4` 8 **未比对**（`SimModule` 未提供这三个器件，且 ALU 166 门超 80 硬上限，按接口对齐须走宏单元） | M3 只交付 L3 时序器件与已有 L2 件；补 decoder3/comparator4 需新增模块与门数预算，ALU 已判定必须宏单元。留待 M4 或单独立项 |
+| 18 | 快照 `ifz-sim/2` 示例含 `clocks: [{name, period, duty, phase}]` | 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟全部由 `set_input` 的定时事件驱动（`SimSequential.drive_clock` 也只排事件） | 不为"对齐示例"引入未使用的时钟抽象；恢复后的时钟事件仍按绝对 tick 排定，`state_digest` 已证明续跑一致 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

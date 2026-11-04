@@ -227,6 +227,8 @@ func measure_settle(outputs: Array, from_tick: int) -> int:
 
 func snapshot() -> Dictionary:
 	## 只允许在队列为空时快照（静止 tick），否则拒绝，避免存档后的波形不同。
+	## `ifz-sim/2` 在 `ifz-circuit/1` 的 wires 之外增加 regs（DFF 的 q/last_edge/meta）与 clocks。
+	## 本引擎的时钟由 `set_input` 事件驱动，没有时钟对象，故 `clocks` 恒为空数组（字段保留）。
 	if not is_quiescent():
 		return {"ok": false, "error": "队列非空（%d 事件），拒绝存档" % pending()}
 	var sorted_wires := {}
@@ -234,19 +236,25 @@ func snapshot() -> Dictionary:
 	keys.sort()
 	for key in keys:
 		sorted_wires[str(key)] = str(wires[key]["bits"])
-	var canonical := JSON.stringify({"format": "ifz-circuit/1", "name": name, "tick": eng.now, "wires": sorted_wires})
+	var regs := _regs_state()
+	var clocks: Array = []
+	var canonical := JSON.stringify({"format": "ifz-sim/2", "name": name, "tick": eng.now,
+		"wires": sorted_wires, "regs": regs, "clocks": clocks})
 	return {
 		"ok": true,
 		"error": "",
-		"format": "ifz-circuit/1",
+		"format": "ifz-sim/2",
 		"tick": eng.now,
 		"wires": sorted_wires,
+		"regs": regs,
+		"clocks": clocks,
 		"digest": digest(canonical),
 		"canonical": canonical,
 	}
 
 func restore(snap: Dictionary) -> Dictionary:
-	if str(snap.get("format", "")) != "ifz-circuit/1":
+	var fmt := str(snap.get("format", ""))
+	if fmt != "ifz-circuit/1" and fmt != "ifz-sim/2":
 		return {"ok": false, "error": "存档格式不兼容"}
 	if not is_quiescent():
 		return {"ok": false, "error": "恢复前必须清空队列"}
@@ -270,8 +278,25 @@ func restore(snap: Dictionary) -> Dictionary:
 		_wval[wid] = _enc(bits)
 		_wlast[wid] = snap_tick
 		history.append({"t": snap_tick, "wire": str(key), "old": old, "new": bits})
+	if fmt == "ifz-sim/2":
+		var regs: Dictionary = snap.get("regs", {})
+		for d in dffs:
+			var rd: Dictionary = regs.get(str(d.name), {})
+			d.edge_t = int(rd.get("last_edge", d.edge_t))
+			d.meta = bool(rd.get("meta", false))
 	eng.now = snap_tick
 	return {"ok": true, "error": ""}
+
+func _regs_state() -> Dictionary:
+	var raw := {}
+	for d in dffs:
+		raw[str(d.name)] = {"q": probe(str(d.name)), "last_edge": int(d.edge_t), "meta": bool(d.meta)}
+	var out := {}
+	var keys := raw.keys()
+	keys.sort()
+	for key in keys:
+		out[str(key)] = raw[key]
+	return out
 
 func state_digest() -> String:
 	var sorted_wires := {}
@@ -279,7 +304,7 @@ func state_digest() -> String:
 	keys.sort()
 	for key in keys:
 		sorted_wires[str(key)] = probe(str(key))
-	return digest(JSON.stringify({"tick": eng.now, "wires": sorted_wires}))
+	return digest(JSON.stringify({"tick": eng.now, "wires": sorted_wires, "regs": _regs_state()}))
 
 static func digest(text: String) -> String:
 	var ctx := HashingContext.new()

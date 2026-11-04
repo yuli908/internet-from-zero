@@ -13,6 +13,7 @@ func run(ctx: TestContext) -> void:
 	_test_shift_register(ctx)
 	_test_counter(ctx)
 	_test_counter_period(ctx)
+	_test_snapshot(ctx)
 
 func _mk(name: String) -> SimCircuit:
 	var c := SimCircuit.new(name)
@@ -208,3 +209,67 @@ func _test_counter_period(ctx: TestContext) -> void:
 	var p8 := SimSequential.measure_counter_period(8)
 	ctx.check("counter8: 找到稳定周期", bool(p8.get("ok", false)), str(p8.get("error", "")))
 	ctx.eq("counter8: 最小偶数周期 = 26", int(p8.get("period", 0)), 26)
+
+func _counter_circuit(prefix: String) -> SimCircuit:
+	var c := SimCircuit.new(prefix)
+	c.add_wire("clk", SimValue.ZERO)
+	SimSequential.create_counter(c, "cnt", 4, "clk")
+	SimSequential.drive_clock(c, "clk", 14, 4, -1, 0)
+	return c
+
+func _test_snapshot(ctx: TestContext) -> void:
+	## G10：ifz-sim/2 往返 digest 相同（含 regs/tick）；能恢复 ifz-circuit/1；非静止态被拒。
+	var c := _counter_circuit("snap_src")
+	c.run_until(80)
+	c.settle()
+	ctx.check("snap: 静止态可取快照", bool(c.snapshot().get("ok", false)), "队列应空")
+	var snap := c.snapshot()
+	ctx.eq("snap: 格式为 ifz-sim/2", str(snap.get("format", "")), "ifz-sim/2")
+	var regs: Dictionary = snap.get("regs", {})
+	ctx.eq("snap: regs 含 4 个 DFF", regs.size(), 4)
+	ctx.check("snap: regs 带 q/last_edge/meta",
+		(regs.get("cnt.q0", {}) as Dictionary).has("q") and (regs.get("cnt.q0", {}) as Dictionary).has("last_edge")
+		and (regs.get("cnt.q0", {}) as Dictionary).has("meta"), str(regs.get("cnt.q0", {})))
+	ctx.check("snap: clocks 字段存在且为空", (snap.get("clocks", []) as Array).is_empty())
+	var d1 := str(snap.get("digest", ""))
+	var r := c.restore(snap)
+	ctx.check("snap: 恢复 ok", bool(r.get("ok", false)), str(r.get("error", "")))
+	var snap2 := c.snapshot()
+	ctx.eq("snap: 往返 digest 相同", str(snap2.get("digest", "")), d1)
+	ctx.eq("snap: 往返 tick 相同", int(snap2.get("tick", -1)), int(snap.get("tick", -2)))
+
+	# 旧格式 ifz-circuit/1 仍可恢复（按全 X 恢复，无 regs）。
+	var old := snap.duplicate(true)
+	old["format"] = "ifz-circuit/1"
+	old.erase("regs")
+	old.erase("clocks")
+	ctx.check("snap: 接受 ifz-circuit/1", bool(c.restore(old).get("ok", false)))
+
+	# 非静止态拒绝。
+	var busy := SimCircuit.new("snap_busy")
+	busy.add_wire("a", SimValue.ZERO)
+	busy.set_input("a", SimValue.ONE, 3)
+	ctx.check("snap: 非静止态被拒", not bool(busy.snapshot().get("ok", false)))
+
+	# 恢复后继续跑 与 不中断 的结果一致。
+	var ref := _counter_circuit("snap_ref")
+	var cut := _counter_circuit("snap_cut")
+	ref.run_until(60)
+	ref.settle()
+	cut.run_until(60)
+	cut.settle()
+	var mid := cut.snapshot()
+	ctx.check("snap: 切断点静止", bool(mid.get("ok", false)), str(mid.get("error", "")))
+	var fresh := SimCircuit.new("snap_fresh")
+	fresh.add_wire("clk", SimValue.ZERO)
+	SimSequential.create_counter(fresh, "cnt", 4, "clk")
+	fresh.settle()   # 建门时的初始求值事件必须先清空，restore 才允许
+	var rr := fresh.restore(mid)
+	ctx.check("snap: 新实例恢复", bool(rr.get("ok", false)), str(rr.get("error", "")))
+	SimSequential.drive_clock(ref, "clk", 14, 6, -1, 70)
+	SimSequential.drive_clock(fresh, "clk", 14, 6, -1, 70)
+	ref.run_until(200)
+	fresh.run_until(200)
+	ref.settle()
+	fresh.settle()
+	ctx.eq("snap: 恢复后继续跑 digest == 不中断", fresh.state_digest(), ref.state_digest())

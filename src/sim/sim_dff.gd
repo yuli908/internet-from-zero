@@ -22,6 +22,7 @@ var setup := SETUP
 var hold := HOLD
 var clk_to_q := CLK_TO_Q
 var edge_t := -1073741824
+var meta := false
 
 static func attach(p_sim: SimCircuit, p_name: String, p_d: String, p_clk: String,
 		p_reset: String = "", p_setup: int = SETUP, p_hold: int = HOLD,
@@ -49,6 +50,7 @@ func _on_clk(old: String, t: int) -> void:
 	if not rising:
 		return
 	edge_t = t
+	meta = false
 	var d_now := sim.probe(d_name)
 	if not reset_name.is_empty() and sim.probe(reset_name) == SimValue.ONE:
 		if sim.sink != null:
@@ -61,6 +63,7 @@ func _on_clk(old: String, t: int) -> void:
 	if sim.sink != null:
 		sim.sink.record(t, "L3", "SAMPLE", name, {"d": d_now, "q": val, "meta": setup_bad})
 	if setup_bad:
+		meta = true
 		sim.note_metastable(t, name, "setup")
 	sim.eng.schedule_after(clk_to_q, Callable(sim, "_write"), [name, val])
 
@@ -68,5 +71,6 @@ func _on_d(_old: String, t: int) -> void:
 	if sim.probe(clk_name) != SimValue.ONE:
 		return
 	if (t - edge_t) < hold:
+		meta = true
 		sim.note_metastable(t, name, "hold")
 		sim.eng.schedule_after(clk_to_q, Callable(sim, "_write"), [name, SimValue.X])
