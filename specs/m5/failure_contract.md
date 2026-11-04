@@ -1,0 +1,136 @@
+# M5 · 结构化失败回传契约（`specs/m5/failure_contract.md`）
+
+> 面向 UI 会话：gate 失败不再只给"未通过"字符串，而是给机器可读的结构化结果。
+> 生效版本：M5 基础设施（2026-11-04）。本文件是唯一口径，UI 照此渲染诊断文本。
+> 相关代码：`src/core/gate_result.gd`、`src/core/gate_attempts.gd`、`src/core/gate_report.gd`、
+> `src/core/lab_checks.gd`、`src/core/black_box.gd`、`src/core/voltage_model.gd`。
+
+## 1. 统一结果形状
+
+`GateReport.cases[]` 每条用例（旧字段 `id/title/ok/detail/required` 全部保留）：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `code` | int | 稳定枚举（见 §2）；成功恒为 `0 (OK)` |
+| `code_name` | String | `code` 的稳定名字，UI 不要用它做分支，只用于日志 |
+| `gate_id` | String | 用例 id，等于 `id`（`T1.1-1` … `T1.6-4`） |
+| `input` | Variant | 具体输入：哪一行/哪个值/哪条线，见 §4 |
+| `expected` | Variant | 期望值；`null` 表示"无该维度" |
+| `actual` | Variant | 实测值；`null` 表示"没测到" |
+| `error_tags` | Array[String] | 六类错因标签 `K/S/C/P/M/R`，按 §3 映射 |
+| `attempt` | int | 同一 gate 连续失败次数（1 起；通过后归 0） |
+
+取第一条失败（提示阶梯用）：
+
+```gdscript
+rep.first_failure()   # 结构化 dict；全部通过时返回 {}
+rep.failure_codes()   # Array[int]，失败用例的 code 列表
+rep.to_dict()         # {ran_at, passed, cases:[...]}，可直接进存档/日志
+```
+
+兼容入口 `GateReport.add(id, title, ok, detail, required)` 仍可用；它会以
+`code=E_GENERIC / error_tags=["R"]` 记录失败（兜底，不丢用例）。
+
+## 2. code 枚举（`GateResult`，int 常量）
+
+| code | 常量名 | 默认描述 | 来源 gate 类型 |
+|---|---|---|---|
+| 0 | `OK` | 通过 | 全部 |
+| 1 | `E_MISSING_GRAPH` | 缺少电路 | gate `basic`/`xor`/`second`、half_adder `truth` |
+| 2 | `E_BUILD` | 电路无法构建 | 黑盒验收、延迟测量失败 |
+| 3 | `E_UNCONNECTED` | 有输入未连接 | `BlackBox.check_outputs` 前置检查 |
+| 4 | `E_UNKNOWN_KIND` | 未知判定类型 | 任何 lab 的 `kind` 不在白名单 |
+| 5 | `E_UNKNOWN_TARGET` | 未知目标函数 | gate `basic`/`xor`/`second` 的目标不是 and/or/not/xor |
+| 6 | `E_TRUTH_ROW` | 真值表某行不正确 | gate `basic`/`xor`/`second`、half_adder `truth`、random_x 外的行比对 |
+| 7 | `E_TABLE_CELL` | 填表某格不正确 | boolean `table` / `demorgan` |
+| 8 | `E_DELAY_EXCEED` | 稳定时间超出上限 | gate `xor`、half_adder `delay` |
+| 9 | `E_DELAY_MISMATCH` | 稳定时间与期望不符 | signal `delay` |
+| 10 | `E_OUTPUT_MISMATCH` | 输出与期望不符 | level `voltage_judge` |
+| 11 | `E_STRUCTURE_SAME` | 两种结构相同（要求不同结构） | gate `second` |
+| 12 | `E_ENCAPSULATION` | 尚未封装 | gate `encapsulation`、half_adder `encapsulation` |
+| 13 | `E_COVERAGE` | 覆盖不完整 | binary `coverage` |
+| 14 | `E_QUIZ` | 选择题答案错误 | binary / signal 的 `quiz` |
+| 15 | `E_TARGET_UNREACHED` | 目标值尚未达成 | binary `target` |
+| 16 | `E_GLITCH` | 毛刺仍存在或未达宽度 | signal `glitch` / `fix` |
+| 17 | `E_X_ROW` | 含 X 的用例失败 | half_adder `random_x` |
+| 99 | `E_GENERIC` | 未分类失败（兜底） | 未知 code、`add()` 兼容入口 |
+
+规则：
+- `code` 取 `GateResult.normalize()` 后的值；未知 int 一律归一为 `99 (E_GENERIC)`，不抛错、不静默丢弃。
+- **不要用 `code_name` 字符串做业务分支**；用 int 常量或 `GateResult.is_ok()`。
+- 新增 code 只增不改：已发布的 int 值不复用。
+
+## 3. error_tags 六类
+
+| 标签 | 口径 | 当前映射的 code |
+|---|---|---|
+| `K` 概念/知识 | 公式、真值表、选择题 | 6, 7, 14, 17 |
+| `S` 结构/连线 | 缺电路、悬空线、构建失败、结构重复 | 1, 2, 3, 11 |
+| `C` 计算/取值 | 单点取值/输出不符、目标未达成 | 6, 7, 10, 15 |
+| `P` 步骤/流程 | 未知类型/目标、未封装、覆盖不全 | 4, 5, 12, 13 |
+| `M` 时序/亚稳 | 延迟、毛刺、X 传播 | 8, 9, 16, 17 |
+| `R` 兜底 | 未分类 | 99 |
+
+> **偏差 24（重要）**：教学组诊断表 `docs/curriculum/05-failure-diagnostics.md` **尚未入库**（仓库当前只有
+> `05-onboarding-guidance.md`、`06-assessment-and-feedback.md`）。本文件与 `GateResult.TAG_MAP` 的映射
+> 是按六类语义的**机器初值**，教学组交付后**只改 `TAG_MAP` 映射表**，不改 code、字段或调用方。
+
+## 4. 每类 gate 的精度（能回传到什么粒度）
+
+| gate / kind | 成功 | 失败 code | 回传精度（`input` / `expected` / `actual`） |
+|---|---|---|---|
+| level `voltage_judge` | `OK` | 10 | **精确到条**：`input={v}`，`expected` 期望判读（"0"/"1"/"X"），`actual` 实判 |
+| binary `coverage` | `OK` | 13 | **精确到值**：`input={"missing":[未覆盖值…]}`，`expected={"missing":[]}` |
+| binary `target` | `OK` | 15 | **精确到目标**：`input={"target":"t137"}`，`expected` 目标数值，`actual` 达成布尔 |
+| binary / signal `quiz` | `OK` | 14 | **精确到选项**：`input={"chosen":int}`，`expected`/`actual` 正确/所选 |
+| boolean `table` | `OK` | 7 | **精确到格**：`input={"gate":"and","row":2}`，`expected` 该格值，`actual` 填错值；缺行时 `actual="(缺)"` |
+| boolean `demorgan` | `OK` | 7 | **精确到格**：同上，`gate="demorgan"`，`expected` 左式值，`actual` 填错值 |
+| gate `basic` | `OK` | 1/2/3/5/6 | **精确到首个失败任务的行**：`input={a,b}`，`expected/actual` 该行输出字典；缺图/未知目标单独成 code |
+| gate `xor` | `OK` | 6/8 | 行错→**精确到行**；延迟超限→`input={inputs}`，`expected` 上限 tick，`actual` 实测 tick |
+| gate `encapsulation` | `OK` | 12 | **只到 gate 级**：`expected=true`，`actual` 封装标记（无更细信息可给） |
+| gate `second` | `OK` | 1/6/11 | 缺第二结构→code 1（`input={"graph":"t_xor_2"}`）；同结构→code 11；行为错→**精确到行** |
+| signal `delay` | `OK` | 2/9 | **精确到 tick**：`expected` 期望值，`actual` 实测值（差几个 tick 直接可见） |
+| signal `glitch` | `OK` | 16 | **精确到 tick**：`expected` 最小宽度，`actual` 实测宽度 |
+| signal `fix` | `OK` | 16 | **只到 gate 级**：`expected=true`，`actual` 是否仍见毛刺 |
+| half_adder `truth` | `OK` | 1/2/3/6 | **精确到行**：`input={a,b}`，`expected/actual` 为 `{sum,carry}` |
+| half_adder `delay` | `OK` | 2/8 | **精确到 tick**：`expected` 上限，`actual` 实测 |
+| half_adder `encapsulation` | `OK` | 12 | **只到 gate 级**（同上） |
+| half_adder `random_x` | `OK` | 3/17 | **精确到首组输入**：`input={a,b}`，`expected/actual` 为 `{sum,carry}`；悬空线→code 3 |
+| 任意 `kind` 未知 | — | 4 | `input={"kind":原始值}`，`expected="已知 gate kind"` |
+
+**做不到精确的**：`encapsulation`、`fix`、`second` 的"结构相同"只能给到 gate 级或结构标签级；
+这三处 UI 只应展示 code 对应文本，不要假装有行列级证据。
+
+## 5. attempt 计数
+
+```gdscript
+var tracker := GateAttemptTracker.new()
+...# 每次判定该节时把同一个 tracker 传入 LabChecks.* 的最后一个参数
+```
+
+- 失败 `+1` 并从 1 开始；通过立即清零。
+- 键是 `gate_id`（同一节内跨重跑连续）；空 id 不计数。
+- `attempts(id)` 查询，`reset(id)` 单清，`reset()` 全清。
+- 只在内存中，不写存档：每节实验重新开始就新建 tracker。
+- 提示阶梯：`attempt==1` 给第 1 级提示，`==2` 第 2 级，`>=3` 第 3 级（阈值由教学组口径决定，工程只保证计数可用）。
+
+## 6. UI 渲染建议
+
+- 诊断正文 = `GateResult.describe(code)` + 具体证据（`input` / `expected` / `actual`）；
+  例：`V=0.85 V 判为 X，期望 0（T1.1-4）`。
+- 有行列/先后的 code（6/7/13/17）优先展示"哪一行/哪一格/哪些值"；延迟类展示"差 N tick"。
+- `actual == null` 表示"没测到"（通常是构建失败），不要显示成 0 或空。
+- 标签用于筛选/配色，不要直接给玩家看 `K/S/C/P/M/R` 字母。
+- 未知 code（未来新增但 UI 未适配）按 `E_GENERIC` 文本显示即可，不要崩溃。
+
+## 7. 验证
+
+- `tests/test_gate_result.gd`（本契约的机器锁）：每种 gate 类型的成功/失败、`error_tags` 映射、
+- `attempt` 递增/重置/往返、未知 code 兜底、`unconnected` 精确回传。
+- 全量回归：`RESULT: 2033 checks, 0 failures`（23 套件）。
+
+## 8. 变更记录
+
+| 日期 | 变更 |
+|---|---|
+| 2026-11-04 | 首版：18 个稳定 code + 六类标签 + 各类 gate 精度 + attempt 语义；标注偏差 24（诊断文档未入库） |

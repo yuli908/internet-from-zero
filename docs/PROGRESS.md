@@ -1,6 +1,6 @@
 # 进度与偏差（PROGRESS）
 
-- 里程碑：**M1 已验收；M2 已交付（A/B/C/D 全部完成）；M3 已交付（T0→T8 + 验收表）；M4 已交付（T0→T5：宏单元 / 8 种 CH02 kind / 题库接口 / 难度三档）**
+- 里程碑：**M1 已验收；M2 已交付（A/B/C/D 全部完成）；M3 已交付（T0→T8 + 验收表）；M4 已交付（T0→T5：宏单元 / 8 种 CH02 kind / 题库接口 / 难度三档）；M5 基础设施已交付（结构化失败回传）**
 - 基线日期：2026-11-04
 - 口径：只有**跑过、有证据**的项才标"已完成"；没验证的一律标"需人工"或"未完成"，不写成通过。
 - 证据目录：`artifacts/shots/`（11 张截图）、`artifacts/logs/`（导入/测试/冒烟/基准日志）
@@ -8,7 +8,7 @@
 ## 1. 一句话结论
 
 M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 + 24 条 gate + 多解黑盒 + L0a/L0b/L1 仿真；
-当前基线 `RESULT: 1810 checks, 0 failures`（22 套件，含 M3/M4 追加）。
+当前基线 `RESULT: 2033 checks, 0 failures`（23 套件，含 M3/M4/M5 追加）。
 
 M2 进度（顺序固定，不跳步）：
 
@@ -40,10 +40,10 @@ M1 **没有**做到：L3–L7、原生 GDExtension、沙箱与真实集成、题
 | UI | 工作台（6 实验卡）、6 个实验页、知识树、商店、档案、诊断；点击式电路编辑器；波形与判读条 | `artifacts/shots/*.png`（workbench/shop/skills/archive/diagnostics + lab_level…lab_half_adder） |
 | 工程化 | `README.md`、5 篇 ADR、本文件、4 个 PowerShell 脚本、CI 草案、`native/` 脚手架 | 本文档与 `scripts/selfcheck.ps1` |
 
-### 2.1 自动测试构成（22 套件，1810 项）
+### 2.1 自动测试构成（23 套件，2033 项）
 
-`bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `l2` / `black_box` / `lab_checks` / `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards` / `macro` / `ch02_kinds` / `questions` / `difficulty`
-（M3 追加 `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards`；M4 追加 `macro` / `ch02_kinds` / `questions` / `difficulty`）
+`bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `l2` / `black_box` / `lab_checks` / `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards` / `macro` / `ch02_kinds` / `questions` / `difficulty` / `gate_result`
+（M3 追加 `l3` / `l3_vectors` / `l2_vectors` / `trace` / `rewards`；M4 追加 `macro` / `ch02_kinds` / `questions` / `difficulty`；M5 追加 `gate_result`，+223 checks）
 
 ### 2.2 A 性能基准关实测（2026-11-04）
 
@@ -355,6 +355,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - M4 **不改仿真行为**：`SimCircuit` 未引入 `pulse_threshold` / 采样吸收；`SYNC/MASK` 语义留 M5。
 - 测试：`tests/test_difficulty.gd`（M4-G6）。
 
+### 2.20 M5 基础设施：结构化失败回传（2026-11-04）
+
+- 新增 `src/core/gate_result.gd`：18 个稳定 int code（`OK=0`、`E_*` 1–17、`E_GENERIC=99`）、
+  六类标签 `K/S/C/P/M/R`、中文兜底描述、`make()` 统一形状。
+- 新增 `src/core/gate_attempts.gd`：`GateAttemptTracker`（失败 +1、通过清零、单/全重置、字典往返），
+  只在内存，不写存档。
+- `GateReport` 每条 case 增加 `code/code_name/gate_id/input/expected/actual/error_tags/attempt`；
+  旧字段与 `add()` 入口保留（失败按 `E_GENERIC` 兜底）。新增 `first_failure()/failure_codes()/summary()/to_dict()`。
+- `BlackBox`：`check_outputs/check_target/tri_eval` 返回 `code` + 结构化 `failure`；
+  前置检查悬空线 → `E_UNCONNECTED`（`input.unconnected` 列出具体门端口，如 `g_carry.b`）。
+- `LabChecks` / `VoltageModel`：6 节全部 kind 走统一 `_emit` 出口；能精确到"行/格/值/tick/线"的均回传具体输入，
+  封装与 fix 只到 gate 级（详见 `specs/m5/failure_contract.md` §4）。
+- 测试：`tests/test_gate_result.gd`（223 checks）覆盖每类 gate 成功/失败、标签映射、attempt 递增/重置、
+  未知 code 兜底、悬空线精确回传。回归 **2033 checks / 0 failures**（23 套件）。
+- **未接 UI**：`src/ui/` 未改；UI 按 `specs/m5/failure_contract.md` 自行渲染。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -382,6 +398,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 21 | `docs/simulation/10` §6.4 超限错误码写作 `E_L1_SCALE` | 工程内统一为 **`IFZ_E_SCALE`**（`SimDelays`/`SimCircuit`/M3 验收口径一致） | 错误码前缀统一到 `IFZ_E_*`，避免同一约束两个名字；**`docs/simulation/` 不改**，由仿真组据本行统一 |
 | 22 | alu4（166 门）无门级网表，`t_settle` 没有可实测的对象 | 按 `components.py::ALU._build()` 关键路径结构推导为 **61 tick**（控制 4 + 补码选择 7 + 行波加 28 + 两级选择 12 + V 标志 10），`tests/test_macro.gd` 用 `SimDelays` 公式重算断言、不硬编码 | 80 门硬上限决定了 ALU 不能进可交互门级视图；没有网表就没有实测条件。若仿真组日后给出 ALU 实测值，以实测为准并改本行，**`docs/simulation/` 不改** |
 | 23 | `docs/design/11` §3 的 8 种判定 kind 为英文小写（`mosfet_region` … `power_ratio`） | trace kind 取**全大写机械映射**（`MOSFET_REGION` … `POWER_RATIO`），映射表在 `SimCircuit.JUDGEMENT_KINDS`；`build_area` 是语法糖，不产生 trace，也不计入 8 种 | 避免自造词、避免小写/大写两套事件名；映射只有一处（`docs/design/11` → 工程常量），UI 按 `specs/m4/ui_contract.md` 接线 |
+| 24 | 教学组失败诊断表 `docs/curriculum/05-failure-diagnostics.md` 定义 code 与 `K/S/C/P/M/R` 语义（任务书要求"按它设计，不要自己发明"） | **该文件未入库**（仓库只有 `05-onboarding-guidance.md`、`06-assessment-and-feedback.md`），全库 grep 无 `error_tags`/诊断表内容。已按六类语义落地机器初值：18 个 code + `GateResult.TAG_MAP`；结构与字段不依赖映射 | 不能凭空等待文档而阻塞 M5 基础设施；文档交付后**只改 `GateResult.TAG_MAP` 一表**（必要时新增 code），不改 `GateReport` 字段、调用方与 UI 契约形状。详见 `specs/m5/failure_contract.md` §3 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -465,15 +482,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M4 已交付；等 CH02 内容与 UI 会话接回）
+## 6. 下一步（M4 与 M5 基础设施已交付；等 CH02 内容与 UI 会话接回）
 
 M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页只读视图、8 种 CH02 trace kind、题库接口、
-难度三档字段（§2.16–§2.19）。**未完成且不在本会话范围**：
+难度三档字段（§2.16–§2.19）。M5 第一项基础设施（结构化失败回传）已交付（§2.20，
+契约 `specs/m5/failure_contract.md`）。**未完成且不在本会话范围**：
 
+- UI 按新契约渲染诊断文本与提示阶梯：**待 UI 会话接回**（`src/ui/` 本会话未改）；
+- 正式 `docs/curriculum/05-failure-diagnostics.md` 交付后，只重映射 `GateResult.TAG_MAP`（偏差 24）；
 - CH02 的 gate 与奖励数值：等 `docs/design/11-ch02-content-spec.md` 定稿；
 - 42 题正式题库：等教学组 `docs/curriculum/` 交付（`data/questions/`、`manifest.json` 由交付方登记）；
-- 只读视图绘制、难度开关、题库页面、埋点：**待 UI 会话接回**，接口与事件名见 `specs/m4/ui_contract.md`；
-- `SYNC/MASK` 的实际采样语义：留 M5（M4 只保留字段，不改仿真行为）；
+- `SYNC/MASK` 的实际采样语义：留 M5 后续；
 - 原生 GDExtension、ALU 8 行向量比对（`alu4` 仍只比对 0/8，见偏差 17/22）。
 
 `alu4` 整块展开按 80 门硬上限拒绝（`IFZ_E_SCALE`），只提供 ≤50 门只读页。
@@ -481,7 +500,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1810 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 2033 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
