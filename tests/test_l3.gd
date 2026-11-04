@@ -13,6 +13,10 @@ func run(ctx: TestContext) -> void:
 	_test_shift_register(ctx)
 	_test_counter(ctx)
 	_test_counter_period(ctx)
+	_test_register_en(ctx)
+	_test_counter_wrap(ctx)
+	_test_counter_en_load(ctx)
+	_test_counter_too_fast(ctx)
 	_test_snapshot(ctx)
 
 func _mk(name: String) -> SimCircuit:
@@ -209,6 +213,118 @@ func _test_counter_period(ctx: TestContext) -> void:
 	var p8 := SimSequential.measure_counter_period(8)
 	ctx.check("counter8: 找到稳定周期", bool(p8.get("ok", false)), str(p8.get("error", "")))
 	ctx.eq("counter8: 最小偶数周期 = 26", int(p8.get("period", 0)), 26)
+
+func _test_register_en(ctx: TestContext) -> void:
+	## G5：EN=0 保持、EN=1 装载、EN=X → Q=X，t_settle ≤ 9。
+	var c := SimCircuit.new("l3_reg_en")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	c.add_wire("en", SimValue.ZERO)
+	var r := SimSequential.create_register(c, "r", 2, "clk", "rst", "en")
+	ctx.check("reg_en: 构建成功", bool(r.get("ok", false)), str(r.get("error", "")))
+	var q: Array = r["q"]
+	c.settle()
+	# 事件全部按绝对 tick 预排（set_input 的 delay 是相对当前 now 的，分批排会错位）。
+	c.set_input("en", SimValue.ONE, 0)
+	c.set_input("r.d0", SimValue.ONE, 0)
+	c.set_input("clk", SimValue.ONE, 6)
+	c.set_input("clk", SimValue.ZERO, 8)
+	c.set_input("r.d0", SimValue.ZERO, 8)
+	c.set_input("en", SimValue.ZERO, 10)
+	c.set_input("clk", SimValue.ONE, 16)
+	c.set_input("clk", SimValue.ZERO, 18)
+	c.set_input("en", SimValue.X, 20)
+	c.set_input("r.d0", SimValue.ONE, 20)
+	c.set_input("clk", SimValue.ONE, 26)
+	c.set_input("clk", SimValue.ZERO, 28)
+	c.run_until(9)
+	ctx.eq("reg_en: EN=1 装载 d0=1", c.probe(str(q[0])), SimValue.ONE)
+	# 不能用 measure_settle：它内部 settle() 会排空后面已预排的事件。直接读 last_change。
+	var st := int(c.wires[str(q[0])]["last_change"]) - 6
+	ctx.check("reg_en: t_settle ≤ 9", st >= 0 and st <= 9, "settle=%d" % st)
+	c.run_until(19)
+	ctx.eq("reg_en: EN=0 保持不装载", c.probe(str(q[0])), SimValue.ONE)
+	c.run_until(29)
+	ctx.eq("reg_en: EN=X → Q=X", c.probe(str(q[0])), SimValue.X)
+	ctx.eq("reg_en: EN=X 全字 → X（另一位也 X）", c.probe(str(q[1])), SimValue.X)
+
+func _test_counter_wrap(ctx: TestContext) -> void:
+	## G6（1/3）：18 个沿覆盖 0..15 全不同并回绕；周期用 min+6=20（偶数）。
+	var c := SimCircuit.new("l3_wrap")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	var r := SimSequential.create_counter(c, "cnt", 4, "clk", "rst")
+	var q: Array = r["q"]
+	c.set_input("rst", SimValue.ONE, 0)
+	c.set_input("rst", SimValue.ZERO, 2)
+	for k in range(1, 19):
+		c.set_input("clk", SimValue.ONE, k * 20)
+		c.set_input("clk", SimValue.ZERO, k * 20 + 10)
+	var vals := {}
+	for k in range(1, 19):
+		c.run_until((k + 1) * 20 - 1)
+		var v := SimSequential.read_value(c, q)
+		ctx.eq("counter wrap: 第 %d 沿 = %d" % [k, k % 16], v, k % 16)
+		vals[v] = true
+	ctx.eq("counter wrap: 覆盖 16 个值", vals.size(), 16)
+	ctx.check("counter wrap: 无 METASTABLE", c.metastable.is_empty(), str(c.metastable))
+
+func _test_counter_en_load(ctx: TestContext) -> void:
+	## G6（2/3）：LOAD 优先、EN=0 保持、释放后继续自增。
+	var c := SimCircuit.new("l3_cnt_ld")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	c.add_wire("en", SimValue.ONE)
+	c.add_wire("load", SimValue.ZERO)
+	var ld: Array = ["ld0", "ld1", "ld2", "ld3"]
+	for i in 4:
+		c.add_wire(str(ld[i]), SimValue.ZERO)
+	var r := SimSequential.create_counter(c, "cnt", 4, "clk", "rst", "en", "load", ld)
+	ctx.check("cnt_en: 构建成功", bool(r.get("ok", false)), str(r.get("error", "")))
+	var q: Array = r["q"]
+	c.set_input("rst", SimValue.ONE, 0)
+	c.set_input("rst", SimValue.ZERO, 2)
+	# 全部事件按绝对 tick 预排（delay 相对 now，分批排会错位）。
+	c.set_input("ld0", SimValue.ONE, 4)
+	c.set_input("ld3", SimValue.ONE, 4)
+	c.set_input("load", SimValue.ONE, 4)
+	c.set_input("clk", SimValue.ONE, 20)
+	c.set_input("clk", SimValue.ZERO, 30)
+	c.set_input("load", SimValue.ZERO, 34)
+	c.set_input("clk", SimValue.ONE, 40)
+	c.set_input("clk", SimValue.ZERO, 50)
+	c.set_input("en", SimValue.ZERO, 54)
+	c.set_input("clk", SimValue.ONE, 64)
+	c.set_input("clk", SimValue.ZERO, 74)
+	c.set_input("clk", SimValue.ONE, 84)
+	c.set_input("clk", SimValue.ZERO, 94)
+	c.run_until(39)
+	ctx.eq("cnt_en: LOAD 装入 9", SimSequential.read_value(c, q), 9)
+	c.run_until(63)
+	ctx.eq("cnt_en: 放开 LOAD 后自增到 10", SimSequential.read_value(c, q), 10)
+	c.run_until(99)
+	ctx.eq("cnt_en: EN=0 保持 10", SimSequential.read_value(c, q), 10)
+	ctx.check("cnt_en: 无 METASTABLE", c.metastable.is_empty(), str(c.metastable))
+
+func _test_counter_too_fast(ctx: TestContext) -> void:
+	## G6（3/3）：周期 10（< 实测 14）必然违例 → Q=X + METASTABLE，不静默给假值。
+	var c := SimCircuit.new("l3_fast")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	var r := SimSequential.create_counter(c, "cnt", 4, "clk", "rst")
+	var q: Array = r["q"]
+	c.set_input("rst", SimValue.ONE, 0)
+	c.set_input("rst", SimValue.ZERO, 2)
+	for k in range(1, 13):
+		c.set_input("clk", SimValue.ONE, k * 10)
+		c.set_input("clk", SimValue.ZERO, k * 10 + 5)
+	c.run_until(130)
+	ctx.check("period=10: 出现 METASTABLE", not c.metastable.is_empty(), str(c.metastable))
+	var has_x := false
+	for w in q:
+		if c.probe(str(w)) == SimValue.X:
+			has_x = true
+	ctx.check("period=10: 至少一位 Q=X", has_x, str(q))
 
 func _counter_circuit(prefix: String) -> SimCircuit:
 	var c := SimCircuit.new(prefix)

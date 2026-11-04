@@ -154,6 +154,8 @@ func add_gate(gate_name: String, kind: String, ins: Array, delay: int = -1) -> S
 		return ""
 	if kind == "not" and ins.size() != 1:
 		return ""
+	if kind == "mux" and ins.size() != 3:
+		return ""
 	var d := SimDelays.delay(kind) if delay < 0 else delay
 	var out_wid := _wire_id(gate_name)
 	var op := _op_of(kind)
@@ -400,6 +402,8 @@ static func _op_of(kind: String) -> int:
 			return 5
 		"nor":
 			return 6
+		"mux":
+			return 8
 		_:
 			return 7
 
@@ -411,6 +415,12 @@ func _eval_gate(gid: int) -> void:
 	if in1 < 0:
 		var src := _wval[in0]
 		v = _T_NOT[src] if op == 1 else src
+	elif op == 8:
+		# mux(sel, a, b)：sel=X → X；sel=0 → a；sel=1 → b（LE 寄存器 EN 用）
+		var extra_mux: PackedInt32Array = _g_extra[gid]
+		var a := _wval[in1]
+		var b := _wval[extra_mux[0]]
+		v = 0 if _wval[in0] == 0 else (a if _wval[in0] == 1 else b)
 	else:
 		v = _bin(op, _wval[in0], _wval[in1])
 		var extra: PackedInt32Array = _g_extra[gid]

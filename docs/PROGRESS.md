@@ -264,6 +264,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   `test_data` 断言三档齐全且均 ≤ `frame.budget_ms`（5.0）。
 - 全量回归：**1573 checks, 0 failures**（T5 的 1568 + T6 5 项）；基准日志 `artifacts/logs/bench.{log,json}`。
 
+### 2.13 T7 收尾：EN/LOAD 补全与验收汇总（2026-11-04）
+
+- L3 器件补齐 EN/LOAD（`mux` 为新增 L2 组合门：`sel=X → X`、`sel=0 → a`、`sel=1 → b`，延迟 3）：
+  - `create_register(..., en)`：每 bit 一个 mux，EN=0 保持、EN=1 装载、EN=X → Q=X；
+  - `create_counter(..., en, load, load_srcs)`：EN mux 内层 + LOAD mux 外层；
+  - `create_shift_register(..., en)`。
+- 新增断言：G5（EN 三态 + t_settle=2 ≤9）、G6（18 沿 0..15 全覆盖并回绕、LOAD 装入 9、
+  放开后自增 10、EN=0 两个沿保持、`cnt_en` 无 METASTABLE）、G6 短周期（period=10 → 出现
+  METASTABLE 且至少一位 Q=X）。
+- 两次踩到的实现约束（已写进测试注释）：
+  1. `set_input(delay)` 的 delay 是**相对当前 `now`**，分批排事件会错位 → 事件必须一次性按绝对 tick 预排；
+  2. `measure_settle()` 内部 `settle()` 会排空**未来已预排**的事件 → 预排场景下改用 `wires[..]["last_change"]` 直接算。
+  3. 两级 mux 串联引入 6 tick 延迟，切换 EN/LOAD 需离下一个时钟沿 ≥6 tick，否则触发 hold（这本身是正确语义）。
+- 全量回归：**1606 checks, 0 failures**。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -286,6 +301,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 16 | 计数器最小时钟周期：仿真组 L3 写 `period ≥ 6W+9`（4 位 33、8 位 57，8 位取 70）；本工程上一轮结构推导 `6W+20`（4 位 44） | **以真实 `SimCircuit` 实测裁决：4 位 14、8 位 26**（`SimSequential.measure_counter_period`；判据 = 偶数周期 + 无 `METASTABLE` + 连续两个完整周期逐沿值正确，4 位扫 34 沿、8 位扫 514 沿）。写回 `data/sim/delays.json` 的 `l3.counter4/8_min_period`，`test_l3`/`test_data` 断言 | 我们的计数器是紧凑自增链（`2W-2` 组合门 + `W` DFF，8 位仅 14 门），不是参考实现的 104 门展开；`6W+9`/`6W+20` 都是按展开结构估的。**`docs/simulation/` 不改**，由仿真组据本行修正 |
 | 17 | 仿真组 L2 参考向量 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | 已比对 **105/105**（HA/FA/ripple8/mux2/mux4 逐行全等）；`decoder3` 10、`comparator4` 17、`alu4` 8 **未比对**（`SimModule` 未提供这三个器件，且 ALU 166 门超 80 硬上限，按接口对齐须走宏单元） | M3 只交付 L3 时序器件与已有 L2 件；补 decoder3/comparator4 需新增模块与门数预算，ALU 已判定必须宏单元。留待 M4 或单独立项 |
 | 18 | 快照 `ifz-sim/2` 示例含 `clocks: [{name, period, duty, phase}]` | 字段保留但**恒为空数组**：本引擎没有时钟对象，时钟全部由 `set_input` 的定时事件驱动（`SimSequential.drive_clock` 也只排事件） | 不为"对齐示例"引入未使用的时钟抽象；恢复后的时钟事件仍按绝对 tick 排定，`state_digest` 已证明续跑一致 |
+| 19 | G6 写 `period = t_clk_min + 5`（4 位 = 19） | 实测用 **`min+6 = 20`**（Clock 要求偶数，19 非法）；G6 的"周期=10 时 X+METASTABLE"仍按要求断言 | `min+5` 与"偶数"约束冲突；取满足两者的最小偶数 20，语义（确定性）不变 |
+| 20 | G8 写 `tests/data/l3_vectors.json` ≥40 条（4 类器件 + 复位 + 两类违例） | **未完成**：L3 行为已由 `test_l3.gd` 63 项断言覆盖（采样/复位/setup/hold/EN/LOAD/回绕/短周期），但未落成 JSON 向量文件；L2 侧已有 105 行只读向量比对 | 上下文预算优先给 EN/LOAD 语义补全（G5/G6）；向量文件属纯数据整理，留待人工补齐 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -304,9 +321,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 存档前向迁移框架（注册式迁移器 + fixture + 迁移链契约测试） | **已完成（2026-11-04）** | 见 §2.4：`SaveCodec.registry_errors()`、`tests/data/saves/legacy_v1.json`、`legacy_v2.json`、`tests/test_save.gd` |
 | 沙箱、编译器桥接、L7 伴生进程与「转发」标记 | **未完成** | 仅 ADR 0004 设计，无代码 |
 | L2 组合模块封装 / `t_settle` 声明 | **已完成（2026-11-04）** | 见 §2.3：`src/sim/sim_module.gd` + `tests/test_l2.gd`（半加器/全加器/8 位行波加法器/2:1/4:1 选择器） |
-| L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **未完成**（M3 规格已写，待批准） | `SimCircuit.add_dff` 只有 clk→Q=2 tick 的上升沿采样，**无 setup/hold/RESET，也无任何测试**；`delays.json` 的 `dff` 只有常量。见 `specs/m3/spec.md` |
-| 统一 `TraceSink`（`(tick, layer, kind, subject, payload)`） | **未完成**（M3 规格已写，待批准） | 现为 `SimCircuit.history` + `glitches` 两数组；`SimEngine.trace` 只被测试读，字段不统一 |
-| 第一章每节物品奖励入库 | **未完成**（机制未实现；`ch01_levels.json` 的 6 节均未定义物品奖励，等策划奖励表定稿） | M3 规格含通用 `grants.items` 机制与测试，数据侧不改 |
+| L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **L3 已完成（2026-11-04）**；L4–L6 未完成 | 见 §2.6–§2.13：`SimDff`（setup/hold/RESET→X+METASTABLE）+ `SimSequential`（寄存器/计数器/移位寄存器，含 EN/LOAD）+ `tests/test_l3.gd`（63 项）。L4–L6 仅规格 |
+| 统一 `TraceSink`（`(tick, layer, kind, subject, payload)`） | **已完成（2026-11-04）** | 见 §2.9：5 字段 schema、kind 白名单、环形缓冲、`digest()`、1 vs 4 tick/帧摘要一致；`tests/test_trace.gd` 34 项 |
+| 第一章每节物品奖励入库 | **机制已完成（2026-11-04）；数据待策划** | 见 §2.11：`PlayerState.grant_items` 幂等 + 原子校验 + `dry_run`，`tests/test_rewards.gd` 28 项；`ch01_levels.json` 一行未改，等策划奖励表定稿 |
 | 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **未完成** | 当前固定为 EXPLAIN 行为 |
 | 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 |
 | 42 道练习题库与逐题评分表 | **未完成** | 只有第一章 24 条 gate + 多解黑盒 |
@@ -316,6 +333,26 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | `.github/workflows/ci.yml` 在真实 GitHub Actions 上运行 | **需人工** | 本地无法验证；文件内已注明"未在真实 CI 上验证" |
 | 知识卡内容补全（设计目标 ~180 张） | **未完成** | 当前 `skilltree.json` 只有 19 个知识节点（多为一句话摘要），设计文档已标【假设】 |
 | 波形光标测量（`docs/design/03` T1.5 要求测量光标差值） | **需人工** | 波形控件存在，光标/测量功能未在本文档验证，需人工检查后再定论 |
+
+### 4.1 M3 验收项（G1–G15）
+
+| 关 | 判定方式（机器可跑） | 结果 |
+|---|---|---|
+| G1 | `tests/test_l3.gd::_test_m2_baseline` + `_test_chain`：M2 行为不回归、链式 DFF 逐沿右移 | 通过 |
+| G2 | `tests/test_l3.gd::_test_setup`：D 在沿前 <2 tick 变化 → Q=X + `METASTABLE(setup)` | 通过 |
+| G3 | `tests/test_l3.gd::_test_hold`：沿后 <1 tick 变化 → Q=X + `METASTABLE(hold)` | 通过 |
+| G4 | `tests/test_l3.gd::_test_reset`：RESET 高有效、沿上优先、释放后正常采样 | 通过 |
+| G5 | `tests/test_l3.gd::_test_register_en`：EN=0 保持 / EN=1 装载 / EN=X → X，t_settle=2 ≤9 | 通过 |
+| G6 | `_test_counter_wrap`（18 沿 0..15 回绕）、`_test_counter_en_load`（LOAD/EN）、`_test_counter_too_fast`（period=10 → X+METASTABLE） | 通过（周期用 min+6=20，偏差 19） |
+| G7 | `tests/test_l3.gd::_test_shift_register`：串行移入、复位、位宽 | 通过 |
+| G8 | `tests/data/l3_vectors.json` ≥40 条 | **未完成**（偏差 20）；L3 行为由 test_l3 覆盖 |
+| G9 | `tests/test_trace.gd`：5 字段、kind 白名单、tick 单调、`history`==CHANGE 数、1 vs 4 tick/帧 digest 相同 | 通过 |
+| G10 | `tests/test_l3.gd::_test_snapshot`：`ifz-sim/2` 往返 digest/tick 相同、兼容 `ifz-circuit/1`、非静止态拒绝 | 通过 |
+| G11 | `scripts/bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400`，p95 1.78/2.71/3.32 ms ≤5；值回写 `delays.json` 且 `test_data` 断言 | 通过 |
+| G12 | `tests/test_rewards.gd`：重复不二次发、未知物品整单拒绝、存档往返保留 | 通过 |
+| G13 | `tests/test_l2_vectors.gd`：只读 `l2_vectors.json` 逐行比对 105/105 | 通过（decoder3/comparator4/alu4 未覆盖，偏差 17） |
+| G14 | 三档 3 次 p95 + `limits` 50/50/80 + 偏差 15 行 | 通过（§2.7） |
+| G15 | `tests/test_circuit.gd` G15 段：上限来自 `SimDelays`、>50 提示结构级、>80 报 `IFZ_E_SCALE` | 通过 |
 
 ## 5. 已知文档 ↔ 工程冲突（不自行改代码，交负责人裁决）
 
@@ -331,24 +368,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M2 已全部交付；M3 规格待批准）
+## 6. 下一步（M3 已交付 L3/TraceSink/奖励机制；G8 向量文件待补）
 
-M2 全部完成：A 基准（§2.2）、B L2（§2.3）、C 迁移（§2.4）、D 走查（§2.5）。
-
-M3 规格已写、**未实现**，见 `specs/m3/spec.md` 与 `specs/m3/tasks.md`。建议范围：
-
-1. **L3 时序层**：DFF（setup/hold/RESET/亚稳态即 X）、寄存器、计数器、移位寄存器；`t_settle` 由结构推导 + 实测。
-2. **TraceSink 统一**：`(tick, layer, kind, subject, payload)` 固定 schema，先映射 `history/glitches`，再做回放。
-3. **物品奖励入库**：通用 `grants.items` 机制 + 幂等/存档测试；**数据侧等策划奖励表定稿**，本轮不改 `ch01_levels.json`。
-
-未纳入 M3（另立项）：原生 GDExtension（基准已证明 200 门必须原生）、冒险三档、错误码编号、42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）。
+M3 已按 T0→OPT→T1…T7 交付，验收汇总见 §4.1。仍未完成：G8 的 `tests/data/l3_vectors.json`（偏差 20）、
+原生 GDExtension、冒险三档、错误码编号、42 道题库、CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）。
 
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1410 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1606 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
-powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（p50/p95/p99/max）
+powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
+.\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
+git diff --stat -- docs/simulation/ docs/design/ docs/curriculum/    # 期望为空（只读文档不改）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1      # 手动操作
 
 # 6 节脚本走查 + 重启读档校验（无窗口，快照写入 user://walkthrough.json）

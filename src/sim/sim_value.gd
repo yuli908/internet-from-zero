@@ -14,6 +14,7 @@ const GATE_DELAY := {
 	"nand": 2, "nor": 2,
 	"and": 3, "or": 3,
 	"xor": 4, "xnor": 5,
+	"mux": 3,
 }
 
 const _AND := {

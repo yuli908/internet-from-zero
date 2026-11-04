@@ -9,7 +9,7 @@ extends RefCounted
 ##  - 计数器周期必须为偶数，最小周期由 `measure_counter_period()` 实测确定（见 M3 spec）。
 
 static func create_register(sim: SimCircuit, p: String, width: int, clk: String,
-		reset: String = "") -> Dictionary:
+		reset: String = "", en: String = "") -> Dictionary:
 	var w := maxi(1, width)
 	var q: Array = []
 	var ins: Array = []
@@ -17,16 +17,25 @@ static func create_register(sim: SimCircuit, p: String, width: int, clk: String,
 		var qw := "%s.q%d" % [p, i]
 		var dw := "%s.d%d" % [p, i]
 		sim.add_wire(dw, SimValue.ZERO)
-		sim.dffs.append(SimDff.attach(sim, qw, dw, clk, reset, SimDff.SETUP, SimDff.HOLD,
+		var dsrc := dw
+		if not en.is_empty():
+			# EN=0 保持（选 Q）、EN=1 装载（选 D）、EN=X → X
+			var mw := "%s.m%d" % [p, i]
+			if sim.add_gate(mw, "mux", [en, qw, dw]).is_empty():
+				return {"ok": false, "error": "寄存器 mux 门创建失败", "q": q, "inputs": ins}
+			dsrc = mw
+		sim.dffs.append(SimDff.attach(sim, qw, dsrc, clk, reset, SimDff.SETUP, SimDff.HOLD,
 			SimDff.CLK_TO_Q, SimValue.ZERO))
 		q.append(qw)
 		ins.append(dw)
 	return {"ok": true, "error": "", "q": q, "inputs": ins}
 
 static func create_counter(sim: SimCircuit, p: String, width: int, clk: String,
-		reset: String = "") -> Dictionary:
+		reset: String = "", en: String = "", load: String = "", load_srcs: Array = []) -> Dictionary:
 	## 计数器 = 寄存器 + 自增链：q0' = !q0；qi' = qi ^ (q0 & ... & qi-1)。
 	var w := maxi(1, width)
+	if not load.is_empty() and load_srcs.size() != w:
+		return {"ok": false, "error": "load_srcs 数量必须等于位宽", "q": []}
 	var q: Array = []
 	for i in w:
 		q.append("%s.q%d" % [p, i])
@@ -51,18 +60,35 @@ static func create_counter(sim: SimCircuit, p: String, width: int, clk: String,
 					return {"ok": false, "error": "计数器 and 门创建失败", "q": q}
 				carry = nc
 	for i in w:
-		sim.dffs.append(SimDff.attach(sim, str(q[i]), str(next[i]), clk, reset,
+		var dsrc := str(next[i])
+		if not en.is_empty():
+			var me := "%s.e%d" % [p, i]
+			if sim.add_gate(me, "mux", [en, str(q[i]), dsrc]).is_empty():
+				return {"ok": false, "error": "计数器 EN mux 创建失败", "q": q}
+			dsrc = me
+		if not load.is_empty():
+			var ml := "%s.l%d" % [p, i]
+			if sim.add_gate(ml, "mux", [load, dsrc, str(load_srcs[i])]).is_empty():
+				return {"ok": false, "error": "计数器 LOAD mux 创建失败", "q": q}
+			dsrc = ml
+		sim.dffs.append(SimDff.attach(sim, str(q[i]), dsrc, clk, reset,
 			SimDff.SETUP, SimDff.HOLD, SimDff.CLK_TO_Q, SimValue.ZERO))
 	return {"ok": true, "error": "", "q": q}
 
 static func create_shift_register(sim: SimCircuit, p: String, width: int, din: String,
-		clk: String, reset: String = "") -> Dictionary:
+		clk: String, reset: String = "", en: String = "") -> Dictionary:
 	var w := maxi(1, width)
 	var q: Array = []
 	var prev := din
 	for i in w:
 		var qw := "%s.q%d" % [p, i]
-		sim.dffs.append(SimDff.attach(sim, qw, prev, clk, reset, SimDff.SETUP, SimDff.HOLD,
+		var dsrc := prev
+		if not en.is_empty():
+			var mw := "%s.m%d" % [p, i]
+			if sim.add_gate(mw, "mux", [en, qw, prev]).is_empty():
+				return {"ok": false, "error": "移位寄存器 mux 门创建失败", "q": q}
+			dsrc = mw
+		sim.dffs.append(SimDff.attach(sim, qw, dsrc, clk, reset, SimDff.SETUP, SimDff.HOLD,
 			SimDff.CLK_TO_Q, SimValue.ZERO))
 		q.append(qw)
 		prev = qw
