@@ -43,21 +43,9 @@ const SUITES := [
 	"res://tests/test_ch02_sections.gd",
 ]
 
-# TODO(迁移中)：期望数正逐个下沉到套件自己的 `const EXPECT`；已迁 23 个，其余仍在本表。
-# 全部迁完后本表删除，总数改为运行时求和。
-# 声明的 check 数（2026-11-04 实测，总数 3226）。少一项即该 suite 判红。
-const SUITE_EXPECT := {
-	"test_questions": 37,
-	"test_difficulty": 24,
-	"test_gate_result": 305,
-	"test_ch01_grants": 43,
-	"test_ch02": 100,
-	"test_denominator": 46,
-	"test_ch02_denominator_ui": 37,
-	"test_lab_bench_ui": 36,
-	"test_teaching": 46,
-	"test_ch01_sections_ui": 256,
-}
+# 期望数已全部下沉到各套件自己的 `const EXPECT`；本文件不再维护任何数字表。
+# 新增套件必须自己声明 EXPECT/EXPECT_GROUPS/GROUP_DESCRIPTIONS，否则 expect=-1 直接判红。
+# TODO：若再次发生「数字对不上」或「无声缩水」任一次，立即上第 4 层（expectations.json + --record）。
 
 const ABORT_PROBE := "res://tests/_abort_probe.gd"
 const EXPECT_PROBES := "res://tests/_expect_probes.gd"
@@ -77,8 +65,8 @@ func _initialize() -> void:
 			ctx.check("suite load %s" % path, false, "无法加载测试脚本")
 			continue
 		var consts: Dictionary = res.get_script_constant_map()
-		# 期望数优先读套件自己声明的 EXPECT；未迁移的套件回退到本文件旧表。
-		var expect: int = int(consts.get("EXPECT", SUITE_EXPECT.get(name, -1)))
+		# 期望数只认套件自己声明的 EXPECT；未声明的套件 expect=-1，直接判红。
+		var expect: int = int(consts.get("EXPECT", -1))
 		if expect > 0:
 			declared += expect
 		var inst: RefCounted = res.new()

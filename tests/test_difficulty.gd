@@ -3,6 +3,21 @@ extends RefCounted
 ## M4-G6：难度三档预留（名字 / 归一 / 默认值 / 存档往返 / 缺字段回落）。
 ## 本轮不验任何仿真行为差异（M5 才接入 SYNC/MASK 语义）。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 24
+const EXPECT_GROUPS := {
+	"names": 4, "validity": 5, "normalize": 4, "default": 3,
+	"roundtrip": 3, "fallback": 5,
+}
+const GROUP_DESCRIPTIONS := {
+	"names": "三档名字列表与 EXPLAIN/SYNC/MASK 常量值",
+	"validity": "三档名字都合法，未知值与大小写不同写法不合法",
+	"normalize": "非法/空串归一 EXPLAIN，SYNC/MASK 原样保留",
+	"default": "新档默认 EXPLAIN，存盘写进 settings.difficulty",
+	"roundtrip": "三档存档往返后难度不丢",
+	"fallback": "缺 settings / 非法值 / 非字典 / v1 旧档一律回落 EXPLAIN 且不升版本",
+}
+
 func run(ctx: TestContext) -> void:
 	_test_names(ctx)
 	_test_default(ctx)
@@ -10,14 +25,17 @@ func run(ctx: TestContext) -> void:
 	_test_fallback(ctx)
 
 func _test_names(ctx: TestContext) -> void:
+	ctx.begin_group("names")
 	ctx.eq("M4-G6 三档名字", Difficulty.names(), ["EXPLAIN", "SYNC", "MASK"])
 	ctx.eq("M4-G6 常量 EXPLAIN", Difficulty.EXPLAIN, "EXPLAIN")
 	ctx.eq("M4-G6 常量 SYNC", Difficulty.SYNC, "SYNC")
 	ctx.eq("M4-G6 常量 MASK", Difficulty.MASK, "MASK")
 	for n in Difficulty.names():
+		ctx.begin_group("validity")
 		ctx.check("M4-G6 %s 合法" % str(n), Difficulty.is_valid(str(n)))
 	ctx.check("M4-G6 未知值非法", not Difficulty.is_valid("HARD"))
 	ctx.check("M4-G6 小写不合法", not Difficulty.is_valid("explain"))
+	ctx.begin_group("normalize")
 	ctx.eq("M4-G6 未知值归一 EXPLAIN", Difficulty.normalize("HARD"), Difficulty.EXPLAIN)
 	ctx.eq("M4-G6 空串归一 EXPLAIN", Difficulty.normalize(""), Difficulty.EXPLAIN)
 	ctx.eq("M4-G6 SYNC 原样保留", Difficulty.normalize(Difficulty.SYNC), Difficulty.SYNC)
@@ -25,6 +43,7 @@ func _test_names(ctx: TestContext) -> void:
 
 func _test_default(ctx: TestContext) -> void:
 	var s := PlayerState.new(7)
+	ctx.begin_group("default")
 	ctx.eq("M4-G6 新档默认 EXPLAIN", s.difficulty, Difficulty.EXPLAIN)
 	s.difficulty = Difficulty.MASK
 	var d := s.to_dict()
@@ -36,11 +55,13 @@ func _test_roundtrip(ctx: TestContext) -> void:
 		var s := PlayerState.new(1)
 		s.difficulty = str(n)
 		var restored := PlayerState.from_dict(s.to_dict())
+		ctx.begin_group("roundtrip")
 		ctx.eq("M4-G6 存档往返保留 %s" % str(n), restored.difficulty, str(n))
 
 func _test_fallback(ctx: TestContext) -> void:
 	var base := PlayerState.new(1).to_dict()
 	base.erase("settings")
+	ctx.begin_group("fallback")
 	ctx.eq("M4-G6 缺 settings 读档回落 EXPLAIN",
 		PlayerState.from_dict(base).difficulty, Difficulty.EXPLAIN)
 

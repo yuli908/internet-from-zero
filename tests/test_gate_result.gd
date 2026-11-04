@@ -2,6 +2,33 @@ extends RefCounted
 
 ## M5 结构化失败回传：code 枚举、error_tags 映射、attempt 计数、每类 gate 的精度。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 305
+const EXPECT_GROUPS := {
+	"code_registry": 1, "per_code_contract": 84, "make_record": 15, "tag_mapping": 11,
+	"tag_map_six_classes": 38, "doc_tag_table": 20, "log_only": 13, "unknown_code": 6,
+	"attempts": 13, "report_shape": 13, "voltage": 10, "binary": 12, "boolean": 22,
+	"gate": 18, "signal": 14, "half_adder": 15,
+}
+const GROUP_DESCRIPTIONS := {
+	"code_registry": "code 枚举数量 ≥18",
+	"per_code_contract": "每个 code 的名字回读、在 TAG_MAP 里、有 describe 文案，且名字表唯一、OK=0、只有 OK 判成功",
+	"make_record": "make 产出的七个字段齐全且取值正确，负 attempt 夹到 0",
+	"tag_mapping": "各 code 到 K/S/C/P/M/R 标签的定稿映射",
+	"tag_map_six_classes": "TAG_MAP 里每个标签都落在六类之内",
+	"doc_tag_table": "19 条 code 的标签与 05-failure-diagnostics.md §1 表逐条对账",
+	"log_only": "4/5/10/99 纯 R 只进日志不进阶梯，且纯 R 只允许这些码与 E_PENDING",
+	"unknown_code": "未知 code 归一 E_GENERIC：名字/tags/describe/make 全部兜底",
+	"attempts": "GateAttemptTracker 计数、通过清零、按 id 隔离、空 id 与整体重置、字典往返",
+	"report_shape": "GateReport 的 legacy/add_case/first_failure/failure_codes/全过语义",
+	"voltage": "电压 gate：正确解全过，改掉期望值后落 E_OUTPUT_MISMATCH 且回传输入/期望/实际",
+	"binary": "二进制 gate：覆盖率缺失、目标未达成、选择题、未知 kind 四类失败码与字段",
+	"boolean": "布尔表 gate：单元格错、缺行、部分填写计数、全错、德摩根表、未知 kind",
+	"gate": "门级 gate：真值表行错、延迟超限、未封装、第二结构缺失/雷同、未知 kind",
+	"signal": "信号 gate：延迟不符、毛刺、修复未做、选择题、未知 kind 五类失败码",
+	"half_adder": "半加器：真值表进位错、延迟超限、未封装、随机行、悬空线回传",
+}
+
 func run(ctx: TestContext) -> void:
 	_result_contract(ctx)
 	_tag_mapping(ctx)
@@ -23,9 +50,11 @@ func run(ctx: TestContext) -> void:
 func _result_contract(ctx: TestContext) -> void:
 	var keys: Array = GateResult.NAMES.keys()
 	keys.sort()
+	ctx.begin_group("code_registry")
 	ctx.check("code names non-empty", keys.size() >= 18, str(keys.size()))
 	var unique := {}
 	for k in keys:
+		ctx.begin_group("per_code_contract")
 		ctx.eq("code name %d" % int(k), GateResult.name_of(int(k)), str(GateResult.NAMES[k]))
 		unique[str(GateResult.NAMES[k])] = true
 		ctx.check("code in tag map %d" % int(k), GateResult.TAG_MAP.has(int(k)))
@@ -34,6 +63,7 @@ func _result_contract(ctx: TestContext) -> void:
 	ctx.check("OK is zero", GateResult.OK == 0)
 	ctx.check("is_ok only for OK", GateResult.is_ok(GateResult.OK) and not GateResult.is_ok(GateResult.E_TRUTH_ROW))
 	var r := GateResult.make(GateResult.E_DELAY_EXCEED, "T1.5-1", {"a": "1"}, 9, 6, 3)
+	ctx.begin_group("make_record")
 	for key in ["code", "code_name", "gate_id", "input", "expected", "actual", "error_tags", "attempt"]:
 		ctx.check("make field %s" % key, r.has(key))
 	ctx.eq("make code", int(r["code"]), GateResult.E_DELAY_EXCEED)
@@ -45,6 +75,7 @@ func _result_contract(ctx: TestContext) -> void:
 	ctx.eq("make negative attempt clamped", int(GateResult.make(GateResult.E_QUIZ, "q", null, 1, 0, -5)["attempt"]), 0)
 
 func _tag_mapping(ctx: TestContext) -> void:
+	ctx.begin_group("tag_mapping")
 	ctx.eq("ok no tags", GateResult.tags_for(GateResult.OK), [])
 	ctx.eq("unconnected -> S", GateResult.tags_for(GateResult.E_UNCONNECTED), ["S"])
 	ctx.eq("missing graph -> S", GateResult.tags_for(GateResult.E_MISSING_GRAPH), ["S"])
@@ -59,6 +90,7 @@ func _tag_mapping(ctx: TestContext) -> void:
 	# 所有映射都在六类标签内
 	for k in GateResult.TAG_MAP.keys():
 		for tag in GateResult.TAG_MAP[k]:
+			ctx.begin_group("tag_map_six_classes")
 			ctx.check("tag %s in six classes" % str(tag), (GateResult.TAGS as Array).has(str(tag)))
 
 func _tag_table_matches_doc(ctx: TestContext) -> void:
@@ -69,6 +101,7 @@ func _tag_table_matches_doc(ctx: TestContext) -> void:
 		10: ["R"], 11: ["S", "P"], 12: ["P"], 13: ["P"], 14: ["K"],
 		15: ["C", "P"], 16: ["M", "S"], 17: ["K", "M"], 99: ["R"],
 	}
+	ctx.begin_group("doc_tag_table")
 	ctx.eq("doc table size", expected.size(), 19)
 	for code in expected.keys():
 		ctx.eq("doc tags %d" % int(code), GateResult.tags_for(int(code)), expected[code])
@@ -82,6 +115,7 @@ func _log_only_codes(ctx: TestContext) -> void:
 		if GateResult.tags_for(int(k)) != ["R"]:
 			ladder.append(int(k))
 	for c in log_only:
+		ctx.begin_group("log_only")
 		ctx.eq("log-only %d is pure R" % c, GateResult.tags_for(c), ["R"])
 		ctx.check("log-only %d not in ladder set" % c, not ladder.has(c))
 	for k in GateResult.NAMES.keys():
@@ -89,6 +123,7 @@ func _log_only_codes(ctx: TestContext) -> void:
 			ctx.check("pure R only log-only (%d)" % int(k), log_only.has(int(k)) or int(k) == GateResult.E_PENDING)
 
 func _unknown_code(ctx: TestContext) -> void:
+	ctx.begin_group("unknown_code")
 	ctx.eq("normalize unknown", GateResult.normalize(12345), GateResult.E_GENERIC)
 	ctx.eq("name unknown", GateResult.name_of(12345), "E_GENERIC")
 	ctx.eq("tags unknown", GateResult.tags_for(12345), ["R"])
@@ -99,6 +134,7 @@ func _unknown_code(ctx: TestContext) -> void:
 
 func _attempts(ctx: TestContext) -> void:
 	var t := GateAttemptTracker.new()
+	ctx.begin_group("attempts")
 	ctx.eq("attempt #1", t.record("T1.4-2", false), 1)
 	ctx.eq("attempt #2", t.record("T1.4-2", false), 2)
 	ctx.eq("attempt #3", t.record("T1.4-2", false), 3)
@@ -123,6 +159,7 @@ func _report_shape(ctx: TestContext) -> void:
 	var rep := GateReport.new()
 	rep.add("legacy", "旧入口", false, "旧的失败")
 	var c: Dictionary = rep.cases[0]
+	ctx.begin_group("report_shape")
 	ctx.eq("legacy code", int(c["code"]), GateResult.E_GENERIC)
 	ctx.eq("legacy tags", c["error_tags"], ["R"])
 	ctx.check("legacy still fails", not rep.all_required_passed())
@@ -146,6 +183,7 @@ func _report_shape(ctx: TestContext) -> void:
 
 func _voltage(ctx: TestContext, cfg: Dictionary) -> void:
 	var rep := LabChecks.voltage(cfg)
+	ctx.begin_group("voltage")
 	ctx.check("voltage pass", rep.all_required_passed(), rep.summary())
 	for i in rep.cases.size():
 		ctx.eq("voltage ok code %d" % i, int(rep.cases[i]["code"]), GateResult.OK)
@@ -168,6 +206,7 @@ func _binary(ctx: TestContext, cfg: Dictionary) -> void:
 		visited[str(v)] = true
 	var achieved := {"t137": true, "t2f": true}
 	var rep := LabChecks.binary(cfg, visited, achieved, 1)
+	ctx.begin_group("binary")
 	ctx.check("binary pass", rep.all_required_passed(), rep.summary())
 
 	var miss := visited.duplicate()
@@ -204,6 +243,7 @@ func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
 		"demorgan": ["1", "1", "1", "0"],
 	}
 	var rep := LabChecks.boolean(cfg, filled)
+	ctx.begin_group("boolean")
 	ctx.check("boolean pass", rep.all_required_passed(), rep.summary())
 
 	var bad := filled.duplicate(true)
@@ -270,6 +310,7 @@ func _gate(ctx: TestContext, cfg: Dictionary) -> void:
 		"t_xor_2": _xor_graph_b(),
 	}
 	var rep := LabChecks.gate(cfg, graphs, {"encapsulated": true})
+	ctx.begin_group("gate")
 	ctx.check("gate pass", rep.all_required_passed(), rep.summary())
 
 	var wrong_basic := graphs.duplicate()
@@ -325,6 +366,7 @@ func _gate(ctx: TestContext, cfg: Dictionary) -> void:
 
 func _signal(ctx: TestContext, cfg: Dictionary) -> void:
 	var rep := LabChecks.signal_cases(cfg, 9, 2, true, 1)
+	ctx.begin_group("signal")
 	ctx.check("signal pass", rep.all_required_passed(), rep.summary())
 
 	var r2 := LabChecks.signal_cases(cfg, 6, 2, true, 1)
@@ -359,6 +401,7 @@ func _signal(ctx: TestContext, cfg: Dictionary) -> void:
 func _half_adder(ctx: TestContext, cfg: Dictionary) -> void:
 	var graph := _half_adder_graph()
 	var rep := LabChecks.half_adder(cfg, graph, true)
+	ctx.begin_group("half_adder")
 	ctx.check("half_adder pass", rep.all_required_passed(), rep.summary())
 
 	var wrong := _half_adder_wrong_carry()

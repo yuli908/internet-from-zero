@@ -4,14 +4,41 @@
 
 const Ch02ChecksScript := preload("res://src/core/ch02_checks.gd")
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 100
+const EXPECT_GROUPS := {
+	"loadable": 2, "doc_shape": 4, "gate_cases_per_lab": 25, "gate_totals": 3,
+	"economy": 8, "manifest": 3, "transistor_correct": 8, "transistor_quiz": 2,
+	"transistor_region": 12, "inverter": 9, "nand": 2, "replace": 5,
+	"power": 13, "trace": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "ch02_levels / ch02_labs 两个数据文件可读",
+	"doc_shape": "章节 version=2、id=ch02、5 节、5 目标",
+	"gate_cases_per_lab": "每节 4 条 gate、gate_ids 与用例一一对应、奖励物品存在",
+	"gate_totals": "20 条 gate、2 条 pending 且清单为 T2.2-3/T2.4-4",
+	"economy": "CH01 结余区间、CH02 收支与章末结余、起始金币模式与开局物品",
+	"manifest": "manifest 登记 10 个文件且含 ch02 两个新文件",
+	"transistor_correct": "2.1 正确解全过、四测点、Vds=6.0 仍饱和且 Id 封顶 5000µA",
+	"transistor_quiz": "2.1 错误选择题失败并命中 E_QUIZ",
+	"transistor_region": "2.1 三区域判对/判错/未作答/期望区域不符均按 E_REGION 处理",
+	"inverter": "2.2 正确解 required 全过、pending 不计入、轨到轨合法与越界、错误解落真值表",
+	"nand": "2.3 全 NAND 正确解全过、换掉 t_or 后失败",
+	"replace": "2.4 正确解 required 全过、pending 1 不计入、错误解落 E_EQUIV",
+	"power": "2.5 功耗/面积/槽位三类判据：正确解过、错比、塞不下、槽位不足、展开门数口径",
+	"trace": "四个判定 kind 写入统一 trace，pending 不写假 trace",
+}
+
 func run(ctx: TestContext) -> void:
 	var lv := TestUtil.read_json("res://data/chapters/ch02_levels.json")
 	var labs := TestUtil.read_json("res://data/labs/ch02_labs.json")
 	var db := TestUtil.data_db()
 	var cat: Catalog = db.catalog
 
+	ctx.begin_group("loadable")
 	ctx.check("ch02_levels 可读", not lv.is_empty())
 	ctx.check("ch02_labs 可读", not labs.is_empty())
+	ctx.begin_group("doc_shape")
 	ctx.eq("ch02 version", int(lv.get("version", 0)), 2)
 	ctx.eq("ch02 id", str(lv.get("id", "")), "ch02")
 	ctx.eq("ch02 5 节", (lv.get("labs", []) as Array).size(), 5)
@@ -26,6 +53,7 @@ func run(ctx: TestContext) -> void:
 		var lid := str(lab.get("id", ""))
 		var key := str(lab.get("data_key", ""))
 		var seg: Dictionary = (labs.get("labs", {}) as Dictionary).get(key, {})
+		ctx.begin_group("gate_cases_per_lab")
 		ctx.check("ch02 段存在 %s" % key, not seg.is_empty())
 		var cases: Array = seg.get("gate_cases", [])
 		ctx.eq("%s gate 数" % lid, cases.size(), 4)
@@ -39,12 +67,14 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s 的 gate_ids 全部有定义" % lid,
 			_contains_all((lab.get("gate_ids", []) as Array), gate_ids_seen))
 		ctx.eq("%s 奖励物品存在" % lid, _missing_item(seg.get("grants", {}), cat), "")
+	ctx.begin_group("gate_totals")
 	ctx.eq("ch02 gate 总数", cases_total, 20)
 	ctx.eq("ch02 pending 数", pending_ids.size(), 2)
 	ctx.eq("ch02 pending 清单", pending_ids, ["T2.2-3", "T2.4-4"])
 
 	# ---- 经济口径纠偏（12 §5）：不是 252 / 不是 88 ----
 	var eco: Dictionary = lv.get("economy", {})
+	ctx.begin_group("economy")
 	ctx.eq("CH01 结余下限", int(eco.get("ch01_surplus_range", [0, 0])[0]), 277)
 	ctx.eq("CH01 结余上限", int(eco.get("ch01_surplus_range", [0, 0])[1]), 337)
 	ctx.eq("CH02 必需支出", int(eco.get("required_spend", 0)), 70)
@@ -56,6 +86,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- manifest 登记：8 → 10 ----
 	var files: Array = TestUtil.read_json("res://data/manifest.json").get("files", [])
+	ctx.begin_group("manifest")
 	ctx.eq("manifest 10 文件", files.size(), 10)
 	ctx.check("manifest 含 ch02_levels", "res://data/chapters/ch02_levels.json" in files)
 	ctx.check("manifest 含 ch02_labs", "res://data/labs/ch02_labs.json" in files)
@@ -64,6 +95,7 @@ func run(ctx: TestContext) -> void:
 	var t_cfg: Dictionary = labs["labs"]["transistor"]
 	var t_answers := {"T2.1-1": "cutoff", "T2.1-2": "linear", "T2.1-3": "saturation", "T2.1-4": 1}
 	var t_ok: Dictionary = Ch02ChecksScript.run("transistor", t_cfg, {"answers": t_answers})
+	ctx.begin_group("transistor_correct")
 	ctx.check("2.1 正确解全过", bool((t_ok["report"] as GateReport).all_required_passed()))
 	ctx.eq("2.1 pending 0", (t_ok["pending"] as Array).size(), 0)
 	# 第四个测点：Vgs=3.3、Vds=6.0 仍在饱和，Id 与 Vds=3.0 完全相等（容差 0）
@@ -78,6 +110,7 @@ func run(ctx: TestContext) -> void:
 	var t_bad_quiz := t_answers.duplicate()
 	t_bad_quiz["T2.1-4"] = 0
 	var t_bad: Dictionary = Ch02ChecksScript.run("transistor", t_cfg, {"answers": t_bad_quiz})
+	ctx.begin_group("transistor_quiz")
 	ctx.check("2.1 错误选择题失败", not bool((t_bad["report"] as GateReport).all_required_passed()))
 	ctx.check("2.1 错误选择题命中 quiz code",
 		GateResult.E_QUIZ in (t_bad["report"] as GateReport).failure_codes())
@@ -85,6 +118,7 @@ func run(ctx: TestContext) -> void:
 	for combo in [["T2.1-1", "cutoff"], ["T2.1-2", "linear"], ["T2.1-3", "saturation"]]:
 		var only := t_answers.duplicate()
 		only[combo[0]] = combo[1]
+		ctx.begin_group("transistor_region")
 		ctx.check("2.1 %s 判对通过" % combo[1],
 			bool((Ch02ChecksScript.run("transistor", t_cfg, {"answers": only})["report"] as GateReport).all_required_passed()))
 		var wrong_by := {"cutoff": "linear", "linear": "saturation", "saturation": "cutoff"}
@@ -110,6 +144,7 @@ func run(ctx: TestContext) -> void:
 	var i_cfg: Dictionary = labs["labs"]["inverter"]
 	var i_ok: Dictionary = Ch02ChecksScript.run("inverter", i_cfg, {"graph": _g1("not")})
 	var i_rep: GateReport = i_ok["report"]
+	ctx.begin_group("inverter")
 	ctx.check("2.2 正确解 required 全过", i_rep.all_required_passed())
 	ctx.eq("2.2 pending 1", (i_ok["pending"] as Array).size(), 1)
 	ctx.check("2.2 pending 不计入 required", _pending_not_required(i_rep))
@@ -137,6 +172,7 @@ func run(ctx: TestContext) -> void:
 		"t_or": _nand_or(),
 	}
 	var n_ok: Dictionary = Ch02ChecksScript.run("nand", n_cfg, {"graphs": n_graphs})
+	ctx.begin_group("nand")
 	ctx.check("2.3 正确解全过", bool((n_ok["report"] as GateReport).all_required_passed()))
 	var n_bad_graphs := n_graphs.duplicate()
 	n_bad_graphs["t_or"] = _g2("and")
@@ -146,6 +182,7 @@ func run(ctx: TestContext) -> void:
 	# ---- 2.4 等价替换 ----
 	var r_cfg: Dictionary = labs["labs"]["replace"]
 	var r_ok: Dictionary = Ch02ChecksScript.run("replace", r_cfg, {"graph": _xor_nand()})
+	ctx.begin_group("replace")
 	ctx.check("2.4 正确解 required 全过", bool((r_ok["report"] as GateReport).all_required_passed()))
 	ctx.eq("2.4 pending 1", (r_ok["pending"] as Array).size(), 1)
 	ctx.check("2.4 pending 不计入 required", _pending_not_required(r_ok["report"]))
@@ -158,6 +195,7 @@ func run(ctx: TestContext) -> void:
 	var p_cfg: Dictionary = labs["labs"]["power"]
 	var p_graphs := {"not": _g1("not"), "and": _g2("and"), "or": _g2("or"), "xor": _g2("xor")}
 	var p_ok: Dictionary = Ch02ChecksScript.run("power", p_cfg, {"answers": {"power_mw": 0.05445, "ratio": 0.5, "T2.5-4": 1}, "graphs": p_graphs})
+	ctx.begin_group("power")
 	ctx.check("2.5 正确解全过", bool((p_ok["report"] as GateReport).all_required_passed()))
 	var p_bad: Dictionary = Ch02ChecksScript.run("power", p_cfg, {"answers": {"power_mw": 0.05445, "ratio": 0.8, "T2.5-4": 1}, "graphs": p_graphs})
 	ctx.check("2.5 错误解失败", not bool((p_bad["report"] as GateReport).all_required_passed()))
@@ -203,6 +241,7 @@ func run(ctx: TestContext) -> void:
 	var sim := SimCircuit.new("ch02_judge")
 	var sink := sim.enable_trace()
 	Ch02ChecksScript.run("replace", r_cfg, {"graph": _xor_nand(), "sim": sim})
+	ctx.begin_group("trace")
 	ctx.check("2.4 写入 EQUIV trace", sink.count_kind("EQUIV") > 0)
 	Ch02ChecksScript.run("transistor", t_cfg, {"answers": {"default": 1}, "sim": sim})
 	ctx.check("2.1 写入 MOSFET_REGION trace", sink.count_kind("MOSFET_REGION") > 0)

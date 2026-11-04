@@ -7,6 +7,25 @@ extends RefCounted
 const LabBaseGd = preload("res://src/ui/screens/lab_base.gd")
 const Ch02ChecksScript = preload("res://src/core/ch02_checks.gd")
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 37
+const EXPECT_GROUPS := {
+	"loadable": 2, "denominator_inverter": 4, "header": 3, "settlement": 5,
+	"settlement_counts": 2, "replace_section": 9, "ready_restore": 5,
+	"unaffected_labs": 3, "ui_wiring": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "ch02_labs 里 inverter / replace 两节数据可读",
+	"denominator_inverter": "LabBase.gate_denominator 对 inverter 得 4/3/1 且延后 id 为 T2.2-3",
+	"header": "抬头写 3 项验收而不是 4 项，并保留编号与副标题",
+	"settlement": "结算页显示 3/3 且判绿、延后只留一行、失败明细为空",
+	"settlement_counts": "延后项既不计入分子也不计入分母",
+	"replace_section": "replace 整节 deferred：抬头不出计数、结算不出分数、只留一行 4 项延后",
+	"ready_restore": "T2.2-3 转 ready 后分母回 4、抬头 4 项验收、结算 3/4 且无延后行",
+	"unaffected_labs": "transistor/nand/power 无延后项时分母仍为 4",
+	"ui_wiring": "lab_base.gd 真的调用 deferred_gates/header_code_text/settlement_view 并拦整节延后",
+}
+
 func run(ctx: TestContext) -> void:
 	var labs: Dictionary = TestUtil.read_json("res://data/labs/ch02_labs.json").get("labs", {})
 	var chapter: Dictionary = TestUtil.read_json("res://data/chapters/ch02_levels.json")
@@ -19,11 +38,13 @@ func run(ctx: TestContext) -> void:
 	var replace: Dictionary = labs.get("replace", {})
 	var iv_meta: Dictionary = metas.get("inverter", {})
 	var rp_meta: Dictionary = metas.get("replace", {})
+	ctx.begin_group("loadable")
 	ctx.check("ch02 inverter 可读", not inverter.is_empty())
 	ctx.check("ch02 replace 可读", not replace.is_empty())
 
 	# ---- 分母：inverter 4 条里 T2.2-3 延后，进分母 3 ----
 	var d := LabBaseGd.gate_denominator(inverter)
+	ctx.begin_group("denominator_inverter")
 	ctx.eq("UI 分母：inverter 总 4", int(d["total"]), 4)
 	ctx.eq("UI 分母：inverter 计 3", int(d["counted"]), 3)
 	ctx.eq("UI 分母：inverter 延后 1", int(d["deferred"]), 1)
@@ -31,6 +52,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 抬头行：报 3 项验收，不再报 4 ----
 	var code := LabBaseGd.header_code_text(inverter, iv_meta, 2)
+	ctx.begin_group("header")
 	ctx.eq("抬头计 3 项验收", LabBaseGd.gate_count_text(inverter, iv_meta.get("gate_ids", [])), "3 项验收")
 	ctx.check("抬头行写 3 项验收、不写 4 项", code.contains("3 项验收") and not code.contains("4 项验收"), code)
 	ctx.check("抬头行保留编号与副标题",
@@ -39,6 +61,7 @@ func run(ctx: TestContext) -> void:
 	# ---- 结算页：3/3，不是 3/4；延后只留一行 ----
 	var rep: GateReport = _not_report(inverter)
 	var view := LabBaseGd.settlement_view(inverter, rep, false, {})
+	ctx.begin_group("settlement")
 	ctx.eq("结算显示 3/3（不是 3/4）", str(view["title"]), "验收 · 通过 3/3")
 	ctx.check("结算判绿", bool(view["ok"]))
 	ctx.eq("结算延后 1", int(view["deferred"]), 1)
@@ -48,11 +71,13 @@ func run(ctx: TestContext) -> void:
 	# ---- 延后项即使被当成通过，也不进分子/分母（不靠人记） ----
 	var all_ids := ["T2.2-1", "T2.2-2", "T2.2-3", "T2.2-4"]
 	var sc := LabBaseGd.settlement_counts(inverter, all_ids)
+	ctx.begin_group("settlement_counts")
 	ctx.eq("延后项不进分子", int(sc["ok"]), 3)
 	ctx.eq("延后项不进分母", int(sc["total"]), 3)
 
 	# ---- replace：整节 deferred，不进分母、不进进度条 ----
 	var rd := LabBaseGd.gate_denominator(replace)
+	ctx.begin_group("replace_section")
 	ctx.eq("replace 总 4", int(rd["total"]), 4)
 	ctx.eq("replace 进分母 0", int(rd["counted"]), 0)
 	ctx.check("replace 整节延后标记", bool(rd["section_deferred"]))
@@ -71,6 +96,7 @@ func run(ctx: TestContext) -> void:
 		if str((raw as Dictionary).get("id", "")) == "T2.2-3":
 			(raw as Dictionary)["content_status"] = "ready"
 	var rdy := LabBaseGd.gate_denominator(ready)
+	ctx.begin_group("ready_restore")
 	ctx.eq("ready 后分母 4", int(rdy["counted"]), 4)
 	ctx.eq("ready 后延后 0", int(rdy["deferred"]), 0)
 	ctx.eq("ready 后抬头 4 项验收", LabBaseGd.gate_count_text(ready, iv_meta.get("gate_ids", [])), "4 项验收")
@@ -80,10 +106,12 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 没有延后项的三节不受影响 ----
 	for id in ["transistor", "nand", "power"]:
+		ctx.begin_group("unaffected_labs")
 		ctx.eq("%s 分母仍 4" % id, int(LabBaseGd.gate_denominator(labs.get(id, {}))["counted"]), 4)
 
 	# ---- 接线回归：UI 文件必须真的调接口，不能只有测试在调 ----
 	var src := FileAccess.get_file_as_string("res://src/ui/screens/lab_base.gd")
+	ctx.begin_group("ui_wiring")
 	ctx.check("UI 层调用 deferred_gates", src.contains("Ch02Checks.deferred_gates("))
 	ctx.check("抬头走 header_code_text", _body(src, "func _code_text").contains("header_code_text("))
 	ctx.check("结算走 settlement_view", _body(src, "func show_report").contains("settlement_view("))

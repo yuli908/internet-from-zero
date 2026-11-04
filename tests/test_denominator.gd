@@ -5,25 +5,52 @@ extends RefCounted
 
 const Ch02ChecksScript := preload("res://src/core/ch02_checks.gd")
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 46
+const EXPECT_GROUPS := {
+	"loadable": 1, "inverter_deferred": 4, "replace_section_deferred": 5,
+	"replace_invariance": 4, "no_pending_unaffected": 9, "ready_returns_to_denominator": 3,
+	"section_status_consistency": 3, "replace_ready_partial": 3, "pending_log_only": 1,
+	"optimistic_denominator": 5, "id_sat_default": 4, "build_area_slots": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "ch02_labs 数据文件可读",
+	"inverter_deferred": "inverter 4 条 gate 中 T2.2-3 延后、进分母 3",
+	"replace_section_deferred": "replace 整节 deferred：进分母 0、4 条全延后、标记为真",
+	"replace_invariance": "深拷贝/重复调用/换引用都不改变 replace 的 0 分母",
+	"no_pending_unaffected": "transistor/nand/power 无 pending：gate 数 4、进分母 4、延后 0",
+	"ready_returns_to_denominator": "T2.2-3 转 ready 后回到分母 4 且不再延后",
+	"section_status_consistency": "章节级 content_status 与 gate 级分母口径一致",
+	"replace_ready_partial": "replace 整节转 ready 后仍因 static_current 留在分母 3",
+	"pending_log_only": "E_PENDING(25) 只挂 R 标签、不进提示阶梯",
+	"optimistic_denominator": "正向对照：旧逻辑 3/4、新逻辑 3/3 全绿",
+	"id_sat_default": "id_sat_ua 兜底默认与数据一致（5000），线性 4 mA 不误判超饱和",
+	"build_area_slots": "build_area 按真实顶层器件占槽，7 槽 > 4 目标时落 E_AREA 并写明理由",
+}
+
 func run(ctx: TestContext) -> void:
 	var labs: Dictionary = TestUtil.read_json("res://data/labs/ch02_labs.json").get("labs", {})
+	ctx.begin_group("loadable")
 	ctx.check("ch02_labs 可读", not labs.is_empty())
 	var inverter: Dictionary = labs.get("inverter", {})
 	var replace: Dictionary = labs.get("replace", {})
 
 	# ---- 4 → 3：inverter / replace 各有一项永远 pending ----
 	var inv: Dictionary = Ch02ChecksScript.deferred_gates(inverter)
+	ctx.begin_group("inverter_deferred")
 	ctx.eq("inverter gate 总数 4", int(inv["total"]), 4)
 	ctx.eq("inverter 进分母 3", int(inv["counted"]), 3)
 	ctx.eq("inverter 延后数 1", int(inv["deferred"]), 1)
 	ctx.eq("inverter 延后 id", inv["ids"], ["T2.2-3"])
 	var rep_lab: Dictionary = Ch02ChecksScript.deferred_gates(replace)
+	ctx.begin_group("replace_section_deferred")
 	ctx.eq("replace gate 总数 4", int(rep_lab["total"]), 4)
 	ctx.eq("replace 进分母 0（整节 deferred）", int(rep_lab["counted"]), 0)
 	ctx.eq("replace 延后 4", int(rep_lab["deferred"]), 4)
 	ctx.eq("replace 延后 ids", rep_lab["ids"], ["T2.4-1", "T2.4-2", "T2.4-3", "T2.4-4"])
 	ctx.check("replace 整节 deferred 标记", bool(rep_lab["section_deferred"]))
 	# 任何调用方式都必须 0：原引用 / 深拷贝 / 再取一次
+	ctx.begin_group("replace_invariance")
 	ctx.eq("replace 深拷贝调用仍 0", int(Ch02ChecksScript.deferred_gates(replace.duplicate(true))["counted"]), 0)
 	ctx.eq("replace 重复调用仍 0", int(Ch02ChecksScript.deferred_gates(labs["replace"])["counted"]), 0)
 	ctx.check("replace 不出现 3", int(rep_lab["counted"]) != 3)
@@ -32,6 +59,7 @@ func run(ctx: TestContext) -> void:
 	# ---- 没有 pending 的节不许被误剔：4 / 4 ----
 	for id in ["transistor", "nand", "power"]:
 		var r: Dictionary = Ch02ChecksScript.deferred_gates(labs.get(id, {}))
+		ctx.begin_group("no_pending_unaffected")
 		ctx.eq("%s gate 总数 4" % id, int(r["total"]), 4)
 		ctx.eq("%s 进分母 4" % id, int(r["counted"]), 4)
 		ctx.eq("%s 延后 0" % id, int(r["deferred"]), 0)
@@ -42,12 +70,14 @@ func run(ctx: TestContext) -> void:
 		if str((raw as Dictionary).get("id", "")) == "T2.2-3":
 			raw["content_status"] = "ready"
 	var rdy: Dictionary = Ch02ChecksScript.deferred_gates(ready)
+	ctx.begin_group("ready_returns_to_denominator")
 	ctx.eq("ready 后进分母 4", int(rdy["counted"]), 4)
 	ctx.eq("ready 后延后 0", int(rdy["deferred"]), 0)
 	ctx.check("ready 后无 section_deferred", not bool(rdy["section_deferred"]))
 
 	# ---- 整节 deferred：整节不进分母（沿用既有裁决，不按 gate 逐个丢） ----
 	var ch2 := ChapterRuntime.from_doc(TestUtil.read_json("res://data/chapters/ch02_levels.json"))
+	ctx.begin_group("section_status_consistency")
 	ctx.eq("replace 整节状态取自数据", str(ch2.content_status("replace")), "deferred")
 	ctx.check("章节口径与 gate 口径一致（均为 0）",
 		str(ch2.content_status("replace")) != "ready" and int(rep_lab["counted"]) == 0)
@@ -57,11 +87,13 @@ func run(ctx: TestContext) -> void:
 	var rep_ready: Dictionary = replace.duplicate(true)
 	rep_ready["content_status"] = "ready"
 	var rr: Dictionary = Ch02ChecksScript.deferred_gates(rep_ready)
+	ctx.begin_group("replace_ready_partial")
 	ctx.eq("replace ready 后进分母 3", int(rr["counted"]), 3)
 	ctx.eq("replace ready 后仅 T2.4-4 延后", rr["ids"], ["T2.4-4"])
 	ctx.check("replace ready 后不是 4", int(rr["counted"]) != 4)
 
 	# ---- E_PENDING(25) 不进提示阶梯 ----
+	ctx.begin_group("pending_log_only")
 	ctx.eq("25 为纯 R（只进日志）", GateResult.tags_for(GateResult.E_PENDING), ["R"])
 
 	# ---- 正向对照：旧逻辑 3/4，新逻辑 3/3 ----
@@ -71,6 +103,7 @@ func run(ctx: TestContext) -> void:
 	for c in i_rep.cases:
 		if bool((c as Dictionary).get("ok", false)):
 			passed += 1
+	ctx.begin_group("optimistic_denominator")
 	ctx.eq("inverter 实过 3 项", passed, 3)
 	ctx.eq("旧逻辑分母 4", i_rep.cases.size(), 4)
 	ctx.check("旧逻辑显示 3/4（差项永远补不上）", passed == 3 and i_rep.cases.size() == 4)
@@ -79,6 +112,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 附 1：id_sat_ua 兜底默认必须与数据一致（旧值 1000 会让线性 4 mA 被判成超饱和） ----
 	var dev: Dictionary = (labs.get("transistor", {}) as Dictionary).get("device", {})
+	ctx.begin_group("id_sat_default")
 	ctx.eq("数据 id_sat_ua 为 5000", int(dev.get("id_sat_ua", -1)), 5000)
 	ctx.eq("缺省兜底等于数据值", Ch02ChecksScript.id_ua_of(3.3, 3.0, {}), float(dev.get("id_sat_ua", -1)))
 	ctx.check("线性 4 mA 不再大于饱和电流", Ch02ChecksScript.id_ua_of(3.3, 0.2, {})
@@ -92,6 +126,7 @@ func run(ctx: TestContext) -> void:
 	var p_answers := {"power_mw": 0.05445, "ratio": 0.5, "T2.5-4": 1}
 	var p_graphs := {"not": _g1("not"), "and": _g2("and"), "or": _g2("or"), "xor": _g2("xor")}
 	var p_ok: Dictionary = Ch02ChecksScript.run("power", p_cfg, {"answers": p_answers, "graphs": p_graphs})
+	ctx.begin_group("build_area_slots")
 	ctx.check("现成门占 4 槽全过", bool((p_ok["report"] as GateReport).all_required_passed()))
 	var p_tight := {"not": _g1("not"), "and": _g2("and"), "or": _g2("or"), "xor": _nand_xor()}
 	var p_slot: Dictionary = Ch02ChecksScript.run("power", p_cfg, {"answers": p_answers, "graphs": p_tight})

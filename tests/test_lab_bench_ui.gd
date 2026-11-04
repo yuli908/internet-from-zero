@@ -6,6 +6,22 @@ extends RefCounted
 const Lab = preload("res://src/ui/screens/laboratory_screen.gd")
 const EditorGd = preload("res://src/ui/widgets/circuit_editor.gd")
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 36
+const EXPECT_GROUPS := {
+	"geometry": 10, "bench_palette": 7, "store_bins": 4, "rack_select": 3,
+	"canvas_drop": 4, "wiring": 3, "entry_wiring": 5,
+}
+const GROUP_DESCRIPTIONS := {
+	"geometry": "三区（元件台/画布/收纳区）位置宽高、同高 612、间距 18、右缘 1232",
+	"bench_palette": "元件台 6 门槽 + 3 工具位的尺寸/间距且不越区，含 and/or/not",
+	"store_bins": "收纳格不越出收纳区、与实验位不重叠、6 实验位一行且不越区",
+	"rack_select": "本章 6 个实验位，已解锁可点、锁定不可点",
+	"canvas_drop": "从元件台拖门入画布：合法门型落门、门型正确、非法门型不落",
+	"wiring": "点输出端口再点输入端口会让图上真的多一根连到 AND 的线",
+	"entry_wiring": "黑板按钮进原型台、主壳注册与标题、无空态提示、截图走真实落门连线接口",
+}
+
 func run(ctx: TestContext) -> void:
 	var z: Dictionary = Lab.zone_rects()
 	var bench: Rect2 = z["bench"]
@@ -13,6 +29,7 @@ func run(ctx: TestContext) -> void:
 	var store: Rect2 = z["store"]
 
 	# ---- 三区几何 ----
+	ctx.begin_group("geometry")
 	ctx.eq("元件台 x=0", bench.position.x, 0.0)
 	ctx.eq("元件台宽 236", bench.size.x, 236.0)
 	ctx.eq("画布 x=254", canvas.position.x, 254.0)
@@ -25,6 +42,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("三区右缘 1232", store.end.x, 1232.0)
 
 	# ---- 元件台：6 个门槽 + 3 个工具位，全部在区内 ----
+	ctx.begin_group("bench_palette")
 	ctx.eq("元件台门槽 6 个", Lab.PALETTE_GATES.size(), 6)
 	var last_slot: Rect2 = Lab.bench_slot_rect(5)
 	ctx.eq("门槽宽 212", last_slot.size.x, 212.0)
@@ -41,6 +59,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 收纳区：8 个收纳格 + 6 个实验位，两段不重叠 ----
 	var last_bin: Rect2 = Lab.bin_slot_rect(Lab.BIN_COUNT - 1)
+	ctx.begin_group("store_bins")
 	ctx.check("收纳格不越出收纳区", last_bin.end.x <= store.size.x and last_bin.end.y <= store.size.y,
 		"last=%s" % str(last_bin))
 	ctx.check("收纳格与实验位不重叠", last_bin.end.y < Lab.rack_slot_rect(0).position.y,
@@ -55,6 +74,7 @@ func run(ctx: TestContext) -> void:
 	for raw in (TestUtil.chapter_doc().get("labs", []) as Array):
 		if raw is Dictionary:
 			order.append(str((raw as Dictionary).get("id", "")))
+	ctx.begin_group("rack_select")
 	ctx.eq("本章实验位正好 6 个", order.size(), 6)
 	var unlocked := {str(order[0]): true}
 	ctx.check("已解锁实验位可点", Lab.slot_open(str(order[0]), unlocked))
@@ -62,6 +82,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 拖入：元件台数据 → 画布落门 ----
 	var e := _editor()
+	ctx.begin_group("canvas_drop")
 	ctx.check("画布接受元件台拖入", bool(e._can_drop_data(Vector2(300, 200), {"bench_gate": "or"})))
 	e._drop_data(Vector2(300, 200), {"bench_gate": "or"})
 	ctx.eq("拖入后画布有 1 个门", e.gate_count(), 1)
@@ -74,6 +95,7 @@ func run(ctx: TestContext) -> void:
 	e = _editor()
 	var a := e.add_gate_at("and", Vector2(200, 150))
 	var b := e.add_gate_at("not", Vector2(420, 150))
+	ctx.begin_group("wiring")
 	ctx.check("两个门都有自己的 id", not a.is_empty() and not b.is_empty(), "%s/%s" % [a, b])
 	var pa: Vector2 = e.graph.nodes[a]["pos"]
 	var pb: Vector2 = e.graph.nodes[b]["pos"]
@@ -85,6 +107,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 入口接线：黑板「实验室」进原型台，实验位再进任意已解锁 lab ----
 	var wb := FileAccess.get_file_as_string("res://src/ui/screens/workbench_screen.gd")
+	ctx.begin_group("entry_wiring")
 	ctx.check("黑板实验室按钮进原型台", wb.contains("show_screen\", \"laboratory\""))
 	var main_src := FileAccess.get_file_as_string("res://src/ui/main.gd")
 	ctx.check("主壳注册 laboratory 屏", main_src.contains("\"laboratory\": preload"))
