@@ -24,6 +24,8 @@ var metastable: Array = []
 var dffs: Array = []
 var input_names: Array = []
 var output_names: Array = []
+var layer := "L2"
+var sink: TraceSink = null
 
 var _watch: Dictionary = {}
 
@@ -105,6 +107,9 @@ func _write(wire_name: String, bits: String) -> void:
 
 func _write_id(wid: int, val: int, bits: String = "") -> void:
 	if _wval[wid] == val:
+		if sink != null:
+			sink.record(eng.now, layer, "DROP", _wname[wid],
+				{"value": bits if not bits.is_empty() else _dec(val)})
 		return
 	var w: Dictionary = wires[_wname[wid]]
 	var old := str(w["bits"])
@@ -115,6 +120,8 @@ func _write_id(wid: int, val: int, bits: String = "") -> void:
 	_wval[wid] = val
 	_wlast[wid] = eng.now
 	history.append({"t": eng.now, "wire": _wname[wid], "old": old, "new": next_bits})
+	if sink != null:
+		sink.record(eng.now, layer, "CHANGE", _wname[wid], {"old": old, "new": next_bits})
 	if _watch.has(_wname[wid]):
 		glitches.append({"t": eng.now, "wire": _wname[wid], "value": next_bits})
 	# fanout：门事件按订阅顺序入堆（DFF 走 SimDff 的 closure listener）
@@ -186,8 +193,18 @@ func add_dff(cell_name: String, d_src: String, clk_src: String, delay: int = -1,
 	return cell_name
 
 func note_metastable(t: int, subject: String, reason: String) -> void:
-	## T1 先落数组；T3 的 TraceSink 接上后从这里转成 kind=METASTABLE 事件。
 	metastable.append({"t": t, "subject": subject, "reason": reason})
+	if sink != null:
+		sink.record(t, "L3", "METASTABLE", subject, {"reason": reason})
+
+func enable_trace(capacity: int = 20000) -> TraceSink:
+	## 打开统一事件流（只读观测）。默认关闭，避免影响既有性能与行为。
+	sink = TraceSink.new(capacity)
+	return sink
+
+func trace_digest() -> String:
+	return "" if sink == null else sink.digest()
+
 
 func run(ticks: int) -> Dictionary:
 	return run_until(eng.now + ticks)

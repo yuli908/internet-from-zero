@@ -43,15 +43,23 @@ static func attach(p_sim: SimCircuit, p_name: String, p_d: String, p_clk: String
 	return d
 
 func _on_clk(old: String, t: int) -> void:
-	if sim.probe(clk_name) != SimValue.ONE:
+	var rising := sim.probe(clk_name) == SimValue.ONE
+	if sim.sink != null:
+		sim.sink.record(t, "L3", "EDGE", clk_name, {"edge": "rise" if rising else "fall", "from": old})
+	if not rising:
 		return
 	edge_t = t
+	var d_now := sim.probe(d_name)
 	if not reset_name.is_empty() and sim.probe(reset_name) == SimValue.ONE:
+		if sim.sink != null:
+			sim.sink.record(t, "L3", "SAMPLE", name, {"d": d_now, "q": SimValue.ZERO, "reset": true})
 		sim.eng.schedule_after(clk_to_q, Callable(sim, "_write"), [name, SimValue.ZERO])
 		return
 	var dw: Dictionary = sim.wires[d_name]
 	var setup_bad: bool = (t - int(dw["last_change"])) < setup
 	var val := SimValue.X if (setup_bad or str(dw["bits"]) == SimValue.X) else str(dw["bits"])
+	if sim.sink != null:
+		sim.sink.record(t, "L3", "SAMPLE", name, {"d": d_now, "q": val, "meta": setup_bad})
 	if setup_bad:
 		sim.note_metastable(t, name, "setup")
 	sim.eng.schedule_after(clk_to_q, Callable(sim, "_write"), [name, val])

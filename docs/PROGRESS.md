@@ -203,6 +203,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - 全量回归：**1493 checks, 0 failures**（比 T1 的 1452 项新增 41 项：器件/周期 + 向量 + 上限对齐断言）。
   `tests/test_data.gd` 同步断言 `limits` 50/50/80 与 `delays.json` 的 `l3.counter4_min_period=14` / `counter8_min_period=26`。
 
+### 2.9 T3 TraceSink 统一事件流（2026-11-04）
+
+- `src/sim/trace_sink.gd`（`class_name TraceSink`）：固定 5 字段 `{tick, layer, kind, subject, payload}`；
+  `kind` 白名单 7 项（`CHANGE/EDGE/DROP/SAMPLE/METASTABLE/ERR_ADDR/ERR_METASTABLE`）、`layer` 白名单 7 项；
+  环形缓冲（默认 20000，超限丢最旧并累计 `dropped_old`，`export()` 带计数）；`digest()` 对
+  `tick|layer|kind|subject|canonical(payload)` 拼接后 SHA-256（payload 键排序、基础类型）。
+- 接入点（只读观测，不改求值）：`SimCircuit._write_id` 写 `CHANGE`、同值合并写 `DROP`、`note_metastable` 写
+  `METASTABLE`；`SimDff._on_clk` 写 `EDGE`（rise/fall）与 `SAMPLE`（含 reset/meta 标记）。
+  `SimCircuit.enable_trace(cap)` 显式开启（默认关闭，避免影响既有性能）；`history`/`glitches` 保留给 UI。
+- G9 五条断言（`tests/test_trace.gd`）全过：5 字段形状与类型、kind 全在白名单、tick 单调不减、
+  `history` 条数 == sink `CHANGE` 条数（逐线同样成立）、**1 tick/帧 与 4 tick/帧的 `digest()` 逐字节相同**
+  （同一事件序列下 `run_until` 绝对 tick 分步，事件条数与 q 值也相同）。
+- 另测：环形缓冲 8 容量写 10 条 → 保留 8 / `dropped_old=2` / 最新 tick=9；未知 kind·layer、空 subject、
+  tick 回退各被拒并计 `rejected`；`ERR_ADDR` 可写入（第二章扩展用，不改 schema）。
+- 全量回归：**1527 checks, 0 failures**（T2 的 1493 + T3 34 项）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
