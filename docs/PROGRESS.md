@@ -300,9 +300,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   - 两者均在 50 门交互默认上限内（测试断言），不触发 `IFZ_E_SCALE`；ALU 仍不做（166 门，宏单元）。
 - `tests/test_l2_vectors.gd` 扩展：`decoder3` 10 行 + `comparator4` 17 行逐行比对，
   **132/132 全等**；另断言 `t_settle` 4/11 与 JSON `t_settle` 一致、门数 11/33 且 ≤ `gdscript_gate_limit()`。
-- **实测**：`l2_vectors.json` 实际 **140 行**（`determinism.rows` 同计数）；接口消息与偏差 17 原写的
-  "143 行"系笔误，已更正。余下只有 `alu4` 8 行不比对。
-- 全量回归：**1621 checks, 0 failures**（T8 的 1610 + 11 项）。
+- **实测**：`l2_vectors.json` 实际 **140 行**（`determinism.rows` 计数同 140，测试逐键对账并断言总数 140、种子 539365636）；
+  接口消息与偏差 17 原写的"143 行"系笔误，已更正。余下只有 `alu4` 8 行不比对。
+- 全量回归：**1631 checks, 0 failures**（T8 的 1610 + 21 项）。
 - **ALU 宏单元方案**（只写规格、未实现）：ALU 166 门不进可交互门级视图，按参考结构拆 7 个只读页
   （5/40/9/16/48/32/16，每页 ≤50），三块语义分组算术/逻辑/选择；展开/折叠边界与 `IFZ_E_SCALE` 口径见
   `specs/m4/spec.md` §3.1。
@@ -407,7 +407,7 @@ CH02 内容（`docs/design/11` 已出规格，依赖 8 种新判定 kind）—�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1621 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1631 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）

@@ -28,6 +28,14 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("decoder3 向量行数", (vec.get("decoder3", []) as Array).size(), 10)
 	ctx.eq("comparator4 向量行数", (vec.get("comparator4", []) as Array).size(), 17)
 	ctx.eq("alu4 向量行数（宏单元，不比对）", (vec.get("alu4", []) as Array).size(), 8)
+	# determinism.rows 与逐键实测行数对账：证明总数 140（不是 143）
+	var rows_meta: Dictionary = (vec.get("determinism", {}) as Dictionary).get("rows", {})
+	var total_rows := 0
+	for k in rows_meta.keys():
+		total_rows += int(rows_meta[k])
+		ctx.eq("determinism.rows %s" % k, int(rows_meta[k]), (vec.get(k, []) as Array).size())
+	ctx.eq("向量总行数", total_rows, 140)
+	ctx.eq("随机种子", int((vec.get("determinism", {}) as Dictionary).get("seed", 0)), 539365636)
 	# 延迟表必须与向量生成器同源
 	var gd: Dictionary = vec.get("gate_delay", {})
 	ctx.eq("延迟表 and", int(gd.get("and", 0)), SimDelays.delay("and"))
