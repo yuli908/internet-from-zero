@@ -643,7 +643,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 4645 checks, 0 failures（41 套件）
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 5199 checks, 0 failures（45 套件；含并行 CH09/CH10，见 §9）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
@@ -689,4 +689,51 @@ artifacts/shots/lab_level.png  lab_binary.png  lab_boolean.png  lab_gate.png  la
 - CH05 / CH06 仅做数据层注册与 gate 引用对齐（CH05 既有 4 节共 17 条 gate，其中 `clock_limit` 为 5 条）；
   章节 UI 可达性与既有 `ch05/ch06_labs.json` 的文案联动仍待 UI 会话。
 - `src/ui/` 与 `project.godot` 未改（不在本次范围）。
+
+## 9. CH07–CH08 数据落地与章节注册（2026-11-05）
+
+本轮新增 3 个套件、共 403 项检查；当次全量实测（工作区同时含并行会话的 CH09/CH10 提交）：
+
+- `SUITE test_ch07 expected=208 actual=208`
+- `SUITE test_ch08 expected=157 actual=157`
+- `SUITE test_chapters_07_08 expected=38 actual=38`
+- `SUITE_TOTAL expected=5197 actual=5197`，`RESULT: 5199 checks, 0 failures`，45 套件。
+- 按 §8 基线 4645 + 本轮 403 = 5048；其余增量为并行 CH09（`test_ch09` 83 项）等，不计入本轮提交。
+
+CH07（4 节 `serial_basics` / `frame4` / `uart` / `two_machine`，各 5 段、共 16 条 gate）：
+
+- `data/labs/ch07_labs.json`、`src/core/ch07_checks.gd`、`tests/test_ch07.gd`（208 项）。
+- 每节 `after` 序列均为 `0,0,1,2,3`，末段 `after=3`，`required=4`。
+- `T7.1-1`（`sample_phase`）落 `pending_kinds`：位窗口/采样 tick 接口与 ±10% 位宽容差未校准，
+  不进分母、不判红；`serial_basics` 分母 3，其余 3 节分母 4。
+- 其余判据（`edge_sample` / `period_calc` / `frame_fields` / `stop_low` / `parity_calc` / `uart_offset` /
+  `single_point_shift` / `offset_calc` / `two_machine` / `baud_mismatch` / `no_checksum` / `quiz`）
+  全部判绿/判红，失败码限定在 `E_UNCONNECTED(3)` / `E_TABLE_CELL(7)` / `E_DELAY_MISMATCH(9)` /
+  `E_OUTPUT_MISMATCH(10)` / `E_COVERAGE(13)` / `E_QUIZ(14)`。
+
+CH08（3 节 `protocol_editor` / `handshake` / `capture`，各 5 段、共 12 条 gate）：
+
+- `data/labs/ch08_labs.json`、`src/core/ch08_checks.gd`、`tests/test_ch08.gd`（157 项）。
+- `T8.1-3`（`field_start_spec`）落 `pending_kinds`：8.1 字段位宽 `field_spec` 未定，无法给出机器起始位真值，
+  不进分母、不猜数补 gate；`protocol_editor` 分母 3，`handshake` / `capture` 分母 4。
+- 其余判据（`protocol_replay` / `skip_layer` / `handshake_fsm` / `timeout_idle` / `self_heal_path` /
+  `capture_layers` / `single_snapshot` / `capture_start` / `quiz`）全部判绿/判红。
+
+章节注册：
+
+- `data/chapters/ch07_levels.json`（badge `CH07-SERIAL`，`next_chapter: ch08`）、
+  `data/chapters/ch08_levels.json`（badge `CH08-PROTO`，`next_chapter: ch09`）；
+  `ch06_levels.json` 的 `next_chapter` 由空改为 `ch07`，链路 `ch06→ch07→ch08→ch09` 闭合。
+- `data/skilltree.json` 追加 25 个节点，总节点 **167**（progress 52 / knowledge 74 / skill 41）。
+- `data/manifest.json` 登记 4 个新文件，共 **23** 个文件。
+- `tests/test_chapters_07_08.gd`（38 项）断言装载、`use_chapter` 可达、`labs_by_chapter` 数量、
+  manifest 无漏登记、`gate_ids` 无悬空、节点引用、全量 `validate()`；并含 5 条内存副本红证：
+  删 `CH07-1`、加悬空 `T7.1-9`、删 ch08 levels 登记、删 `two_machine`、删 `SK-CAPTURE`。
+
+仍未完成 / 落 pending：
+
+- CH07 `T7.1-1`、CH08 `T8.1-3` 仍为 `pending`（判定口径未定），未做硬阈值判定。
+- CH04 `area_check` 仍 pending（沿用 §8）。
+- CH09/CH10 的 levels、manifest、skilltree 注册不在本轮范围。
+- `src/ui/`、`project.godot`、`docs/design/`、`docs/curriculum/` 未改。
 
