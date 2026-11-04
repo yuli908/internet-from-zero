@@ -54,13 +54,13 @@ rep.to_dict()         # {ran_at, passed, cases:[...]}，可直接进存档/日�
 | 16 | `E_GLITCH` | 毛刺仍存在或未达宽度 | signal `glitch` / `fix` |
 | 17 | `E_X_ROW` | 含 X 的用例失败 | half_adder `random_x`、CH02 `x_propagation` |
 | 18 | `E_REGION` | MOS 工作区判错 | CH02 `mosfet_region` |
-| 19 | `E_STATIC_CURRENT` | 静态电流超出上限 | CH02 `static_current`（当前 pending） |
-| 20 | `E_RAIL_MARGIN` | 输出电平未达轨到轨 | CH02 `rail_margin`（当前 pending） |
+| 19 | `E_STATIC_CURRENT` | 静态电流超出上限 | CH02 `static_current`（**唯一 pending**：`T2.2-3`、`T2.4-4`；原因见 §9.5.2） |
+| 20 | `E_RAIL_MARGIN` | 输出电平未达轨到轨 | CH02 `rail_margin`（**已实现** `_judge_rail`，不再 pending；口径见 §9.5.1） |
 | 21 | `E_EQUIV` | 与参考函数不等价 | CH02 `equiv` |
 | 22 | `E_AREA` | 门数超出上限 | CH02 `area_max` / `target` / `build_area` |
 | 23 | `E_POWER_CALC` | 功耗计算不符 | CH02 `power_calc` |
 | 24 | `E_POWER_RATIO` | 功耗比不符 | CH02 `power_ratio` |
-| 25 | `E_PENDING` | 仿真层暂不支持（待接入） | CH02 `static_current` / `rail_margin`；`required=false`，不算通过 |
+| 25 | `E_PENDING` | 仿真层暂不支持（待接入） | 当前仅 CH02 `static_current`（`T2.2-3`、`T2.4-4`）；`required=false`，不算通过 |
 | 99 | `E_GENERIC` | 未分类失败（兜底） | 未知 code、`add()` 兼容入口 |
 
 规则：
@@ -187,20 +187,21 @@ LADDER_TEXT := {
 - 2.5 内部“槽位”与“总门数预算”也必须按 `gate_id` 分开（二者证据键不同：有无 `max_total_gates`）。
 - 组别（08 文档 §2.2 的 A–H）仍按 code 分组用于配色/筛选，**不要**用组别反推具体文案。
 
-### 9.2 `19/20` 当前一条都发不出来：`E_PENDING(25)` 的定位
+### 9.2 `20` 已转正、`19` 仍是 pending：`E_PENDING(25)` 的定位
 
-`src/core/ch02_checks.gd` 的 `PENDING_REASONS` 把 `static_current`(19)、`rail_margin`(20) 在入口拦成 `E_PENDING(25)`，并固定 `required=false`。因此：
+`src/core/ch02_checks.gd` 的 `PENDING_REASONS` 现在**只剩 `static_current`**，在入口把它拦成 `E_PENDING(25)`，并固定 `required=false`；`rail_margin`(20) 已由 `_judge_rail` 实现并直接落 `E_RAIL_MARGIN`，不再被拦截。因此：
 
-- 19/20 **当前不可能出现在玩家面前**，也不会红、不计入失败统计；直到对应 gate 转正（从 `PENDING_REASONS` 移除）才可见。
+- **20 已可见**：会红、计入失败统计，并进玩家提示阶梯（文案按 §9.1 的二元键规则写）。
+- **19 是唯一 pending**：`T2.2-3`、`T2.4-4` 两条 gate 当前不可能出现在玩家面前，也不会红、不计入失败统计。
 - `E_PENDING(25)` 是**内容未完成占位，不是玩家错误**：永不进提示阶梯、永不进失败率/失败统计；`detail` 只用于开发日志（`pending：<原因>`）。
 - UI 遇到 25 不应显示“失败”，也不应计入“本节失败次数”；只可在开发模式显示“待接入”。
-- 19/20 的文案可以先落表，但**必须在 25 拦截生效前保持不可达**；两组文案不得复用 25 的“技术故障”措辞。
+- 19 的文案可以先落表，但**必须在 25 拦截生效前保持不可达**；不得复用 25 的“技术故障”措辞。
 
 ### 9.3 玩家可见 code 清单（当前版本）
 
 | 范围 | 会进玩家提示阶梯 | 只进日志 / 不可见 | 说明 |
 |---|---|---|---|
-| CH02 新增 | **18、21、22、23、24** | 19、20、25 | 19/20 被 `PENDING_REASONS` 拦成 25；25 是占位 |
+| CH02 新增 | **18、20、21、22、23、24** | 19、25 | 20 已转正；19 被 `PENDING_REASONS` 拦成 25（`T2.2-3`、`T2.4-4`）；25 是占位 |
 | 第一章 0–17 | 1、2、3、6、7、8、11、12、13、14、15、16、17 | 4、5、10、99 | 4/5/10 是配置缺陷，99 是兜底；0 是通过 |
 | 例外 | — | 9 | 9 依赖玩家“先猜再测”，当前 1.5 延迟由模型固定测量，**实际打不出来**（08 文档 §3 已注明） |
 
@@ -220,3 +221,42 @@ LADDER_TEXT := {
 | 6/7/14/17 | 否 | 同一 code 下语义一致，差异只在证据 | 维持 |
 
 除 16 与 22 外，未发现必须拆文案的一码多用；`E_PENDING` 的多原因由 9.2 处理（永不展示）。
+
+### 9.5 `rail_margin` 已实现 + `static_current` 为何仍是唯一 pending
+
+#### 9.5.1 `E_RAIL_MARGIN`(20) 的实现口径（已落地，`src/core/ch02_checks.gd::_judge_rail`）
+
+纯离散算术，**不依赖器件层 / 模拟求解器**：先用黑盒求各稳态逻辑输出，再把逻辑值反查成实际电平，比对轨到轨门限。
+
+```
+V_high = Vdd · R_L / (R_L + Ron)
+V_low  = Vdd · Ron / (R_L + Ron)
+```
+
+- 参数来源：`data/labs/ch02_labs.json` 中 `inverter` 段的 `rail`（`vdd 3.3` / `ron_ohm 50` / `load_ohm 2000`），gate 级可用 `rail` 覆盖；门限默认 `v_high_min 3.2 V`、`v_low_max 0.1 V`，可由用例的 `v_high_min` / `v_low_max` 覆盖。
+- 当前参数下的自检值：`V_high ≈ 3.2195 V`（≥3.2 通过）、`V_low ≈ 0.0805 V`（≤0.1 通过）。
+- 失败落 `E_RAIL_MARGIN`(20)：输出为 `1` 但 `V_high < v_high_min`，或输出为 `0` 但 `V_low > v_low_max`；输出为 `X`/`?` 落 `E_BUILD`(2)。
+- 证据形状：`input={"v_high_min","v_low_max"}`，`expected="V_high ≥ …，V_low ≤ …"`，`actual={"v_high","v_low","states":[…]}`，`detail="N 稳态：V_high=…，V_low=…"`。
+- 提示文案按 §9.1 的 `(code, gate_id)` 规则；20 的错因单一（电平余量不足），同一 gate 内可共用措辞。
+
+#### 9.5.2 `static_current` 仍是唯一 pending 的原因
+
+`PENDING_REASONS` 当前只含 `static_current`，对应 `T2.2-3`、`T2.4-4` 两条 gate。**不转正的前置条件一句话**：需要 L1 仿真层具备“按真实拓扑实测平均电流”的能力（器件级电流模型或等效网表求解），而不是按门类型查表。
+
+原因展开：L1 只有逻辑节点、没有晶体管级网表，任何电流值都只能按门类型查表估算；这与规格“必须在 L1 电路上实测、不能只查表”的口径直接冲突。因此只要 L1 仍是纯逻辑仿真，19 就保持 `E_PENDING(25)` + `required=false`，不红、不计失败统计、不进提示阶梯。
+
+### 9.6 2.4 整节延后（已裁决的设计决定）
+
+2.4 依赖器件级网表，**整节延后**，等网表能力就绪后再开放。落地用三字段锁定，**整节禁入**，不做“四个 gate 逐个 pending 展示”：
+
+| 字段 / 接口 | 形状 | 规则 |
+|---|---|---|
+| `content_status` | `"ready"` / `"deferred"` | 缺省 `"ready"`；`"deferred"` 表示整节暂不可进入 |
+| `deferred_reason` | 字符串 | **玩家可见中文**，不许含内部术语（如“网表”“仿真层”“pending”）；缺省空串，UI 不展示空串 |
+| `lab_content_available(lab_id)` | `-> {"available": bool, "reason": String}` | 唯一查询入口；`deferred` 时 `available=false` 且 `reason=deferred_reason` |
+
+约束：
+- 延后期间**整节禁入**：不运行任何 gate、不产生 `attempt`、不计失败、不显示逐条 pending；进入入口时只展示 `deferred_reason`。
+- **技能树节点照常显示**（看得见、点不进）：节点保留标题与图标，点击给出 `deferred_reason`，不得灰掉或隐藏节点。
+- 不得用 `E_PENDING(25)` 表达整节延后：25 是单 gate 占位，整节延后由 `content_status` 表达，二者不要混用。
+- 2.4 转正时只改 `content_status` 与 `deferred_reason`，不新增 code、不改本节契约。
