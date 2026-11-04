@@ -19,8 +19,15 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("inverter 延后 id", inv["ids"], ["T2.2-3"])
 	var rep_lab: Dictionary = Ch02ChecksScript.deferred_gates(replace)
 	ctx.eq("replace gate 总数 4", int(rep_lab["total"]), 4)
-	ctx.eq("replace 进分母 3", int(rep_lab["counted"]), 3)
-	ctx.eq("replace 延后 id", rep_lab["ids"], ["T2.4-4"])
+	ctx.eq("replace 进分母 0（整节 deferred）", int(rep_lab["counted"]), 0)
+	ctx.eq("replace 延后 4", int(rep_lab["deferred"]), 4)
+	ctx.eq("replace 延后 ids", rep_lab["ids"], ["T2.4-1", "T2.4-2", "T2.4-3", "T2.4-4"])
+	ctx.check("replace 整节 deferred 标记", bool(rep_lab["section_deferred"]))
+	# 任何调用方式都必须 0：原引用 / 深拷贝 / 再取一次
+	ctx.eq("replace 深拷贝调用仍 0", int(Ch02ChecksScript.deferred_gates(replace.duplicate(true))["counted"]), 0)
+	ctx.eq("replace 重复调用仍 0", int(Ch02ChecksScript.deferred_gates(labs["replace"])["counted"]), 0)
+	ctx.check("replace 不出现 3", int(rep_lab["counted"]) != 3)
+	ctx.eq("inverter 深拷贝调用仍 3", int(Ch02ChecksScript.deferred_gates(inverter.duplicate(true))["counted"]), 3)
 
 	# ---- 没有 pending 的节不许被误剔：4 / 4 ----
 	for id in ["transistor", "nand", "power"]:
@@ -41,13 +48,18 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 整节 deferred：整节不进分母（沿用既有裁决，不按 gate 逐个丢） ----
 	var ch2 := ChapterRuntime.from_doc(TestUtil.read_json("res://data/chapters/ch02_levels.json"))
-	var sec := str(ch2.content_status("replace"))
-	ctx.eq("replace 整节状态取自数据", sec, "deferred")
-	var d_sec: Dictionary = Ch02ChecksScript.deferred_gates(replace, sec)
-	ctx.eq("整节 deferred 进分母 0", int(d_sec["counted"]), 0)
-	ctx.eq("整节 deferred 延后 4", int(d_sec["deferred"]), 4)
-	ctx.check("整节 deferred 标记为真", bool(d_sec["section_deferred"]))
+	ctx.eq("replace 整节状态取自数据", str(ch2.content_status("replace")), "deferred")
+	ctx.check("章节口径与 gate 口径一致（均为 0）",
+		str(ch2.content_status("replace")) != "ready" and int(rep_lab["counted"]) == 0)
 	ctx.check("ready 节整节标记为假", not bool(inv["section_deferred"]))
+
+	# ---- replace 转 ready 后回到 3（仍有 static_current 那条 pending），不是 4 ----
+	var rep_ready: Dictionary = replace.duplicate(true)
+	rep_ready["content_status"] = "ready"
+	var rr: Dictionary = Ch02ChecksScript.deferred_gates(rep_ready)
+	ctx.eq("replace ready 后进分母 3", int(rr["counted"]), 3)
+	ctx.eq("replace ready 后仅 T2.4-4 延后", rr["ids"], ["T2.4-4"])
+	ctx.check("replace ready 后不是 4", int(rr["counted"]) != 4)
 
 	# ---- E_PENDING(25) 不进提示阶梯 ----
 	ctx.eq("25 为纯 R（只进日志）", GateResult.tags_for(GateResult.E_PENDING), ["R"])
@@ -71,6 +83,9 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("缺省兜底等于数据值", Ch02ChecksScript.id_ua_of(3.3, 3.0, {}), float(dev.get("id_sat_ua", -1)))
 	ctx.check("线性 4 mA 不再大于饱和电流", Ch02ChecksScript.id_ua_of(3.3, 0.2, {})
 		< Ch02ChecksScript.id_ua_of(3.3, 3.0, {}))
+	# 物理约束（独立于文件数值）：用数据里的 device 判，饱和电流必须大于线性区最大电流。
+	ctx.check("数据饱和电流 > 线性区最大电流", Ch02ChecksScript.id_ua_of(3.3, 0.2, dev)
+		< Ch02ChecksScript.id_ua_of(3.3, 3.0, dev))
 
 	# ---- 附 2：build_area 槽位分支按真实顶层器件占用，而不是 target 个数 ----
 	var p_cfg: Dictionary = labs.get("power", {})

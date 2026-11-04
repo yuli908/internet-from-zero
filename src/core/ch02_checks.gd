@@ -21,10 +21,13 @@ const BUILD_AREA_GATE_BUDGET := 8
 ## 面积按"展开后"统计：一个成品 XOR = NOT 1 + AND 1 + OR 1 + XOR 4。
 const GATE_EXPAND_WEIGHTS := {LogicGates.Type.XOR: 4}
 
-static func deferred_gates(cfg: Dictionary, lab_status: String = "ready") -> Dictionary:
+static var _lab_status_cache := {}
+
+static func deferred_gates(cfg: Dictionary) -> Dictionary:
 	## 只读分母接口（UI 用）：`content_status` 非 "ready" 的 gate 不进分母、不进进度条。
-	## gate 级字段缺省时回落到旧字段 `status`，再缺省视为 ready；`lab_status` 传整节状态，
-	## 整节 deferred 时全部 gate 不进分母（沿用既有裁决）。ready 后自动回到分母，无需迁移存档。
+	## 整节状态由函数自己解析：先看 lab 配置的 `content_status`，缺省再按 id 查章节数据；
+	## 调用方不需要（也不能）用参数把 deferred 的节“传成 ready”。
+	## gate 级缺省回落到旧字段 `status`，再缺省 ready。ready 后自动回到分母，无需迁移存档。
 	var ids := []
 	var all_ids := []
 	var total := 0
@@ -36,11 +39,30 @@ static func deferred_gates(cfg: Dictionary, lab_status: String = "ready") -> Dic
 		all_ids.append(cid)
 		if _gate_content_status(raw) != "ready":
 			ids.append(cid)
-	if lab_status != "ready":
+	if _lab_content_status(cfg) != "ready":
 		return {"total": total, "counted": 0, "deferred": total,
 			"ids": all_ids, "section_deferred": true}
 	return {"total": total, "counted": total - ids.size(), "deferred": ids.size(),
 		"ids": ids, "section_deferred": false}
+
+static func _lab_content_status(cfg: Dictionary) -> String:
+	if cfg.has("content_status"):
+		return str(cfg["content_status"])
+	var lid := str(cfg.get("id", ""))
+	if lid.is_empty():
+		return "ready"
+	if _lab_status_cache.is_empty():
+		_lab_status_cache = _load_lab_statuses()
+	return str(_lab_status_cache.get(lid, "ready"))
+
+static func _load_lab_statuses() -> Dictionary:
+	var out := {}
+	var doc = JSON.parse_string(FileAccess.get_file_as_string("res://data/chapters/ch02_levels.json"))
+	if doc is Dictionary:
+		for raw in (doc.get("labs", []) as Array):
+			if raw is Dictionary:
+				out[str(raw.get("id", ""))] = str(raw.get("content_status", "ready"))
+	return out
 
 static func _gate_content_status(c: Dictionary) -> String:
 	if c.has("content_status"):
