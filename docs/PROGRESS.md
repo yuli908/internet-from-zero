@@ -643,7 +643,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 4092 checks, 0 failures（37 套件）
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 4645 checks, 0 failures（41 套件）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
@@ -664,3 +664,29 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1      # 手动操
 artifacts/shots/workbench.png  shop.png  skills.png  archive.png  diagnostics.png
 artifacts/shots/lab_level.png  lab_binary.png  lab_boolean.png  lab_gate.png  lab_signal.png  lab_half_adder.png
 ```
+
+## 8. CH03–CH06 数据落地与章节注册（2026-11-05）
+
+本节覆盖 §1 / §7 的旧基线数字：全量测试现为 **41 套件、SUITE_TOTAL 4643 + runner 自检 2 = 4645 checks、0 failures**
+（日志 `artifacts/logs/tests.log`，复现命令同 §7）。
+
+- CH03（4 节 `full_adder` / `adder8` / `clock_edge` / `bistable_reg`，段数 5/5/5/6，共 16 条 gate）：
+  `data/labs/ch03_labs.json`、`src/core/ch03_checks.gd`、`tests/test_ch03.gd`（216 项检查）。
+- CH04（5 节 `mux` / `alu8` / `control_unit` / `memory` / `io_bus`，各 5 段，共 20 条 gate）：
+  `data/labs/ch04_labs.json`、`src/core/ch04_checks.gd`、`tests/test_ch04.gd`（265 项检查）。
+- 章节注册：新增 `data/chapters/ch03_levels.json` … `ch06_levels.json`（labs 的 `id`/`data_key`/`requires`/`gate_ids`/`reward`、
+  `objectives`、`complete_reward`、`next_chapter` 链已对齐 ch02）；`data/skilltree.json` 追加 CH03–CH06 里程碑/知识/技能节点，
+  总节点 **142**（progress 41 / knowledge 67 / skill 34）；`data/manifest.json` 登记 4 章 levels + labs，共 **19** 个文件。
+- 数据层红绿验证：`tests/test_chapters_03_06.gd`（63 项）断言四章可装载、`use_chapter` 可达、`labs_by_chapter` 非空、
+  manifest 无漏登记、`gate_ids` 无悬空；并含 5 条"改坏数据必须变红"自证（删进度节点 / 造悬空 gate /
+  删 manifest 登记 / 删 lab 条目 / 删 `SK-VM` 引用）。
+- 判定红绿：每个 gate 各有"正确解判绿"与"错误解判红"用例（`test_ch03` / `test_ch04` 的 `judge_*` 组）。
+
+仍未完成 / 落 pending：
+
+- CH04 `area_check`（4.2「展开门数 ≤ 预算」）预算数值未定，写入 `pending_kinds`，不进分母、不判红。
+- CH03 延迟判定只断言"报告有延迟且级数 = 8"，延迟上限口径未定，未做上限判红。
+- CH05 / CH06 仅做数据层注册与 gate 引用对齐（CH05 既有 4 节共 17 条 gate，其中 `clock_limit` 为 5 条）；
+  章节 UI 可达性与既有 `ch05/ch06_labs.json` 的文案联动仍待 UI 会话。
+- `src/ui/` 与 `project.godot` 未改（不在本次范围）。
+
