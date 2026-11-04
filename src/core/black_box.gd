@@ -22,15 +22,21 @@ static func rows_for(inputs: Array, bits: Array = []) -> Array:
 
 static func check_outputs(graph: CircuitGraph, input_ids: Array, output_ids: Array, expected: Array, delay_per_gate: int = -1) -> Dictionary:
 	if graph == null:
-		return {"ok": false, "rows": [], "issues": ["电路为空"], "passed": 0, "total": 0}
+		return _failed("电路为空", GateResult.E_MISSING_GRAPH, null, null, null, expected.size())
+	var loose := unconnected(graph)
+	if not loose.is_empty():
+		return _failed("有输入未连接：%s" % JSON.stringify(loose), GateResult.E_UNCONNECTED,
+			{"unconnected": loose}, "所有输入已连接", loose, expected.size())
 	var built := SimCircuit.build_graph(graph, delay_per_gate)
 	if not bool(built.get("ok", false)):
-		return {"ok": false, "rows": [], "issues": [str(built.get("error", "构建失败"))], "passed": 0, "total": expected.size()}
+		return _failed(str(built.get("error", "构建失败")), GateResult.E_BUILD,
+			{"graph": "build"}, "可构建", str(built.get("error", "")), expected.size())
 	var sim: SimCircuit = built["sim"]
 	var map: Dictionary = built.get("output_map", {})
 	var results := []
 	var issues := []
 	var passed := 0
+	var first: Dictionary = {}
 	for raw in expected:
 		var row: Dictionary = raw
 		var ins: Dictionary = row.get("inputs", {})
@@ -40,6 +46,9 @@ static func check_outputs(graph: CircuitGraph, input_ids: Array, output_ids: Arr
 		var rr := sim.settle()
 		if not bool(rr.get("ok", false)):
 			issues.append("仿真失败：%s" % str(rr.get("error", "")))
+			if first.is_empty():
+				first = {"code": GateResult.E_BUILD, "gate_id": "", "input": ins,
+					"expected": exp, "actual": str(rr.get("error", "")), "error_tags": GateResult.tags_for(GateResult.E_BUILD), "attempt": 0}
 			break
 		var got := {}
 		var ok := true
@@ -53,15 +62,36 @@ static func check_outputs(graph: CircuitGraph, input_ids: Array, output_ids: Arr
 			passed += 1
 		else:
 			issues.append("输入 %s：期望 %s，实际 %s" % [JSON.stringify(ins), JSON.stringify(exp), JSON.stringify(got)])
+			if first.is_empty():
+				first = {"code": GateResult.E_TRUTH_ROW, "gate_id": "", "input": ins,
+					"expected": exp, "actual": got, "error_tags": GateResult.tags_for(GateResult.E_TRUTH_ROW), "attempt": 0}
 		results.append({"inputs": ins, "expected": exp, "got": got, "ok": ok})
 		sim = SimCircuit.build_graph(graph, delay_per_gate)["sim"]
 		# 每行重建仿真器，避免历史值掩盖 X；重建后重新设置输入
-	return {"ok": passed == expected.size() and issues.is_empty(), "rows": results, "issues": issues, "passed": passed, "total": expected.size()}
+	if not first.is_empty():
+		first["code_name"] = GateResult.name_of(int(first["code"]))
+	var code := GateResult.E_TRUTH_ROW if not first.is_empty() else GateResult.OK
+	return {"ok": passed == expected.size() and issues.is_empty(), "rows": results, "issues": issues,
+		"passed": passed, "total": expected.size(), "code": code, "failure": first}
+
+static func _failed(msg: String, code: int, input: Variant, expected: Variant, actual: Variant, total: int) -> Dictionary:
+	var f := GateResult.make(code, "", input, expected, actual, 0)
+	return {"ok": false, "rows": [], "issues": [msg], "passed": 0, "total": total, "code": code, "failure": f}
+
+static func unconnected(graph: CircuitGraph) -> Array:
+	## 哪条线未连接：返回悬空输入节点 id 列表（空 = 全部连接）。
+	if graph == null:
+		return []
+	var r := graph.evaluate()
+	var loose: Variant = r.get("unconnected", [])
+	return (loose as Array).duplicate() if loose is Array else []
+
 
 static func check_target(graph: CircuitGraph, target: String, input_ids: Array, output_ids: Array, delay_per_gate: int = -1) -> Dictionary:
 	var expected := target_rows(target, input_ids)
 	if expected.is_empty():
-		return {"ok": false, "rows": [], "issues": ["未知目标函数 %s" % target], "passed": 0, "total": 0}
+		return _failed("未知目标函数 %s" % target, GateResult.E_UNKNOWN_TARGET,
+			{"target": target}, "已知目标函数", target, 0)
 	return check_outputs(graph, input_ids, output_ids, expected, delay_per_gate)
 
 static func target_rows(target: String, input_ids: Array) -> Array:
@@ -99,18 +129,20 @@ static func half_adder_tri(a: String, b: String) -> Dictionary:
 static func tri_eval(graph: CircuitGraph, values: Dictionary, delay_per_gate: int = -1) -> Dictionary:
 	var built := SimCircuit.build_graph(graph, delay_per_gate)
 	if not bool(built.get("ok", false)):
-		return {"ok": false, "values": {}, "error": str(built.get("error", ""))}
+		return {"ok": false, "values": {}, "error": str(built.get("error", "")),
+			"code": GateResult.E_BUILD, "failure": GateResult.make(GateResult.E_BUILD, "", values, "可构建", str(built.get("error", "")))}
 	var sim: SimCircuit = built["sim"]
 	var map: Dictionary = built.get("output_map", {})
 	for id in values.keys():
 		sim.set_input(str(id), str(values[id]))
 	var rr := sim.settle()
 	if not bool(rr.get("ok", false)):
-		return {"ok": false, "values": {}, "error": str(rr.get("error", ""))}
+		return {"ok": false, "values": {}, "error": str(rr.get("error", "")),
+			"code": GateResult.E_BUILD, "failure": GateResult.make(GateResult.E_BUILD, "", values, "可仿真", str(rr.get("error", "")))}
 	var out := {}
 	for oid in map.keys():
 		out[str(oid)] = sim.probe(str(map[oid]))
-	return {"ok": true, "values": out, "error": ""}
+	return {"ok": true, "values": out, "error": "", "code": GateResult.OK, "failure": {}}
 
 static func depth(graph: CircuitGraph) -> int:
 	var memo := {}

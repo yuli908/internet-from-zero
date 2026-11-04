@@ -24,7 +24,7 @@ static func thresholds(cfg: Dictionary) -> Dictionary:
 		"high_min": high_min,
 	}
 
-static func cases(cfg: Dictionary) -> GateReport:
+static func cases(cfg: Dictionary, tracker: GateAttemptTracker = null) -> GateReport:
 	var rep := GateReport.new()
 	var th := thresholds(cfg)
 	for raw in cfg.get("gate_cases", []):
@@ -33,15 +33,13 @@ static func cases(cfg: Dictionary) -> GateReport:
 		var c: Dictionary = raw
 		if str(c.get("kind", "")) != "voltage_judge":
 			continue
+		var cid := str(c.get("id", ""))
 		var v := float(c.get("v", 0.0))
 		var got := judge(v, float(th["low_max"]), float(th["high_min"]))
 		var want := str(c.get("expect", ""))
 		var ok := got == want
-		rep.add(
-			str(c.get("id", "")),
-			str(c.get("title", "")),
-			ok,
-			"V=%.2f V → 判 %s" % [v, got],
-			bool(c.get("required", true))
-		)
+		var attempt := tracker.record(cid, ok) if tracker != null else 0
+		rep.add_case(GateResult.OK if ok else GateResult.E_OUTPUT_MISMATCH, cid,
+			str(c.get("title", "")), {"v": v}, want, got, [], "V=%.2f V → 判 %s" % [v, got],
+			bool(c.get("required", true)), attempt)
 	return rep
