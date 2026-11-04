@@ -135,7 +135,7 @@ var tracker := GateAttemptTracker.new()
 
 - `tests/test_gate_result.gd`（本契约的机器锁）：每种 gate 类型的成功/失败、`error_tags` 映射、
 - `attempt` 递增/重置/往返、未知 code 兜底、`unconnected` 精确回传。
-- 全量回归：`RESULT: 2033 checks, 0 failures`（23 套件）。
+- 全量回归：测试基线以 `docs/PROGRESS.md` 的当前记录为准（本契约不硬编码具体数量）；要求 0 failures，且原有项不降。
 
 ## 8. 变更记录
 
@@ -259,4 +259,5 @@ V_low  = Vdd · Ron / (R_L + Ron)
 - 延后期间**整节禁入**：不运行任何 gate、不产生 `attempt`、不计失败、不显示逐条 pending；进入入口时只展示 `deferred_reason`。
 - **技能树节点照常显示**（看得见、点不进）：节点保留标题与图标，点击给出 `deferred_reason`，不得灰掉或隐藏节点。
 - 不得用 `E_PENDING(25)` 表达整节延后：25 是单 gate 占位，整节延后由 `content_status` 表达，二者不要混用。
+  - **理由**：25 表示“单个 gate 未完成、节是开着的”；整节延后时玩家根本进不去。混用会让玩家看到四个 gate 全挂“待补”，误以为自己哪里做错了。
 - 2.4 转正时只改 `content_status` 与 `deferred_reason`，不新增 code、不改本节契约。
