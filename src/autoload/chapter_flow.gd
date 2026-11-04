@@ -75,18 +75,14 @@ func _finish_chapter() -> void:
 	p.set_flag(runtime().chapter_reward_key(), true)
 	p.set_flag(runtime().chapter_complete_flag(), true)
 	var reward: Dictionary = runtime().data.get("complete_reward", {})
-	p.add_gold(int(reward.get("gold", 0)))
-	p.add_xp(int(reward.get("xp", 0)))
+	var payout := runtime().chapter_finish_reward(DataDB.skill_graph)
+	p.add_gold(int(payout.get("gold", 0)))
+	p.add_xp(int(payout.get("xp", 0)))
 	var badge := str(reward.get("badge", ""))
 	if not badge.is_empty():
 		p.set_flag("badge:%s" % badge, true)
-	var milestone := runtime().id().to_upper()
-	var node := DataDB.skill_graph.node(milestone)
-	Knowledge.unlock(milestone)
-	if node.is_empty():
-		# 章节里程碑节点缺失时（如 CH02 数据未补），章末金币按数据里的预算口径发放，不写死。
-		var eco: Dictionary = runtime().data.get("economy", {})
-		p.add_gold(int(eco.get("chapter_end_gold", 0)))
+	var node_id := str(payout.get("node_id", ""))
+	Knowledge.unlock(node_id if not node_id.is_empty() else runtime().id().to_upper())
 	EventBus.chapter_completed.emit(runtime().id())
 	EventBus.toast("章节完成！%s" % runtime().title(), "ok")
 	EventBus.fire("chapter_completed:%s" % runtime().id())

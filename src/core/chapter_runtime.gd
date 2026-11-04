@@ -214,6 +214,28 @@ func chapter_reward_claimable(state: PlayerState) -> bool:
 	## 章末奖励一次性：全部可完成节做完，且未领过。
 	return all_done(state) and not state.has_flag(chapter_reward_key())
 
+func chapter_finish_reward(skill_graph: KnowledgeGraph) -> Dictionary:
+	## 章末结算：奖励优先来自章末节点（`complete_reward.badge` → 章节 ID）。
+	## 只有节点缺失时才回落到 `economy.chapter_end_gold`，日常路径不再使用兜底。
+	var reward: Dictionary = data.get("complete_reward", {})
+	var gold := int(reward.get("gold", 0))
+	var xp := int(reward.get("xp", 0))
+	var node: Dictionary = {}
+	var badge := str(reward.get("badge", ""))
+	if skill_graph != null and not badge.is_empty():
+		node = skill_graph.node(badge)
+	if skill_graph != null and node.is_empty():
+		node = skill_graph.node(id().to_upper())
+	if node.is_empty():
+		var eco: Dictionary = data.get("economy", {})
+		return {"gold": gold + int(eco.get("chapter_end_gold", 0)), "xp": xp, "node_id": "", "fallback": true}
+	return {
+		"gold": gold + int(node.get("gold_award", 0)),
+		"xp": xp + int(node.get("xp_award", 0)),
+		"node_id": str(node.get("id", "")),
+		"fallback": false,
+	}
+
 func dsl_errors() -> Array:
 	var errs := []
 	for lab_id in lab_order:

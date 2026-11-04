@@ -56,13 +56,14 @@ func run(ctx: TestContext) -> void:
 		if not need.is_empty():
 			ctx.check("recipe %s skill %s" % [rid, need], kg.nodes.has(need))
 
-	ctx.eq("skill node count", kg.nodes.size(), 36)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 7)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 19)
-	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 10)
+	ctx.eq("skill node count", kg.nodes.size(), 62)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 14)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 32)
+	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 16)
 	ctx.check("CH01 milestone exists", kg.nodes.has("CH01"))
 	ctx.check("KN-ELEC-01 exists", kg.nodes.has("KN-ELEC-01"))
 	ctx.check("SK-LEVEL exists", kg.nodes.has("SK-LEVEL"))
+	ctx.check("SK-DEMORGAN exists", kg.nodes.has("SK-DEMORGAN"))
 	ctx.check("legacy voltage exists", kg.nodes.has("voltage"))
 
 	ctx.eq("chapter id", ch.id(), "ch01")
@@ -170,6 +171,108 @@ func run(ctx: TestContext) -> void:
 	ctx.check("排除 ch02 后注册表不含 ch02", not db_only1.has_chapter("ch02"))
 	ctx.check("仅 ch01 时默认章节仍 ch01", db_only1.default_chapter_id() == "ch01")
 
+	# ---- 章内地图节点数：与 UI 派生规则一致（里程碑 + 知识卡 + 技能 + 挑战 + 章末）----
+	ctx.eq("ch01 地图节点数 36", _grid_count(ch, kg), 36)
+	ctx.eq("ch02 地图节点数 31", _grid_count(ch02_rt, kg), 31)
+
+	# ---- CH02 节点齐全：章节 / 徽章 / 5 里程碑 / 13 知识卡 / 5 技能 ----
+	ctx.check("CH02 存在", kg.nodes.has("CH02"))
+	ctx.check("CH02-CMOS 存在", kg.nodes.has("CH02-CMOS"))
+	var ch02_cards := 0
+	var ch02_skills := []
+	for lid in ch02_rt.lab_order:
+		var lab: Dictionary = ch02_rt.lab(str(lid))
+		var ms := str(lab.get("milestone", ""))
+		ctx.check("ch02 %s 里程碑 %s" % [str(lid), ms], not ms.is_empty() and kg.nodes.has(ms))
+		for cid in (lab.get("knowledge_cards", []) as Array):
+			ctx.check("ch02 %s 知识卡 %s" % [str(lid), str(cid)], kg.nodes.has(str(cid)))
+			ch02_cards += 1
+		for sid in (lab.get("skill_nodes", []) as Array):
+			ctx.check("ch02 %s 技能 %s" % [str(lid), str(sid)], kg.nodes.has(str(sid)))
+			if not ch02_skills.has(str(sid)):
+				ch02_skills.append(str(sid))
+		var single := str(lab.get("skill_node", ""))
+		if not single.is_empty():
+			ctx.check("ch02 %s skill_node %s" % [str(lid), single], kg.nodes.has(single))
+			if not ch02_skills.has(single):
+				ch02_skills.append(single)
+	ctx.eq("ch02 知识卡 13 张", ch02_cards, 13)
+	ctx.eq("ch02 引用技能 6 个", ch02_skills.size(), 6)
+
+	# ---- 节点表自检：ID 唯一、前置与 gate 引用无悬空 ----
+	var tree_doc: Dictionary = TestUtil.read_json("res://data/skilltree.json")
+	var seen_ids := {}
+	var dup_ids := []
+	for raw in tree_doc.get("nodes", []):
+		var nd: Dictionary = raw
+		var nid := str(nd.get("id", ""))
+		if seen_ids.has(nid):
+			dup_ids.append(nid)
+		seen_ids[nid] = true
+	ctx.check("节点 ID 唯一", dup_ids.is_empty(), str(dup_ids))
+	var gate_ids := {}
+	for c in [ch, ch02_rt]:
+		for lid in c.lab_order:
+			for gid in (c.lab(str(lid)).get("gate_ids", []) as Array):
+				gate_ids[str(gid)] = true
+	var dangling := []
+	for raw in tree_doc.get("nodes", []):
+		var nd: Dictionary = raw
+		var nid := str(nd.get("id", ""))
+		for p in (nd.get("prereq", []) as Array):
+			if not kg.nodes.has(str(p)):
+				dangling.append("%s->%s" % [nid, str(p)])
+		var reqs: Dictionary = nd.get("requires", {})
+		for r in (reqs.get("all", []) as Array):
+			var req: Dictionary = r
+			var rid := str(req.get("id", ""))
+			if str(req.get("type", "")) == "node" and not kg.nodes.has(rid):
+				dangling.append("%s->%s" % [nid, rid])
+			if str(req.get("type", "")) == "gate" and not gate_ids.has(rid):
+				dangling.append("%s->gate:%s" % [nid, rid])
+	ctx.check("前置引用全部可解析", dangling.is_empty(), str(dangling))
+
+	# ---- 章末奖励走真节点；兜底只在节点缺失时生效 ----
+	var payout: Dictionary = ch02_rt.chapter_finish_reward(kg)
+	ctx.check("CH02 奖励不走兜底", not bool(payout.get("fallback", true)))
+	ctx.eq("CH02 奖励节点", str(payout.get("node_id", "")), "CH02-CMOS")
+	ctx.eq("CH02 节点金币 25", int(payout.get("gold", 0)), 25)
+	var stripped: Dictionary = tree_doc.duplicate(true)
+	var kept := []
+	for raw in stripped.get("nodes", []):
+		var nd: Dictionary = raw
+		if str(nd.get("id", "")) == "CH02-CMOS" or str(nd.get("id", "")) == "CH02":
+			continue
+		kept.append(nd)
+	stripped["nodes"] = kept
+	var kg_stripped := KnowledgeGraph.from_doc(stripped)
+	var payout2: Dictionary = ch02_rt.chapter_finish_reward(kg_stripped)
+	ctx.check("节点缺失才走兜底", bool(payout2.get("fallback", false)))
+	ctx.eq("兜底金币 = chapter_end_gold", int(payout2.get("gold", 0)), 25)
+
 	var tut: Array = db.tutorial_doc.get("steps", [])
 	ctx.check("tutorial has steps", tut.size() >= 5)
 	ctx.eq("DataDB errors", db.errors.size(), 0)
+
+func _grid_count(c: ChapterRuntime, kg: KnowledgeGraph) -> int:
+	## 与 UI 章节地图的派生规则一致：里程碑 + 章节点 + 知识卡 + 技能 + 每节挑战 + 章末验收。
+	var count := c.lab_order.size() + 1
+	var seen := {}
+	for lid in c.lab_order:
+		var lab: Dictionary = c.lab(str(lid))
+		for cid in (lab.get("knowledge_cards", []) as Array):
+			if kg.node(str(cid)).is_empty():
+				continue
+			count += 1
+		var sks: Array = (lab.get("skill_nodes", []) as Array).duplicate()
+		var single := str(lab.get("skill_node", ""))
+		if not single.is_empty() and not sks.has(single):
+			sks.append(single)
+		for sid in sks:
+			var key := str(sid)
+			if seen.has(key) or kg.node(key).is_empty():
+				continue
+			seen[key] = true
+			count += 1
+	count += c.lab_order.size() + 1
+	return count

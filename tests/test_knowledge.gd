@@ -5,9 +5,9 @@ extends RefCounted
 func run(ctx: TestContext) -> void:
 	var db: Node = TestUtil.data_db()
 	var kg: KnowledgeGraph = db.skill_graph
-	ctx.eq("node count", kg.nodes.size(), 36)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 7)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 19)
+	ctx.eq("node count", kg.nodes.size(), 62)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 14)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 32)
 
 	var st := PlayerState.new()
 	st.gold = 0
@@ -48,7 +48,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("poor xp", poor.xp, 0)
 	ctx.check("poor cannot unlock binary", not bool(kg.can_unlock(poor, "binary").get("ok", false)))
 
-	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), 36)
+	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), 62)
 	ctx.check("progress done grew", int(kg.progress(st).get("done", 0)) >= 3)
 	ctx.check("demorgan node exists", kg.nodes.has("demorgan"))
 	ctx.check("bargain effect", str(kg.node("bargain").get("effects", {})).contains("price_discount"))

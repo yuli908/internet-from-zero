@@ -18,6 +18,8 @@ var chapters: Dictionary = {}
 var chapter_order: Array = []
 var labs_by_chapter: Dictionary = {}
 var _runtimes: Dictionary = {}
+## 只装了部分章节（测试用探针）时为真：跳过跨章节的 gate 条件校验。
+var partial_load := false
 var tutorial_doc: Dictionary = {}
 var sim_doc: Dictionary = {}
 var manifest: Dictionary = {}
@@ -30,6 +32,7 @@ func _ready() -> void:
 func load_all(only_chapters: Array = []) -> void:
 	errors.clear()
 	loaded_files = 0
+	partial_load = not only_chapters.is_empty()
 	manifest = _json("res://data/manifest.json")
 	var files: Array = manifest.get("files", [])
 	for f in files:
@@ -170,48 +173,56 @@ func _validate() -> void:
 		if not skill.is_empty() and not skill_graph.has_node(skill):
 			errors.append("配方 %s 依赖不存在的技能 %s" % [str(recipe_id), skill])
 	var gate_ids := {}
-	for lab_id in chapter.lab_order:
-		var lab := chapter.lab(str(lab_id))
-		var key := str(lab.get("data_key", ""))
-		if not labs.has(key):
-			errors.append("实验 %s 缺少实验数据段 %s" % [str(lab_id), key])
+	for cid in chapter_order:
+		var rt := runtime_for(str(cid))
+		if rt == null:
 			continue
-		if not skill_graph.has_node(str(lab.get("knowledge", ""))):
-			errors.append("实验 %s 指向不存在的知识节点" % str(lab_id))
-		for card in lab.get("knowledge_cards", []):
-			if not skill_graph.has_node(str(card)):
-				errors.append("实验 %s 的知识卡 %s 不存在" % [str(lab_id), str(card)])
-		if not skill_graph.has_node(str(lab.get("skill_node", ""))):
-			errors.append("实验 %s 的技能节点 %s 不存在" % [str(lab_id), str(lab.get("skill_node", ""))])
-		if not str(lab.get("milestone", "")).is_empty() and not skill_graph.has_node(str(lab.get("milestone", ""))):
-			errors.append("实验 %s 的里程碑 %s 不存在" % [str(lab_id), str(lab.get("milestone", ""))])
-		var cases: Array = lab_data(key).get("gate_cases", [])
-		if cases.is_empty():
-			errors.append("实验 %s 没有 gate 用例" % str(lab_id))
-		var case_ids := {}
-		for raw in cases:
-			var c: Dictionary = raw
-			gate_ids[str(c.get("id", ""))] = true
-			case_ids[str(c.get("id", ""))] = true
-			if str(c.get("id", "")).is_empty() or str(c.get("title", "")).is_empty():
-				errors.append("实验 %s 的 gate 用例缺少 id/title" % str(lab_id))
-		for gid in lab.get("gate_ids", []):
-			if not case_ids.has(str(gid)):
-				errors.append("实验 %s 的 gate_ids 引用了未定义的用例 %s" % [str(lab_id), str(gid)])
-		var grants: Dictionary = chapter.grants(str(lab_id), labs)
-		var gitems: Variant = grants.get("items", {})
-		if not (gitems is Dictionary):
-			errors.append("实验 %s 的 grants.items 必须是字典" % str(lab_id))
-		else:
-			for iid in (gitems as Dictionary).keys():
-				if not catalog.has_item(str(iid)):
-					errors.append("实验 %s 的奖励物品 %s 不存在" % [str(lab_id), str(iid)])
-				if int((gitems as Dictionary)[iid]) < 1:
-					errors.append("实验 %s 的奖励物品 %s 数量非法" % [str(lab_id), str(iid)])
+		var chap_labs := labs_for(str(cid))
+		for lab_id in rt.lab_order:
+			var lab := rt.lab(str(lab_id))
+			var key := str(lab.get("data_key", ""))
+			if not chap_labs.has(key):
+				errors.append("章节 %s 实验 %s 缺少实验数据段 %s" % [str(cid), str(lab_id), key])
+				continue
+			var primary_knowledge := str(lab.get("knowledge", ""))
+			if not primary_knowledge.is_empty() and not skill_graph.has_node(primary_knowledge):
+				errors.append("实验 %s 指向不存在的知识节点" % str(lab_id))
+			for card in lab.get("knowledge_cards", []):
+				if not skill_graph.has_node(str(card)):
+					errors.append("实验 %s 的知识卡 %s 不存在" % [str(lab_id), str(card)])
+			if not skill_graph.has_node(str(lab.get("skill_node", ""))):
+				errors.append("实验 %s 的技能节点 %s 不存在" % [str(lab_id), str(lab.get("skill_node", ""))])
+			if not str(lab.get("milestone", "")).is_empty() and not skill_graph.has_node(str(lab.get("milestone", ""))):
+				errors.append("实验 %s 的里程碑 %s 不存在" % [str(lab_id), str(lab.get("milestone", ""))])
+			var cases: Array = (chap_labs.get(key, {}) as Dictionary).get("gate_cases", [])
+			if cases.is_empty():
+				errors.append("实验 %s 没有 gate 用例" % str(lab_id))
+			var case_ids := {}
+			for raw in cases:
+				var c: Dictionary = raw
+				gate_ids[str(c.get("id", ""))] = true
+				case_ids[str(c.get("id", ""))] = true
+				if str(c.get("id", "")).is_empty() or str(c.get("title", "")).is_empty():
+					errors.append("实验 %s 的 gate 用例缺少 id/title" % str(lab_id))
+			for gid in lab.get("gate_ids", []):
+				if not case_ids.has(str(gid)):
+					errors.append("实验 %s 的 gate_ids 引用了未定义的用例 %s" % [str(lab_id), str(gid)])
+			var grants: Dictionary = rt.grants(str(lab_id), chap_labs)
+			var gitems: Variant = grants.get("items", {})
+			if not (gitems is Dictionary):
+				errors.append("实验 %s 的 grants.items 必须是字典" % str(lab_id))
+			else:
+				for iid in (gitems as Dictionary).keys():
+					if not catalog.has_item(str(iid)):
+						errors.append("实验 %s 的奖励物品 %s 不存在" % [str(lab_id), str(iid)])
+					if int((gitems as Dictionary)[iid]) < 1:
+						errors.append("实验 %s 的奖励物品 %s 数量非法" % [str(lab_id), str(iid)])
 	for node_id in skill_graph.order:
 		for p in skill_graph.prereqs(str(node_id)):
 			if not skill_graph.has_node(str(p)):
 				errors.append("技能 %s 的前置 %s 不存在" % [str(node_id), str(p)])
+		if partial_load:
+			continue
 		var req: Dictionary = skill_graph.node(str(node_id)).get("requires", {})
 		_validate_conditions(str(node_id), req.get("all", []), gate_ids)
 		_validate_conditions(str(node_id), req.get("any", []), gate_ids)

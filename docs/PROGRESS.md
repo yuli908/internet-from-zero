@@ -475,6 +475,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   反向用 `TestUtil.data_db(["ch01"])` 排除 ch02 后同一入口取不到，证明断言真的在读注册表。
   全量 **2327 checks / 0 failures**（25 套件）。
 
+### 2.28 补齐章节节点数据：SK-DEMORGAN + 整套 CH02（2026-11-04）
+
+- **CH01 回到 36 格**：`skilltree.json` 补回 `SK-DEMORGAN`（德摩根改写，pos col 3 / row 6，
+  前置 `SK-BOOL` + `T1.3-4`），并在 `ch01_levels.json` 的 boolean 节加入
+  `skill_nodes: ["SK-BOOL", "SK-DEMORGAN"]`，地图节点数 35 → 36。
+- **CH02 新增 26 个节点**：`CH02-1..5`（里程碑）、`CH02`（章节）、`CH02-CMOS`（章末徽章，25 g / 50 xp）
+  + 13 张知识卡（`KN-TR-01..04` / `KN-CMOS-01..03` / `KN-NAND-01..02` / `KN-EQUIV-01` / `KN-COST-01` /
+  `KN-PWR-01..02`）+ 5 个技能（`SK-TR` / `SK-CMOS` / `SK-NAND` / `SK-REPLACE` / `SK-POWER`）。
+  `skilltree.json` 36 → 62 节点（progress 14 / knowledge 32 / skill 16）。
+- **ID 与 UI 派生一致**：里程碑取 `lab.milestone`（`CH02-1..5`），章节点 `CH02`，徽章 `CH02-CMOS`，
+  每节挑战由 UI 派生为 `CH02-CH-<order>`，章末验收 `CH02-CH-FINAL`——未另起命名。
+  2.4 虽 `OPT`+`deferred`，其 `CH02-4` / `SK-REPLACE` 节点照常存在、可见，但不进必修分母。
+- **章末奖励走真节点**：`ChapterRuntime.chapter_finish_reward(skill_graph)`（badge → 章节 ID → 兜底），
+  `ChapterFlow._finish_chapter` 改用该结果；CH02 的 25 g 由 `CH02-CMOS` 节点发放，
+  `economy.chapter_end_gold` 只在节点缺失（如只装部分章节的探针）时生效。
+- **数据债**：`ch02_levels.json` 五个 lab/objective 的 `knowledge` 由占位 id（transistor/cmos/nand/equiv/power）
+  改为首张知识卡，避免指向不存在的节点。
+  `DataDB._validate` 改为逐章节校验（gate_ids 取全部已装章节），`load_all(only_chapters)` 的探针模式跳过跨章节 gate 条件。
+- 测试 +41：ch01 地图 36 / ch02 地图 31、节点 ID 唯一、前置与 gate 引用无悬空、
+  CH02 节点齐全（13 卡 / 6 引用技能）、奖励取自 `CH02-CMOS` 且删节点副本才回落兜底。
+  全量 **2368 checks / 0 failures**。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
