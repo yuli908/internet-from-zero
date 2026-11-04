@@ -9,6 +9,7 @@ const SCREEN_SCRIPTS := {
 	"shop": preload("res://src/ui/screens/shop_screen.gd"),
 	"archive": preload("res://src/ui/screens/archive_screen.gd"),
 	"diagnostics": preload("res://src/ui/screens/diagnostics_screen.gd"),
+	"laboratory": preload("res://src/ui/screens/laboratory_screen.gd"),
 }
 
 const SCREEN_TITLES := {
@@ -16,6 +17,7 @@ const SCREEN_TITLES := {
 	"shop": "商店",
 	"archive": "档案",
 	"diagnostics": "诊断",
+	"laboratory": "实验室",
 }
 
 var _screens: Dictionary = {}

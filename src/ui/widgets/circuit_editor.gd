@@ -22,6 +22,8 @@ var _link_from := ""
 var _font: Font
 var _mono: Font
 var _cap_notice := false
+## 自由搭建模式：不画「门槽」空态提示，避免在实验室里多一句说明文字。
+var quiet := false
 # 非渲染诊断字段：只给测试/日志读取，界面不显示任何状态文字（门上限教学句由 _draw 直绘）。
 var last_status := ""
 var _flash_t := 0.0
@@ -120,7 +122,7 @@ func _draw() -> void:
 	for y in range(0, int(size.y), 32):
 		draw_line(Vector2(0, y), Vector2(size.x, y), UiTheme.alpha(UiTheme.LINE, 0.45), 1.0)
 
-	if gate_count() == 0:
+	if gate_count() == 0 and not quiet:
 		var slot := Rect2(Vector2(210, 130), Vector2(136, 92))
 		_draw_dashed_rect(slot, UiTheme.alpha(UiTheme.AMBER, 0.35))
 		draw_string(_font, Vector2(slot.position.x + 6, slot.position.y - 4), "门槽 136×92", HORIZONTAL_ALIGNMENT_LEFT, slot.size.x - 12, UiTheme.F_META, UiTheme.AMBER)
@@ -360,3 +362,31 @@ func _next_gate_id() -> String:
 	while graph.has_node("g%d" % i):
 		i += 1
 	return "g%d" % i
+
+## 外部投放（实验室元件台）按画布坐标落门，返回新门 id；超上限或门型非法返回空。
+func add_gate_at(kind: String, at: Vector2) -> String:
+	if kind.is_empty() or LogicGates.from_string(kind) < 0:
+		return ""
+	if gate_count() >= max_gates:
+		_cap_notice = true
+		last_status = "该电路需要结构级表示"
+		queue_redraw()
+		return ""
+	var gid := _next_gate_id()
+	var pos := Vector2(
+		clampf(at.x - NODE_SIZE.x * 0.5, 8.0, maxf(8.0, size.x - NODE_SIZE.x - 8.0)),
+		clampf(at.y - NODE_SIZE.y * 0.5, 8.0, maxf(8.0, size.y - NODE_SIZE.y - 8.0))
+	)
+	graph.add_gate(gid, LogicGates.from_string(kind), kind.to_upper(), pos)
+	changed.emit()
+	queue_redraw()
+	return gid
+
+func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+	return data is Dictionary and (data as Dictionary).has("bench_gate")
+
+func _drop_data(at: Vector2, data: Variant) -> void:
+	if not (data is Dictionary):
+		return
+	var payload: Dictionary = data
+	add_gate_at(str(payload.get("bench_gate", "")), at)

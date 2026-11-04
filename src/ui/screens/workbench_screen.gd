@@ -152,7 +152,7 @@ func _build() -> void:
 	_rail.add_child(Ui.hline(UiTheme.LINE))
 	_rail.add_child(Ui.gap(10))
 
-	_rail_buttons["labs"] = _rail_item("实验室", Color("#7FC7CF"), func(): _enter_current_lab(), false)
+	_rail_buttons["labs"] = _rail_item("实验室", Color("#7FC7CF"), func(): _open_laboratory(), false)
 	_rail.add_child(_rail_buttons["labs"])
 	_rail_buttons["shop"] = _rail_item("商店", Color("#D8A24A"), func(): _go("shop"), false)
 	_rail.add_child(_rail_buttons["shop"])
@@ -781,12 +781,11 @@ func _labs_unlocked() -> Dictionary:
 func _entry_lab() -> String:
 	return resolve_entry_lab(_current_lab, _labs, _labs_unlocked())
 
-func _enter_current_lab() -> void:
-	var target := _entry_lab()
-	if target.is_empty():
-		EventBus.toast("本章还没有可进入的实验", "error")
+func _open_laboratory() -> void:
+	## 进实验室原型台，而不是直接跳最后一节；任意已解锁的 lab 由实验位选。
+	if main == null:
 		return
-	select_lab(target, true)
+	main.call("show_screen", "laboratory")
 
 func select_lab(lab_id: String, announce: bool = true) -> void:
 	if not LAB_PATHS.has(lab_id):
