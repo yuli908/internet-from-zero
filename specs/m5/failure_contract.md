@@ -52,7 +52,15 @@ rep.to_dict()         # {ran_at, passed, cases:[...]}，可直接进存档/日�
 | 14 | `E_QUIZ` | 选择题答案错误 | binary / signal 的 `quiz` |
 | 15 | `E_TARGET_UNREACHED` | 目标值尚未达成 | binary `target` |
 | 16 | `E_GLITCH` | 毛刺仍存在或未达宽度 | signal `glitch` / `fix` |
-| 17 | `E_X_ROW` | 含 X 的用例失败 | half_adder `random_x` |
+| 17 | `E_X_ROW` | 含 X 的用例失败 | half_adder `random_x`、CH02 `x_propagation` |
+| 18 | `E_REGION` | MOS 工作区判错 | CH02 `mosfet_region` |
+| 19 | `E_STATIC_CURRENT` | 静态电流超出上限 | CH02 `static_current`（当前 pending） |
+| 20 | `E_RAIL_MARGIN` | 输出电平未达轨到轨 | CH02 `rail_margin`（当前 pending） |
+| 21 | `E_EQUIV` | 与参考函数不等价 | CH02 `equiv` |
+| 22 | `E_AREA` | 门数超出上限 | CH02 `area_max` / `target` / `build_area` |
+| 23 | `E_POWER_CALC` | 功耗计算不符 | CH02 `power_calc` |
+| 24 | `E_POWER_RATIO` | 功耗比不符 | CH02 `power_ratio` |
+| 25 | `E_PENDING` | 仿真层暂不支持（待接入） | CH02 `static_current` / `rail_margin`；`required=false`，不算通过 |
 | 99 | `E_GENERIC` | 未分类失败（兜底） | 未知 code、`add()` 兼容入口 |
 
 规则：
@@ -134,3 +142,81 @@ var tracker := GateAttemptTracker.new()
 | 日期 | 变更 |
 |---|---|
 | 2026-11-04 | 首版：18 个稳定 code + 六类标签 + 各类 gate 精度 + attempt 语义；标注偏差 24（诊断文档未入库） |
+| 2026-11-04 | 增补 CH02 code 18–25（`E_REGION`…`E_PENDING`），只增不改；`E_PENDING` 固定 `required=false`，用于仿真层暂不支持的 gate，不计为通过 |
+
+## 9. CH02 提示落地前的硬约束（2026-11-04 追加）
+
+> 本节为实现 `LADDER_TEXT` 前的契约补丁。只描述规则，不描述实现代码；`GateResult` 的 code、字段、标签均不变。
+
+### 9.1 `E_AREA`(22) 一码多用：提示键必须是 `(code, gate_id)` 二元
+
+`E_AREA` 在 CH02 至少承载四种证据形状、三种玩家可感知错因：
+
+| 位置 | 实际语义 | `input` 证据 | 玩家该看到的话 |
+|---|---|---|---|
+| 2.3 / 2.4 `target` 类用例（`_judge_target`） | **门数超上限**（例：4 个 NAND 造 OR，上限 3） | 行/门数与上限（`detail` 形如“行 p/t，门数 n（上限 l）”） | “门太多，先减一层” |
+| 2.4 `area` 用例（`_judge_area`） | **门数超上限** | `expected` 上限、`actual` 实测门数 | 同上 |
+| 2.5 `build_area` 槽位分支 | **槽位不够**（板子插不下） | `{"slots":4,...}`，`expected` 形如 “n/4 槽” | “这块板放不下，先拆成两块” |
+| 2.5 `build_area` 总门数分支 | **总门数预算超** | `{"slots":...,"max_total_gates":...}` | “总门数超预算” |
+
+因此 **`LADDER_TEXT` 不能做成 `code → 文案` 的一维表**。反例：2.5 玩家实际是“板子插不下”，按 code 查 22 会给他一句“你的门太多了”，既不对因、也把他往错误的修法（删逻辑门）上带。
+
+**键形状（定稿）**：二元键 `(code, gate_id)`，`gate_id` 缺省时才回落到 `code` 级文案；回落链固定为：
+
+```
+(code, gate_id)  →  code  →  E_GENERIC(99)
+```
+
+GDScript 字典没有元组键，落地形态二选一，二选一后不得混用：
+
+```gdscript
+# 形态 A：嵌套字典（推荐，查两次）
+LADDER_TEXT := {
+    22: {
+        "T2.3-2": {1: "…", 2: "…", 3: "…"},
+        "T2.5-2": {1: "…", 2: "…", 3: "…"},
+    },
+    6: {1: "…", 2: "…", 3: "…"},   # code 级回落
+}
+# 形态 B：复合键字符串
+# "22|T2.5-2" → 文案组；再回落 "22"
+```
+
+约束：
+- 同一 `code` 的不同 `gate_id` 允许给出**完全不同**的 L1 方向句，不要求共享措辞。
+- 2.5 内部“槽位”与“总门数预算”也必须按 `gate_id` 分开（二者证据键不同：有无 `max_total_gates`）。
+- 组别（08 文档 §2.2 的 A–H）仍按 code 分组用于配色/筛选，**不要**用组别反推具体文案。
+
+### 9.2 `19/20` 当前一条都发不出来：`E_PENDING(25)` 的定位
+
+`src/core/ch02_checks.gd` 的 `PENDING_REASONS` 把 `static_current`(19)、`rail_margin`(20) 在入口拦成 `E_PENDING(25)`，并固定 `required=false`。因此：
+
+- 19/20 **当前不可能出现在玩家面前**，也不会红、不计入失败统计；直到对应 gate 转正（从 `PENDING_REASONS` 移除）才可见。
+- `E_PENDING(25)` 是**内容未完成占位，不是玩家错误**：永不进提示阶梯、永不进失败率/失败统计；`detail` 只用于开发日志（`pending：<原因>`）。
+- UI 遇到 25 不应显示“失败”，也不应计入“本节失败次数”；只可在开发模式显示“待接入”。
+- 19/20 的文案可以先落表，但**必须在 25 拦截生效前保持不可达**；两组文案不得复用 25 的“技术故障”措辞。
+
+### 9.3 玩家可见 code 清单（当前版本）
+
+| 范围 | 会进玩家提示阶梯 | 只进日志 / 不可见 | 说明 |
+|---|---|---|---|
+| CH02 新增 | **18、21、22、23、24** | 19、20、25 | 19/20 被 `PENDING_REASONS` 拦成 25；25 是占位 |
+| 第一章 0–17 | 1、2、3、6、7、8、11、12、13、14、15、16、17 | 4、5、10、99 | 4/5/10 是配置缺陷，99 是兜底；0 是通过 |
+| 例外 | — | 9 | 9 依赖玩家“先猜再测”，当前 1.5 延迟由模型固定测量，**实际打不出来**（08 文档 §3 已注明） |
+
+补充：
+- 22 虽“可见”，但必须按 9.1 用 `(code, gate_id)` 选文案；只按 code 查视为实现错误。
+- 16 虽在“可见”内，也存在一码两用（见 §9.4），需同样按 gate_id 或证据形状区分。
+- 本清单是“当前版本”快照；任何 code 从不可见转为可见，都要同时补 `(code, gate_id)` 文案与回归用例。
+
+### 9.4 其他“一码多用”隐患（点名）
+
+| code | 是否一码多用 | 具体表现 | 建议 |
+|---|---|---|---|
+| 16 `E_GLITCH` | **是** | `glitch` 语义是“毛刺宽度未达下限”（`expected`/`actual` 为 int）；`fix` 语义是“修复后仍有毛刺”（`expected`/`actual` 为 bool）。两者错因与下一步不同（前者看路径差，后者看修复开关是否生效） | 按 `(16, gate_id)` 分文案；或至少按 `typeof(actual)` 分派（bool=fix，int=glitch）。不得共用一句 |
+| 22 `E_AREA` | **是** | 见 9.1，门数/槽位/总预算三种 | 强制 `(code, gate_id)` |
+| 2 `E_BUILD` | 弱 | 成环、端口非法、图结构不合法共用一句 | 文案可保持通用（“检查连线是否成环或端口接错”），无需拆 |
+| 3 `E_UNCONNECTED` | 否 | 证据本身列出具体线名，文案可通用 | 维持 |
+| 6/7/14/17 | 否 | 同一 code 下语义一致，差异只在证据 | 维持 |
+
+除 16 与 22 外，未发现必须拆文案的一码多用；`E_PENDING` 的多原因由 9.2 处理（永不展示）。
