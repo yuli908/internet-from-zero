@@ -176,3 +176,18 @@ func _load_state() -> void:
 	_on_bits_changed(_value)
 	if _quiz_answer >= 0:
 		_pick_quiz(_quiz_answer)
+
+func scripted_solve() -> bool:
+	## 脚本走查：走遍 0–15 覆盖、摆出两个目标数、答对辨析题，再走真实验收/发奖链路。
+	for v in range(16):
+		_switches.set_value(v)
+		_on_bits_changed(v)
+	for raw in lab_data.get("targets", []):
+		var t: Dictionary = raw
+		var v := int(t.get("value", -1))
+		if v >= 0:
+			_switches.set_value(v)
+			_on_bits_changed(v)
+	_pick_quiz(int(lab_data.get("quiz", {}).get("answer", -1)))
+	_run_cases()
+	return is_done()

@@ -290,6 +290,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			SaveManager.load_game(1)
 
 func _handle_cli() -> void:
+	var walk := CliArgs.value("walkthrough", "")
+	if not walk.is_empty():
+		_run_walkthrough(walk)
+		return
+	var verify := CliArgs.value("verify-walkthrough", "")
+	if not verify.is_empty():
+		_verify_walkthrough(verify)
+		return
 	var shot := CliArgs.value("shot", "")
 	if shot.is_empty():
 		return
@@ -304,3 +312,194 @@ func _handle_cli() -> void:
 	var err := img.save_png(shot)
 	print("SHOT_SAVED=%s err=%d size=%dx%d" % [shot, err, img.get_width(), img.get_height()])
 	get_tree().quit(0 if err == OK else 1)
+
+# ---- 6 节脚本走查（--walkthrough / --verify-walkthrough） --------------------
+
+func _run_walkthrough(path: String) -> void:
+	for i in 3:
+		await get_tree().process_frame
+	var wb: WorkbenchScreen = _screens.get("workbench", null)
+	_show_screen("workbench", false)
+	var p := GameState.player
+	var fails: Array = []
+	var checks := 0
+	var labs: Dictionary = {}
+	for raw_id in DataDB.chapter.lab_order:
+		var lid := str(raw_id)
+		var meta: Dictionary = DataDB.chapter.lab(lid)
+		var gold_before := p.gold
+		var xp_before := p.xp
+		var inv_before := _inv_signature(p.inventory)
+		var chapter_before := ChapterFlow.chapter_complete()
+		wb.select_lab(lid, false)
+		for i in 2:
+			await get_tree().process_frame
+		var page := wb.page_for(lid)
+		var solved := false
+		if page == null:
+			fails.append("%s: 实验页缺失" % lid)
+		else:
+			solved = page.scripted_solve()
+			if not solved:
+				fails.append("%s: scripted_solve 未通过" % lid)
+		var obj := str(meta.get("objective", ""))
+		if not ChapterFlow.is_objective_done(obj):
+			fails.append("%s: 目标 %s 未完成" % [lid, obj])
+		var gates_total := 0
+		var gates: Dictionary = {}
+		for raw_g in meta.get("gate_ids", []):
+			var gid := str(raw_g)
+			var ok := p.has_flag("gate:%s" % gid)
+			gates[gid] = ok
+			gates_total += 1
+			if not ok:
+				fails.append("%s: gate %s 未记账" % [lid, gid])
+		var exp := _expected_reward(meta)
+		var chapter_done := false
+		if not chapter_before and ChapterFlow.chapter_complete():
+			# 最后一节同时触发章节结算：complete_reward + 章节里程碑节点奖励。
+			var fin := _chapter_completion_reward()
+			exp["gold"] = int(exp.get("gold", 0)) + int(fin.get("gold", 0))
+			exp["xp"] = int(exp.get("xp", 0)) + int(fin.get("xp", 0))
+			chapter_done = true
+		var dg := p.gold - gold_before
+		var dx := p.xp - xp_before
+		if dg != int(exp.get("gold", 0)):
+			fails.append("%s: 金币 +%d，期望 +%d" % [lid, dg, int(exp.get("gold", 0))])
+		if dx != int(exp.get("xp", 0)):
+			fails.append("%s: XP +%d，期望 +%d" % [lid, dx, int(exp.get("xp", 0))])
+		if _inv_signature(p.inventory) != inv_before:
+			fails.append("%s: 物品发生未定义变化（数据里没有物品奖励）" % lid)
+		labs[lid] = {
+			"objective": obj, "solved": solved,
+			"gold_before": gold_before, "gold_after": p.gold,
+			"xp_before": xp_before, "xp_after": p.xp,
+			"expected_gold": int(exp.get("gold", 0)), "expected_xp": int(exp.get("xp", 0)),
+			"gates": gates, "inventory_after": _inv_signature(p.inventory),
+			"chapter_completion": chapter_done,
+		}
+		checks += 8 + gates_total
+		EventBus.fire("state_changed")
+	SaveManager.save_game(1)
+	var final := _final_snapshot()
+	var snap := {
+		"ok": fails.is_empty(), "checks": checks,
+		"failures": fails, "labs": labs, "final": final,
+		"item_rewards_defined": false,
+	}
+	_write_json(path, snap)
+	print("WALKTHROUGH_DONE checks=%d failures=%d path=%s" % [checks, fails.size(), path])
+	for f in fails:
+		print("WALKTHROUGH_FAIL %s" % f)
+	get_tree().quit(0 if fails.is_empty() else 1)
+
+func _expected_reward(meta: Dictionary) -> Dictionary:
+	var reward: Dictionary = meta.get("reward", {})
+	var gold := int(reward.get("gold", 0))
+	var xp := int(reward.get("xp", 0))
+	var ids: Array = []
+	for key in ["knowledge", "milestone", "skill_node"]:
+		var v := str(meta.get(key, ""))
+		if not v.is_empty():
+			ids.append(v)
+	ids += meta.get("knowledge_cards", [])
+	ids += meta.get("skill_nodes", [])
+	var seen: Dictionary = {}
+	for raw in ids:
+		var id := str(raw)
+		if seen.has(id):
+			continue
+		seen[id] = true
+		var n: Dictionary = DataDB.skill_graph.node(id)
+		gold += int(n.get("gold_award", 0))
+		xp += int(n.get("xp_award", 0)) - int(n.get("xp_cost", 0))
+	return {"gold": gold, "xp": xp}
+
+func _inv_signature(inv: Dictionary) -> String:
+	## 存档 JSON 往返会把整数读成浮点，物品数量统一按整数比较。
+	var keys := inv.keys()
+	keys.sort()
+	var parts := []
+	for k in keys:
+		parts.append("%s:%d" % [str(k), int(inv[k])])
+	return ",".join(PackedStringArray(parts))
+
+func _chapter_completion_reward() -> Dictionary:
+	## 章节完成时的两笔结算：complete_reward + 章节里程碑节点（ChapterFlow._finish_chapter 解锁 CH01）。
+	var fin: Dictionary = DataDB.chapter.data.get("complete_reward", {})
+	var gold := int(fin.get("gold", 0))
+	var xp := int(fin.get("xp", 0))
+	var n: Dictionary = DataDB.skill_graph.node("CH01")
+	gold += int(n.get("gold_award", 0))
+	xp += int(n.get("xp_award", 0))
+	return {"gold": gold, "xp": xp}
+
+func _final_snapshot() -> Dictionary:
+	var p := GameState.player
+	var objs: Dictionary = {}
+	for raw_oid in DataDB.chapter.objective_order:
+		var oid := str(raw_oid)
+		objs[oid] = ChapterFlow.is_objective_done(oid)
+	var gates: Dictionary = {}
+	for raw_lab in DataDB.chapter.labs.values():
+		var lab: Dictionary = raw_lab
+		for raw_g in lab.get("gate_ids", []):
+			var gid := str(raw_g)
+			gates[gid] = p.has_flag("gate:%s" % gid)
+	var ks: Array = p.knowledge.keys()
+	ks.sort()
+	return {
+		"gold": p.gold, "xp": p.xp, "level": p.level(),
+		"inventory": _inv_signature(p.inventory),
+		"knowledge": ks, "objectives": objs, "gates": gates,
+		"chapter_complete": ChapterFlow.chapter_complete(),
+	}
+
+func _verify_walkthrough(path: String) -> void:
+	for i in 3:
+		await get_tree().process_frame
+	var txt := FileAccess.get_file_as_string(path)
+	var parsed: Variant = JSON.parse_string(txt)
+	if not (parsed is Dictionary):
+		print("WALKTHROUGH_VERIFY_FAIL 快照不可读：%s" % path)
+		get_tree().quit(1)
+		return
+	var snap: Dictionary = parsed
+	var f: Dictionary = snap.get("final", {})
+	var p := GameState.player
+	var errs: Array = []
+	if p.gold != int(f.get("gold", -1)):
+		errs.append("gold %d != %d" % [p.gold, int(f.get("gold", -1))])
+	if p.xp != int(f.get("xp", -1)):
+		errs.append("xp %d != %d" % [p.xp, int(f.get("xp", -1))])
+	if p.level() != int(f.get("level", -1)):
+		errs.append("level %d != %d" % [p.level(), int(f.get("level", -1))])
+	if _inv_signature(p.inventory) != str(f.get("inventory", "")):
+		errs.append("inventory 不一致：%s vs %s" % [_inv_signature(p.inventory), str(f.get("inventory", ""))])
+	var ks: Array = p.knowledge.keys()
+	ks.sort()
+	if JSON.stringify(ks) != JSON.stringify(f.get("knowledge", [])):
+		errs.append("knowledge 不一致")
+	for raw_oid in DataDB.chapter.objective_order:
+		var oid := str(raw_oid)
+		var want := bool((f.get("objectives", {}) as Dictionary).get(oid, false))
+		if ChapterFlow.is_objective_done(oid) != want:
+			errs.append("objective %s 不一致" % oid)
+	for key in (f.get("gates", {}) as Dictionary).keys():
+		var gid := str(key)
+		if p.has_flag("gate:%s" % gid) != bool((f.get("gates", {}) as Dictionary)[key]):
+			errs.append("gate %s 不一致" % gid)
+	if ChapterFlow.chapter_complete() != bool(f.get("chapter_complete", false)):
+		errs.append("chapter_complete 不一致")
+	print("WALKTHROUGH_VERIFY_%s checks=%d failures=%d" % ["OK" if errs.is_empty() else "FAIL", 6 + DataDB.chapter.objectives.size() + (f.get("gates", {}) as Dictionary).size(), errs.size()])
+	for e in errs:
+		print("WALKTHROUGH_VERIFY_FAIL %s" % e)
+	get_tree().quit(0 if errs.is_empty() else 1)
+
+func _write_json(path: String, data: Dictionary) -> void:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		print("WALKTHROUGH_FAIL 无法写快照 %s" % path)
+		return
+	f.store_string(JSON.stringify(data, "  "))
+	f.close()

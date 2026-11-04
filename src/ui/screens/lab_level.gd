@@ -148,3 +148,11 @@ func _load_state() -> void:
 	_seen = st.get("seen", {})
 	_voltage = float(st.get("voltage", 0.2))
 	_slider.set_value_no_signal(_voltage)
+
+func scripted_solve() -> bool:
+	## 脚本走查：依次判读 0 / 1 / X 三个区间，再走真实验收/发奖链路。
+	for v in [0.2, 1.65, 3.1]:
+		_slider.set_value_no_signal(float(v))
+		_on_voltage_changed(float(v))
+	_run_cases()
+	return is_done()

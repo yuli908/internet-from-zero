@@ -126,10 +126,14 @@ func _switch_task(id: String) -> void:
 	var inputs := []
 	for iid in task.get("input_ids", ["a", "b"]):
 		inputs.append({"id": str(iid), "label": str(iid).to_upper()})
-	_editor.setup(inputs, [{"id": "out", "label": "OUT"}], task.get("palette", ["not", "and", "or"]), int(lab_data.get("max_gates", 12)))
-	if _graphs.has(id):
-		_editor.load_dict(_graphs[id])
+	var doc: Variant = null
+	if _graphs.has(id) and _graphs[id] is CircuitGraph:
+		doc = (_graphs[id] as CircuitGraph).to_dict()
 	_current_task = id
+	_editor.setup(inputs, [{"id": "out", "label": "OUT"}], task.get("palette", ["not", "and", "or"]), int(lab_data.get("max_gates", 12)))
+	# setup 会触发 changed → _save_state，写下当前任务；因此要先取旧文档，再回填。
+	if doc is Dictionary:
+		_editor.load_dict(doc)
 	_task_hint.text = "%s\n目标：%s；验收只看 a/b → out 的行为。" % [str(task.get("title", id)), str(task.get("target", ""))]
 	for key in _task_buttons.keys():
 		var b: Button = _task_buttons[key]
@@ -140,7 +144,7 @@ func _switch_task(id: String) -> void:
 func _save_current() -> void:
 	if _current_task.is_empty() or _editor == null:
 		return
-	_graphs[_current_task] = _editor.to_dict()
+	_graphs[_current_task] = CircuitGraph.from_dict(_editor.to_dict())
 
 func _on_editor_changed() -> void:
 	var ev := _editor.evaluate()
@@ -202,7 +206,7 @@ func _show_report(rep: GateReport) -> void:
 
 func _save_state() -> void:
 	if _editor != null and not _current_task.is_empty():
-		_graphs[_current_task] = _editor.to_dict()
+		_graphs[_current_task] = CircuitGraph.from_dict(_editor.to_dict())
 	var docs := {}
 	for k in _graphs.keys():
 		if _graphs[k] is CircuitGraph:
@@ -221,3 +225,72 @@ func _load_state() -> void:
 			_graphs[str(k)] = CircuitGraph.from_dict(docs[k])
 	_current_task = str(st.get("current", ""))
 	_encapsulated = bool(st.get("encapsulated", false))
+
+func scripted_solve() -> bool:
+	## 脚本走查：按任务逐个搭好正确电路（等价于用户点调色板并连线后的状态），
+	## 再调用真实的「封装 + 运行验收」→ pass_report → complete_lab 发奖链路。
+	for raw in _all_tasks():
+		var t: Dictionary = raw
+		var tid := str(t.get("id", ""))
+		# 先切换（会把上一任务的编辑器状态存回 _graphs），再注入脚本图，避免被空图覆盖。
+		_switch_task(tid)
+		_graphs[tid] = _scripted_graph(t)
+		_editor.load_dict((_graphs[tid] as CircuitGraph).to_dict())
+	_encapsulate()
+	_run_cases()
+	return is_done()
+
+func _scripted_graph(task: Dictionary) -> CircuitGraph:
+	var g := CircuitGraph.new()
+	var ids: Array = task.get("input_ids", ["a", "b"])
+	for i in ids.size():
+		var iid := str(ids[i])
+		g.add_input(iid, iid.to_upper(), Vector2(30, 70 + i * 110))
+	g.add_output("out", "OUT", Vector2(390, 140))
+	var target := str(task.get("target", ""))
+	var tid := str(task.get("id", ""))
+	var y := 140.0
+	if target == "not":
+		g.add_gate("g_not", LogicGates.Type.NOT, "NOT", Vector2(200, y))
+		g.link(str(ids[0]), "g_not", 0)
+		g.link("g_not", "out", 0)
+		return g
+	if ids.size() < 2:
+		return g
+	var a := str(ids[0])
+	var b := str(ids[1])
+	if target == "and" or target == "or":
+		var gt: int = LogicGates.Type.AND if target == "and" else LogicGates.Type.OR
+		var label := "AND" if target == "and" else "OR"
+		g.add_gate("g1", gt, label, Vector2(200, y))
+		g.link(a, "g1", 0)
+		g.link(b, "g1", 1)
+		g.link("g1", "out", 0)
+		return g
+	if target != "xor":
+		return g
+	if tid == "t_xor_2":
+		# 第二结构：(a|b) & ~(a&b)
+		g.add_gate("g1", LogicGates.Type.AND, "AND", Vector2(140, y - 70))
+		g.add_gate("g2", LogicGates.Type.OR, "OR", Vector2(140, y + 90))
+		g.add_gate("g3", LogicGates.Type.NOT, "NOT", Vector2(255, y - 70))
+		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(355, y))
+		g.link(a, "g1", 0); g.link(b, "g1", 1)
+		g.link(a, "g2", 0); g.link(b, "g2", 1)
+		g.link("g1", "g3", 0)
+		g.link("g2", "g4", 0); g.link("g3", "g4", 1)
+		g.link("g4", "out", 0)
+	else:
+		# 标准结构：(a & ~b) | (~a & b)
+		g.add_gate("g1", LogicGates.Type.NOT, "NOT", Vector2(130, y - 80))
+		g.add_gate("g2", LogicGates.Type.NOT, "NOT", Vector2(130, y + 120))
+		g.add_gate("g3", LogicGates.Type.AND, "AND", Vector2(255, y - 80))
+		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(255, y + 120))
+		g.add_gate("g5", LogicGates.Type.OR, "OR", Vector2(355, y))
+		g.link(a, "g1", 0); g.link(b, "g2", 0)
+		g.link(a, "g3", 0); g.link("g2", "g3", 1)
+		g.link(b, "g4", 0); g.link("g1", "g4", 1)
+		g.link("g3", "g5", 0); g.link("g4", "g5", 1)
+		g.link("g5", "out", 0)
+	return g
+

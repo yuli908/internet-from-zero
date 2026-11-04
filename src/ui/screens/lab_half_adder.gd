@@ -153,3 +153,24 @@ func _load_state() -> void:
 		_enc_label.add_theme_color_override("font_color", UiTheme.OK)
 		_enc_btn.disabled = true
 	_on_editor_changed()
+
+func scripted_solve() -> bool:
+	## 脚本走查：搭出 SUM=A⊕B、CARRY=A∧B 的正确电路，再走真实封装/验收/发奖链路。
+	var g := CircuitGraph.new()
+	g.add_input("a", "A", Vector2(40, 80))
+	g.add_input("b", "B", Vector2(40, 200))
+	g.add_gate("g_xor", LogicGates.Type.XOR, "XOR", Vector2(190, 80))
+	g.add_gate("g_and", LogicGates.Type.AND, "AND", Vector2(190, 200))
+	g.add_output("sum", "SUM", Vector2(340, 80))
+	g.add_output("carry", "CARRY", Vector2(340, 200))
+	g.link("a", "g_xor", 0)
+	g.link("b", "g_xor", 1)
+	g.link("g_xor", "sum", 0)
+	g.link("a", "g_and", 0)
+	g.link("b", "g_and", 1)
+	g.link("g_and", "carry", 0)
+	_editor.load_dict(g.to_dict())
+	_on_editor_changed()
+	_encapsulate()
+	_run_cases()
+	return is_done()

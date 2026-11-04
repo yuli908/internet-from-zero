@@ -40,7 +40,8 @@
 - [x] F5 `git log` 有 data / sim+checks / UI / tests / docs 五次提交；每次提交前均跑过导入检查。
 
 ## G. 仍需人工（不计入通过）
-- [ ] G1 6 节真实点击走查（操作 → 验收 → 知识树 completed → 重启读档）。
+- [x] G1a 6 节脚本化走查（UI 真实链路 → 验收 → 知识树 completed → 存档 → 重启读档）已完成（2026-11-04，`docs/PROGRESS.md` §2.5；72/36 项 0 失败）。
+- [ ] G1b 6 节真人鼠标点击走查（脚本绕过点击/连线，仍需人工）。
 - [x] G2 性能基准关（50–400 门 / DFF，5 ms/帧实测）已完成（2026-11-04，`docs/PROGRESS.md` §2.2）。
 - [ ] G3 GDExtension 动态库构建与接入。
 - [ ] G4 真实 GitHub Actions 跑通。

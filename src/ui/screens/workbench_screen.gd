@@ -112,6 +112,10 @@ func _open(lab_id: String) -> void:
 	_current = lab_id
 	_refresh_list()
 
+func page_for(lab_id: String) -> LabBase:
+	var page: Variant = _pages.get(lab_id, null)
+	return page if page is LabBase else null
+
 func _on_lab_solved(lab_id: String) -> void:
 	var res := ChapterFlow.complete_lab(lab_id)
 	if bool(res.get("ok", false)):

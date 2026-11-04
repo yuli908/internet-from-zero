@@ -20,7 +20,8 @@ M2 进度（顺序固定，不跳步）：
    `t_settle` 由延迟表推导并经实测校验（HA 4 / FA 10 / ripple8 52 / mux2 7 / mux4 13 tick），
    `tests/test_l2.gd` 逐向量等价（含 X），L1/L2 混合可仿真（§2.3）。
 4. **C 存档迁移框架补全——已完成**：迁移契约可执行（`registry_errors()` + `migrate()` 自检），v1/v2 fixture 经 `SaveStore` 真实落盘读档，进度字段逐项保留（§2.4）。
-5. **D 6 节脚本走查——未完成**（见 §4）。
+5. **D 6 节脚本走查——已完成**：`--walkthrough` 驱动真实 UI 走完 6 节，72 项断言 0 失败；
+   重启进程 `--verify-walkthrough` 36 项一致；6 张 GUI 截图（§2.5）。
 
 M1 **没有**做到：L3–L7、原生 GDExtension、沙箱与真实集成、题库与逐题评分、真实 CI 验证——这些要么只有 ADR，要么完全没有。
 
@@ -105,6 +106,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   未知字段（v1 内嵌、v2 顶层）原样保留，`scrap` 键已消失。
 - 新增 **60 项**检查，总计 **1410 checks / 13 套件 / 0 failures**。
 
+### 2.5 D 6 节脚本走查实测（2026-11-04）
+
+- 入口：`--fresh --walkthrough=user://walkthrough.json` 与 `--verify-walkthrough=user://walkthrough.json`（`src/ui/main.gd`）。
+- 每节走真实链路：`WorkbenchScreen.select_lab` → 实验页 `scripted_solve()` → 页面自己的 `_run_cases()` → `pass_report` → `complete_lab` 发奖；
+  逐节断言目标完成、4 条 gate 记账、金币/XP 增量与数据预期一致、物品不出现未定义变化。
+- 实测：`WALKTHROUGH_DONE checks=72 failures=0`；重启进程后 `WALKTHROUGH_VERIFY_OK checks=36 failures=0`。
+  终局状态：金币 **315**、XP **315**、等级 **4**、知识节点 **34**、24 条 gate 全记账、章节完成标记 `true`。
+- 各节增量（金币 / XP）：level 120→150 / 0→25；binary 150→180 / 25→60；boolean 180→205 / 60→90；
+  gate 205→240 / 90→135；signal 240→260 / 135→170；half_adder 260→315 / 170→315（含章末 25 金币 / 100 XP，偏差 11）。
+- 物品：`ch01_levels.json` 的 6 节均**未定义** lab 物品奖励（仅初始 `M01/M09` 各 1），故走查断言"物品不变"并在快照记 `item_rewards_defined=false`；
+  「每节物品入库」在本章不适用，不能写成已验证。
+- 截图：`artifacts/shots/lab_{level,binary,boolean,gate,signal,half_adder}.png`，6 次 GUI 进程 `--shot`（1440×900，`err=0`）。
+- 走查中发现并修复 3 个真实 UI 缺陷：`LabGate._switch_task` 在 `setup()` 触发 `changed` 时把空图写回当前任务（导致 5 个任务图被覆盖）；
+  `_final_snapshot` 误把 `objectives` 字典的键当字典节点；binary 脚本只覆盖 0–15 未摆出 137/0x2F 两个目标值。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -146,7 +162,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **未完成** | 当前固定为 EXPLAIN 行为 |
 | 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 |
 | 42 道练习题库与逐题评分表 | **未完成** | 只有第一章 24 条 gate + 多解黑盒 |
-| 6 节手动走查（操作 → 验收 → 知识树 completed → 存档 → 重启续玩） | **需人工** | 自动测试只验证判定层与数据，不覆盖真实点击路径 |
+| 6 节脚本化走查（UI 真实链路 → 验收 → 知识树 → 存档 → 重启读档） | **已完成（2026-11-04）** | 见 §2.5：`--walkthrough` 72 项 0 失败，`--verify-walkthrough` 36 项一致；物品奖励本章未定义，仅断言不变 |
+| 6 节真人鼠标走查（操作 → 验收 → 知识树 completed → 存档 → 重启续玩） | **需人工** | 脚本走查绕过鼠标点击/连线动作，真人交互仍需按 `docs/design/08` 走一遍 |
 | 截图冒烟之外的交互验证（拖拽/撤销不出现在 M1）、引导 6 步真实走查 | **需人工** | 需真人按 `docs/design/08` 走一遍 |
 | `.github/workflows/ci.yml` 在真实 GitHub Actions 上运行 | **需人工** | 本地无法验证；文件内已注明"未在真实 CI 上验证" |
 | 知识卡内容补全（设计目标 ~180 张） | **未完成** | 当前 `skilltree.json` 只有 19 个知识节点（多为一句话摘要），设计文档已标【假设】 |
@@ -171,7 +188,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 1. ~~性能基准关~~：已完成，见 §2.2（`scripts/bench.ps1`）。
 2. ~~B. L2 组合层~~：已完成，见 §2.3。
 3. ~~C. 存档迁移框架补全~~：已完成，见 §2.4。
-4. **D. 6 节脚本走查**：脚本驱动 UI 走完 6 节，逐节断言知识树/金币/物品，重启进程读档一致，每节一张截图。
+4. ~~D. 6 节脚本走查~~：已完成，见 §2.5（72 项断言 + 重启读档 36 项 + 6 张截图）。
 5. **原生下沉**：基准关已确认超标（200 门 p95 17.8 ms），M3 启动 GDExtension（ADR 0002 §5），目标 >50 门/50 DFF 场景。
 6. **TraceSink 统一**：先把 `history/glitches` 映射进统一流，再谈回放。
 7. **题库接入**：把 `docs/curriculum/03` 的 42 道练习数据化，接 `LabChecks` 同构判定。
@@ -183,6 +200,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RE
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（p50/p95/p99/max）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1      # 手动操作
+
+# 6 节脚本走查 + 重启读档校验（无窗口，快照写入 user://walkthrough.json）
+& "C:\tools\godot-4.4.1\godot.cmd" --path . --fresh "--walkthrough=user://walkthrough.json"   # 期望 failures=0
+& "C:\tools\godot-4.4.1\godot.cmd" --path . "--verify-walkthrough=user://walkthrough.json"     # 期望 WALKTHROUGH_VERIFY_OK failures=0
+
+# 每节一张截图（GUI 后端）
+& "C:\tools\godot-4.4.1\godot.cmd" --path . "--shot=<abs>\artifacts\shots\lab_level.png" --shot-screen=workbench --shot-lab=level
 ```
 
 截图证据（已存在，作为验收依据；是否入库由负责人决定）：

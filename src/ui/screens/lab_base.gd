@@ -86,6 +86,11 @@ func complete_once() -> void:
 	solved.emit(lab_id)
 	refresh_status()
 
+func scripted_solve() -> bool:
+	## 脚本走查入口：实验页自己把作答状态摆成正确答案，再走真实验收/发奖链路。
+	## 默认不支持；各实验页覆盖。
+	return false
+
 func save_state(data: Dictionary) -> void:
 	if GameState.player == null:
 		return

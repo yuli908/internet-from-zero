@@ -172,3 +172,28 @@ func _load_state() -> void:
 	if f is Dictionary:
 		for k in f.keys():
 			_filled[str(k)] = f[k]
+
+func scripted_solve() -> bool:
+	## 脚本走查：把真值表与德摩根表填成正确值，再走真实验收/发奖链路。
+	for raw in lab_data.get("gates", []):
+		var g: Dictionary = raw
+		var gid := str(g.get("id", ""))
+		var expected: Array = g.get("expected", [])
+		var arr: Array = _filled.get(gid, [])
+		while arr.size() < expected.size():
+			arr.append("?")
+		for i in expected.size():
+			arr[i] = str(int(expected[i]))
+		_filled[gid] = arr
+	var rows: Array = lab_data.get("demorgan", {}).get("rows", [])
+	var dm: Array = _filled.get("demorgan", [])
+	while dm.size() < rows.size():
+		dm.append("?")
+	for i in rows.size():
+		var pair: Array = rows[i]
+		dm[i] = SimValue.not3(SimValue.bin3("and", str(int(pair[0])), str(int(pair[1]))))
+	_filled["demorgan"] = dm
+	_refresh_cells()
+	_save_state()
+	_run_cases()
+	return is_done()

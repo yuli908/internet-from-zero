@@ -195,3 +195,12 @@ func _load_state() -> void:
 		_fix_label.add_theme_color_override("font_color", UiTheme.OK)
 	if _quiz_answer >= 0:
 		_pick_quiz(_quiz_answer)
+
+func scripted_solve() -> bool:
+	## 脚本走查：测延迟 → 复现毛刺 → 修复 → 答题，再走真实验收/发奖链路。
+	_measure()
+	_glitch()
+	_fix()
+	_pick_quiz(int(lab_data.get("quiz", {}).get("answer", -1)))
+	_run_cases()
+	return is_done()
