@@ -413,6 +413,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - 测试：新增 17 checks（bound_first 回收路径 6、2.1 四点 6、rail 合法/越界 4、RAIL_MARGIN trace 1）；
   全量 **2252 checks / 0 failures**（25 套件）。
 
+### 2.24 M5 收尾：绑定件禁卖 + 2.4 内容锁定（2026-11-04）
+
+- **偏差 26 售出端收口**：`EconomyCore.sell` 读取 `bound_first`，绑定件返回明确拒绝原因
+  「「X」是绑定物品，无法出售」，不扣件、不加金币；非绑定件照常出售。
+  测试覆盖绑定件被拒且留包、M01（材料但标绑定）同口径、非绑定件正常、混合背包逐个判定。
+- **2.4 内容锁定**（字段名按任务书定稿）：lab 条目 `content_status`（`ready`/`deferred`，缺省 `ready`）
+  与玩家可见 `deferred_reason`；新增 `ChapterRuntime.lab_content_available(lab_id) -> {available, reason}`，
+  并让既有 `lab_unlocked` / `lab_lock_reason` 先判内容可用性——**整节禁入**，不是让 4 个 gate 显示 pending。
+  `replace` 段已标 `deferred`，技能树节点 `SK-REPLACE` 保留（看得见、点不进）。
+- 注意：`power`（2.5）的 `requires` 是 `replace`，2.4 延后后 2.5 连带被前置锁住——章节 5/5 暂时不可达，
+  待决策（改前置或给延后节占位规则），本轮未擅改。
+- 测试：新增 **22 checks**（售出端 11、内容锁定 11）；全量 **2274 checks / 0 failures**（25 套件）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -442,9 +455,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 23 | `docs/design/11` §3 的 8 种判定 kind 为英文小写（`mosfet_region` … `power_ratio`） | trace kind 取**全大写机械映射**（`MOSFET_REGION` … `POWER_RATIO`），映射表在 `SimCircuit.JUDGEMENT_KINDS`；`build_area` 是语法糖，不产生 trace，也不计入 8 种 | 避免自造词、避免小写/大写两套事件名；映射只有一处（`docs/design/11` → 工程常量），UI 按 `specs/m4/ui_contract.md` 接线 |
 | 24 | 教学组失败诊断表 `docs/curriculum/05-failure-diagnostics.md` 定义 code 与 `K/S/C/P/M/R` 语义（任务书要求"按它设计，不要自己发明"） | **该文件未入库**（仓库只有 `05-onboarding-guidance.md`、`06-assessment-and-feedback.md`），全库 grep 无 `error_tags`/诊断表内容。已按六类语义落地机器初值：18 个 code + `GateResult.TAG_MAP`；结构与字段不依赖映射 | 不能凭空等待文档而阻塞 M5 基础设施；文档交付后**只改 `GateResult.TAG_MAP` 一表**（必要时新增 code），不改 `GateReport` 字段、调用方与 UI 契约形状。详见 `specs/m5/failure_contract.md` §3 |
 | 25 | 2.1 的 MOS 器件参数 | **教学归一化值**：`vth 0.9 V / Ron 50 Ω / Id_sat 5 mA / Id_off 1 nA`，不是真实工艺；已调到"同一 Vds 下线性区电流 < 饱和区电流"（Vds=0.2 V 时线性 4000 µA < 饱和 5000 µA），并在 lab 文案写死四组测量条件（Vgs/Vds，含 Vds=6.0 的"不再上涨"点） | 原 `Id_sat=1000 µA` 低于线性区 4000 µA，与"饱和=封顶"矛盾；教学只需单调关系，不追求 SPICE 精度。见 §2.21 与 `ch02_labs.json` 的 `measure_conditions` |
-| 26 | `bound_first` 首件绑定不可回收 | **已真修（2026-11-04）**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 读取 `granted:<lab>`，已领过的 lab 返回空奖励表，重复刷关不再发放（见 §2.23）；`G01–G04` 与 `M01/M09/G12` 同口径。**残留**：`EconomyCore` 的物品回收/出售逻辑仍未读取 `bound_first`（回收端只影响转手，不影响刷关） | 改 `EconomyCore.sell` 会破坏既有 `test_economy` 的 M01 回收断言（基线不许退）；刷关套利口已在发放端关闭，回收端留待物品系统单独排期 |
+| 26 | `bound_first` 首件绑定不可回收 | **已真修（2026-11-04）**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 读取 `granted:<lab>`，已领过的 lab 返回空奖励表，重复刷关不再发放（见 §2.23）；`G01–G04` 与 `M01/M09/G12` 同口径；**售出端已收口**（§2.24：`EconomyCore.sell` 拒卖绑定件，不扣件、不加金币） | 原 `test_economy` 的 "sell M01" 断言与绑定数据冲突，已改用非绑定 `M08` 验证出售路径，check 数不减 |
 | 27 | CH02 技能树 24 个节点 / `start_gold_mode: carry` | 只在 `ch02_levels.json` 引用 `SK-TR…SK-POWER` 与 `milestone CH02-1…5`，**未新增 `skilltree.json` 节点**；`start_gold_mode` 字段已写入但 `ChapterRuntime` 未实现 carry 逻辑，按规格回落 `start_gold 0` | 新增 24 节点会让 `tests/test_data.gd` 的"36 节点"断言退；M5 任务只授权 ch02 两份数据 + manifest |
 | 28 | CH02 `static_current` / `rail_margin` | **`rail_margin` 已落地**（18/20）：`_judge_rail` 按逻辑输出反算 V_high/V_low，落 `E_RAIL_MARGIN`(20)，无器件层依赖；`static_current` 仍 `E_PENDING` + `required=false`（2 条 gate：`T2.2-3`、`T2.4-4`，**不算通过**） | 不写永远通过的假 gate；`rail_margin` 只需离散分压算术，故先落地；稳态电流仍等最小 L1 电流模型 |
+| 29 | 2.4 正式内容延后（等器件级网表），需在配置里标"待解锁" | lab 条目新增 `content_status`（`ready`/`deferred`，缺省 `ready`）与玩家可见 `deferred_reason`；`ChapterRuntime.lab_content_available` 返回 `{available, reason}`，`lab_unlocked`/`lab_lock_reason` 先判内容可用性 → **整节禁入**，不是 gate 全 pending；`replace` 已置 `deferred`，技能树 `SK-REPLACE` 保留（见 §2.24） | 半开的节会让玩家做完看不到分；`deferred_reason` 只写面向玩家的话。**遗留决策**：2.5 `requires: ["replace"]`，延后期间 2.5 连带锁死，章末 5/5 不可达——需你定是改 2.5 前置，还是给延后节占位规则 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

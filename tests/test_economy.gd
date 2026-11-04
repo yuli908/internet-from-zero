@@ -62,10 +62,37 @@ func run(ctx: TestContext) -> void:
 
 	var st5 := PlayerState.new()
 	st5.gold = 0
-	st5.add_item("M01", 1)
-	var sale := EconomyCore.sell(st5, cat, "M01", 1)
-	ctx.check("sell M01 ok", bool(sale.get("ok", false)))
-	ctx.eq("sell M01 gold", st5.gold, 4)
-	ctx.eq("sell M01 count", st5.item_count("M01"), 0)
-	ctx.eq("total earned", int(sale.get("gain", 0)), 4)
-	ctx.check("cannot sell nothing", not bool(EconomyCore.sell(st5, cat, "M01", 1).get("ok", false)))
+	st5.add_item("M08", 1)
+	var sale := EconomyCore.sell(st5, cat, "M08", 1)
+	ctx.check("sell M08 ok", bool(sale.get("ok", false)))
+	ctx.eq("sell M08 gold", st5.gold, 5)
+	ctx.eq("sell M08 count", st5.item_count("M08"), 0)
+	ctx.eq("total earned", int(sale.get("gain", 0)), 5)
+	ctx.check("cannot sell nothing", not bool(EconomyCore.sell(st5, cat, "M08", 1).get("ok", false)))
+
+	# 绑定件（bound_first）不可出售：拒绝要明确、不扣件、不加金币
+	var st6 := PlayerState.new()
+	st6.gold = 0
+	st6.add_item("G01", 1)
+	var bound_sale := EconomyCore.sell(st6, cat, "G01", 1)
+	ctx.check("绑定件出售被拒", not bool(bound_sale.get("ok", false)))
+	ctx.check("绑定件拒绝原因明确", str(bound_sale.get("error", "")).contains("绑定"))
+	ctx.eq("绑定件仍在背包", st6.item_count("G01"), 1)
+	ctx.eq("绑定件出售不加金币", st6.gold, 0)
+	ctx.eq("绑定件出售 gain 0", int(bound_sale.get("gain", -1)), 0)
+	# M01 虽是可交易材料，但标了 bound_first，同样按绑定件拒卖
+	st6.add_item("M01", 1)
+	ctx.check("M01 绑定件同样被拒且留包",
+		not bool(EconomyCore.sell(st6, cat, "M01", 1).get("ok", true)) and st6.item_count("M01") == 1)
+	# 非绑定件照常出售
+	st6.add_item("M08", 2)
+	var plain_sale := EconomyCore.sell(st6, cat, "M08", 1)
+	ctx.check("非绑定件可正常出售", bool(plain_sale.get("ok", false)))
+	ctx.eq("非绑定件出售入账", st6.gold, 5)
+	ctx.eq("非绑定件扣件", st6.item_count("M08"), 1)
+	# 混合背包：只拒绑定件，其余照常
+	st6.add_item("G02", 1)
+	ctx.check("混合背包：绑定件仍被拒且留包",
+		not bool(EconomyCore.sell(st6, cat, "G02", 1).get("ok", true)) and st6.item_count("G02") == 1)
+	ctx.check("混合背包：非绑定件仍可卖",
+		bool(EconomyCore.sell(st6, cat, "M08", 1).get("ok", false)) and st6.gold == 10)

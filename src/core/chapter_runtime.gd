@@ -88,6 +88,20 @@ func requires(lab_id: String) -> Array:
 		return []
 	return [str(v)]
 
+func content_status(lab_id: String) -> String:
+	## 内容状态：`ready` / `deferred`；旧数据不写该字段即视为 ready，不破坏现有存档。
+	return str(lab(lab_id).get("content_status", "ready"))
+
+func lab_content_available(lab_id: String) -> Dictionary:
+	## 内容级可用性（先于前置 lab 判定）：deferred 的节整节禁入，不是让 gate 显示 pending。
+	var lab_data := lab(lab_id)
+	if lab_data.is_empty():
+		return {"available": false, "reason": "实验不存在"}
+	if content_status(lab_id) != "ready":
+		var reason := str(lab_data.get("deferred_reason", ""))
+		return {"available": false, "reason": reason if not reason.is_empty() else "这一节暂未开放"}
+	return {"available": true, "reason": ""}
+
 func start_gold() -> int:
 	return int(data.get("start_gold", 0))
 
@@ -101,6 +115,8 @@ func lab_unlocked(state: PlayerState, lab_id: String) -> bool:
 	var lab_data := lab(lab_id)
 	if lab_data.is_empty():
 		return false
+	if not bool(lab_content_available(lab_id).get("available", false)):
+		return false
 	for req in requires(lab_id):
 		if not state.is_lab_completed(str(req)):
 			return false
@@ -108,6 +124,9 @@ func lab_unlocked(state: PlayerState, lab_id: String) -> bool:
 
 func lab_lock_reason(state: PlayerState, lab_id: String) -> String:
 	var lab_data := lab(lab_id)
+	var avail := lab_content_available(lab_id)
+	if not bool(avail.get("available", false)):
+		return str(avail.get("reason", ""))
 	var missing := []
 	for req in requires(lab_id):
 		if not state.is_lab_completed(str(req)):

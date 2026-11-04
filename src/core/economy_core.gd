@@ -38,6 +38,9 @@ static func sell(state: PlayerState, catalog: Catalog, item_id: String, qty: int
 		return {"ok": false, "error": "数量必须大于 0", "gain": 0}
 	if catalog.is_currency(item_id):
 		return {"ok": false, "error": "金币本身不能出售", "gain": 0}
+	# 绑定件（`bound_first`）不可变现：教学奖励只随进度进背包，不能卖成金币。
+	if bool(catalog.item(item_id).get("bound_first", false)):
+		return {"ok": false, "error": "「%s」是绑定物品，无法出售" % catalog.item_name(item_id), "gain": 0}
 	var price := catalog.sell_price(item_id)
 	if price <= 0:
 		return {"ok": false, "error": "该物品无法出售", "gain": 0}
