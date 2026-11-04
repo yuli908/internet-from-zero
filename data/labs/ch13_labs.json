@@ -1,0 +1,609 @@
+{
+  "version": 2,
+  "source": "D:\\ai lm\\internet_from_zero\\docs\\curriculum\\24-ch13-lecture-copy.md",
+  "source_note": "段落按课件 §1–§3 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：栈效应表、对象头 2 B + 字段各 1 B、GC 选引用计数、对象 4 B/个、堆 64 B。",
+  "pending_kinds": {
+    "table": "13.1 字节码编码与源码行映射未定（02 无操作码表，扩接口未批）；T13.1-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "bytecode_vm": {
+      "id": "bytecode_vm",
+      "title": "字节码 VM · 一条指令一步，栈顶看得见",
+      "body": "源码编译成字节码，VM 逐条执行：压值、运算、弹结果，每步只改栈顶。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 多一层 VM，才谈得上到处运行",
+          "text": "C 编译成机器码，换一台机器就得重编译；字节码不直接给机器，先给虚拟机。所谓「一次编写到处运行」，靠的是中间多了一层 VM，不是编译器更强。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "栈式 · 压值、运算、弹结果",
+          "text": "字节码也是编号指令，但操作数走操作数栈：压值、做运算、弹结果。单步时能看见栈顶变化，才能说清一条字节码到底做了什么。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "逐行对照 · 源码一行对几条字节码",
+          "text": "逐行对照：源码一行 → 若干条字节码 → 每条执行后操作数栈的样子。对照表要能反查，不能只给一句「运行成功」。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · VM 只放演示，不执行玩家代码",
+          "text": "负例：VM 只放一段演示动画，字节码是预置的，玩家写的源码根本不进 VM。改源码输出不变——「只演示不执行」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 自己写字节码并单步跑通",
+          "text": "验收：自己写一段字节码并单步跑通，逐行对照源码。四条同时——①字节码与源码逐行可对照；②操作数栈快照与语义一致；③跑出预期输出；④P04 JVM 落袋。只看演示，不给过。"
+        }
+      ],
+      "p1": "手写一段字节码并单步跑通，再逐行对照源码与栈快照",
+      "p1_gates": [
+        "T13.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "写一段 5 条指令的字节码，单步跑通并逐行对照源码",
+          "judge": "四条同时：①栈快照逐格对；②行映射可追溯；③输出正确；④P04 编译器落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T13.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "保留 VM 面板，但执行仍走写死的旧路径",
+          "judge": "改源码后字节码与栈快照都不变；detail 写「VM 未接线」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T13.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按栈效应表算 PUSH/PUSH/ADD/PRINT 后的栈深",
+          "judge": "与机器快照一致；不算 P1；detail 写「栈深算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T13.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「把源码编成可单步、可检查的指令」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T13.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T13.1-1",
+          "title": "单步栈快照逐格对上、行映射可追溯、输出正确",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "字节码编码未定稿（02 CH13 无操作码表），源码↔字节码行映射接口未批；不以假设编码冒充逐行可追溯。",
+          "thresholds": {
+            "bytecode_encode": {
+              "status": "pending",
+              "initial": "PUSH/ADD/MUL/PRINT/HALT 仅栈效应表",
+              "reason": "操作码表与行号接口未给；只给压/弹数表供 13.1-C 复算。"
+            }
+          },
+          "keys": [
+            "pc",
+            "opcode",
+            "stack_after"
+          ],
+          "expect_rows": [
+            {
+              "pc": 0,
+              "opcode": "PUSH",
+              "stack_after": 1
+            },
+            {
+              "pc": 1,
+              "opcode": "PUSH",
+              "stack_after": 2
+            },
+            {
+              "pc": 2,
+              "opcode": "ADD",
+              "stack_after": 1
+            },
+            {
+              "pc": 3,
+              "opcode": "PRINT",
+              "stack_after": 0
+            },
+            {
+              "pc": 4,
+              "opcode": "HALT",
+              "stack_after": 0
+            }
+          ],
+          "expect_meta": {
+            "line_map_ok": true,
+            "stack_ok": true,
+            "output_ok": true,
+            "p04_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T13.1-2",
+          "title": "负例：VM 面板摆着，执行仍走写死路径",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "vm_exec",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T13.1-3",
+          "title": "按栈效应表复算三条指令后的栈深",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "after_push2": 2,
+            "after_add": 1,
+            "after_print": 0
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T13.1-4",
+          "title": "为什么要多一层 VM",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么要多一层 VM？",
+            "options": [
+              "把源码编成可单步、可检查的指令，出错能停在具体一步",
+              "让源码直接变成一条机器指令，省掉中间层",
+              "把结果先算好写进内存，运行时不用再算",
+              "把源码字符按顺序搬进寄存器，逐字执行"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先按栈效应表算每条指令的净增减，再跑；栈深与 PC 分开记。",
+      "misconception": "把「源码能跑」当成「字节码对了」；行映射不接，改源码后字节码不变。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "object_ref": {
+      "id": "object_ref",
+      "title": "对象与引用 · 起始地址就是身份",
+      "body": "对象是一段连续字节，引用存的是起始地址；字段按声明顺序排，调用靠对象头找方法表。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 对象是一块连续字节",
+          "text": "对象在内存里不是一个名字，是一块连续字节：字段按声明顺序排，引用是指向这块起始地址的值。`a.b` 就是「按地址加偏移取字段」。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "继承 · 同一块对象，多一层关系",
+          "text": "继承按数据侧定稿排：同一块对象按声明顺序加字段，字段各占 1 字节；方法表槽在对象头第 2 字节。引用仍指向对象起点，调用靠它找到该走哪张表。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "跑一个类 + 继承 + 接口",
+          "text": "跑一个类 + 继承 + 接口的最小程序：每建一个对象，对象图里多一个节点；每存一个引用，多一条边。要说清哪条边是字段引用、哪条是父类关系。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 有节点没边，引用写成名字",
+          "text": "负例：对象图只画节点不连边，或把引用画成「名字 → 对象」。图上没有地址，GC 无从判断可达——这种图必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 程序对，对象图能指认",
+          "text": "验收：类 + 继承 + 接口程序正确，对象图能指认。四条同时——①程序输出正确；②每个对象的字段偏移可指认；③引用边与字段/父类关系对得上；④知识卡落袋。只跑通程序，不给过。"
+        }
+      ],
+      "p1": "建两个对象（含继承），画对象图并逐字段读偏移与值",
+      "p1_gates": [
+        "T13.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "建 A、B 两个对象（B 继承 A），逐字段读偏移与值并画对象图",
+          "judge": "四条同时：①输出对；②偏移对；③引用边可指认；④知识卡落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T13.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "对象图里画了边，但引用仍存副本",
+          "judge": "改副本原对象不变；detail 写「引用未落起始地址」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T13.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "算 x/y/z 三个字段的字节偏移（头 2 B，字段各 1 B）",
+          "judge": "与机器偏移一致；不算 P1；detail 写「头字节或字段序算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T13.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「引用是对象起始地址」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T13.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T13.2-1",
+          "title": "对象图逐字段对：起始地址、字段偏移、值",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "obj",
+            "addr",
+            "field",
+            "offset",
+            "value"
+          ],
+          "expect_rows": [
+            {
+              "obj": "A",
+              "addr": "0x40",
+              "field": "x",
+              "offset": 2,
+              "value": 7
+            },
+            {
+              "obj": "A",
+              "addr": "0x40",
+              "field": "y",
+              "offset": 3,
+              "value": 3
+            },
+            {
+              "obj": "B",
+              "addr": "0x48",
+              "field": "inherit_x",
+              "offset": 2,
+              "value": 7
+            },
+            {
+              "obj": "B",
+              "addr": "0x48",
+              "field": "own_z",
+              "offset": 4,
+              "value": 1
+            }
+          ],
+          "expect_meta": {
+            "output_ok": true,
+            "offsets_ok": true,
+            "refs_ok": true,
+            "card": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T13.2-2",
+          "title": "负例：对象图摆着，引用边不落内存",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "ref_edge",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T13.2-3",
+          "title": "按头 2 字节 + 声明顺序算字段偏移",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "x_offset": 2,
+            "y_offset": 3,
+            "z_offset": 4
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T13.2-4",
+          "title": "引用到底是什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "引用到底是什么？",
+            "options": [
+              "对象起始地址，不是对象副本",
+              "对象的完整拷贝，改引用等于改对象",
+              "字段在对象里的字节偏移",
+              "对象头里的类型码"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先算头 2 字节，再按声明顺序累加字段各 1 字节。",
+      "misconception": "把引用当成「对象副本」；改副本原对象不变，就是引用没落到起始地址。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "gc_reclaim": {
+      "id": "gc_reclaim",
+      "title": "垃圾回收 · 没人指就回收",
+      "body": "GC 只认可达性：从根走不到的对象回收；本课按引用计数，最后一条边断开即回收。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 堆会满，得有人收",
+          "text": "对象建了不释放，堆迟早满。GC 只回答一个问题：哪些对象还有人引用。引用计数数「几条边指过来」，标记清扫从根出发走一遍。本课选引用计数（数据侧定稿），断开最后一条边即回收。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "触发 · 断开最后一个引用再回收",
+          "text": "断开最后一个引用，手动触发 GC，看该对象从对象图消失、堆占用回落。回收时刻要落在「最后一个引用断开之后」，不是之前，也不是永远不。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "代价 · 两种算法各付什么",
+          "text": "引用计数随时更新计数、但放过环；标记清扫要暂停走图、但能收环。能说出本课选的那种付了什么代价，才算懂取舍，而不是背两个名字。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 面板说回收，内存没降",
+          "text": "负例：GC 面板显示「已回收」，堆占用不降，对象图节点还在。数字不回落就是没回收，不许拿日志顶替——这类「只摆着」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 回收时刻对，内存真回落",
+          "text": "验收：手动触发 GC，回收时刻正确、内存回落。四条同时——①不可达对象从对象图消失；②堆占用按对象大小回落；③可达对象一个不少；④GC 报告落袋。只看「回收成功」四个字，不给过。"
+        }
+      ],
+      "p1": "建 4 个对象、断一条边，看哪些被回收、堆占用怎么变",
+      "p1_gates": [
+        "T13.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "建 4 个对象、断一条边，读回收前后状态与堆占用",
+          "judge": "四条同时：①不可达对象消失；②堆回落对；③可达对象保留；④报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T13.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "打印「已回收」，堆占用不降",
+          "judge": "堆字节数不变；detail 写「仅打日志未释放」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T13.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按 4 B/个算回收前后的堆占用与回收量",
+          "judge": "与机器一致；不算 P1；detail 写「对象大小或差值算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T13.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「从根不可达的可以回收」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T13.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T13.3-1",
+          "title": "回收前后逐对象状态与可达性对得上",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "obj",
+            "size",
+            "reachable",
+            "after"
+          ],
+          "expect_rows": [
+            {
+              "obj": "A",
+              "size": 4,
+              "reachable": true,
+              "after": "live"
+            },
+            {
+              "obj": "B",
+              "size": 4,
+              "reachable": false,
+              "after": "freed"
+            },
+            {
+              "obj": "C",
+              "size": 4,
+              "reachable": true,
+              "after": "live"
+            },
+            {
+              "obj": "D",
+              "size": 4,
+              "reachable": true,
+              "after": "live"
+            }
+          ],
+          "expect_meta": {
+            "unreachable_gone": true,
+            "heap_delta_ok": true,
+            "reachable_kept": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T13.3-2",
+          "title": "负例：回收日志打了，堆占用不降",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "free",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T13.3-3",
+          "title": "按 4 B/个算回收前后的堆占用",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "heap_before": 16,
+            "heap_after": 12,
+            "reclaimed": 4
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T13.3-4",
+          "title": "GC 到底在回答什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "GC 到底在回答什么？",
+            "options": [
+              "哪些对象从根不可达，可以回收",
+              "哪些对象最近没人用，先缓存起来",
+              "哪些对象最大，优先搬走",
+              "哪些对象字段最多，先压缩"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先标可达，再按 4 B/个算堆占用；回收前后各记一次。",
+      "misconception": "把「没人用」当成「没人指」；有环的对象在引用计数下不会被回收。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
