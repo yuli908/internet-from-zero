@@ -6,8 +6,25 @@ extends RefCounted
 
 const Ch02ChecksScript := preload("res://src/core/ch02_checks.gd")
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 30
+const EXPECT_GROUPS := {
+	"data": 1, "transistor_body": 5, "inverter_body": 3, "replace_body": 5,
+	"build_area_area": 9, "build_area_budget": 5, "build_area_isolated": 2,
+}
+const GROUP_DESCRIPTIONS := {
+	"data": "ch02_labs 数据文件可读",
+	"transistor_body": "2.1 阈值、截止、三区归类的正文表述",
+	"inverter_body": "2.2 截止管切断与稳态电流表述",
+	"replace_body": "2.4 验收优先级与静态电流 pending 表述",
+	"build_area_area": "2.5 面积判据：槽位/门数阈值、7 门过与 10 门拒",
+	"build_area_budget": "预算分支独立触发：4×成品 XOR 展开 16>8",
+	"build_area_isolated": "槽位放宽副本：10 门仅因预算被拒",
+}
+
 func run(ctx: TestContext) -> void:
 	var labs: Dictionary = TestUtil.read_json("res://data/labs/ch02_labs.json").get("labs", {})
+	ctx.begin_group("data")
 	ctx.check("ch02_labs 可读", not labs.is_empty())
 	_check_transistor(ctx, str((labs.get("transistor", {}) as Dictionary).get("body", "")))
 	_check_inverter(ctx, str((labs.get("inverter", {}) as Dictionary).get("body", "")))
@@ -16,6 +33,7 @@ func run(ctx: TestContext) -> void:
 
 ## 2.1：阈值与三区归类（不能再说「加电压就通」「按 Vds 排序」）。
 func _check_transistor(ctx: TestContext, body: String) -> void:
+	ctx.begin_group("transistor_body")
 	ctx.check("transistor body 写明 0.9 V 阈值", body.contains("阈值 0.9 V"), body)
 	ctx.check("transistor body 写明低于阈值截止", body.contains("低于阈值截止"), body)
 	ctx.check("transistor body 不再说「加电压就通」", not body.contains("栅极加电压，源漏之间就通"), body)
@@ -24,12 +42,14 @@ func _check_transistor(ctx: TestContext, body: String) -> void:
 
 ## 2.2：稳态机制（不是「有电流」，是电源到地被切断、电流 ≤1 µA）。
 func _check_inverter(ctx: TestContext, body: String) -> void:
+	ctx.begin_group("inverter_body")
 	ctx.check("inverter body 写明截止管切断", body.contains("被截止管切断"), body)
 	ctx.check("inverter body 写明稳态电流 ≤1 µA", body.contains("稳态电流 ≤1 µA"), body)
 	ctx.check("inverter body 不再说「有电流」", not body.contains("只有一条通路有电流"), body)
 
 ## 2.4：四项验收同时看，静态电流是 pending 不是结论。
 func _check_replace(ctx: TestContext, body: String) -> void:
+	ctx.begin_group("replace_body")
 	ctx.check("replace body 写明行为等价是第一条", body.contains("行为等价是第一条"), body)
 	ctx.check("replace body 写明四项同时看", body.contains("延迟、门数、静态电流同时看"), body)
 	ctx.check("replace body 写明静态电流 pending", body.contains("标 pending，不当已知"), body)
@@ -38,6 +58,7 @@ func _check_replace(ctx: TestContext, body: String) -> void:
 
 ## 2.5 T2.5-3：展开门数预算 8；成品门 1+1+1+4=7 过，全 NAND 手搓 1+2+3+4=10 拒。
 func _check_build_area(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("build_area_area")
 	ctx.check("ch02 power 配置存在", not cfg.is_empty())
 	var answers := {"power_mw": 0.05445, "ratio": 0.5, "T2.5-4": 1}
 	var seven := {"not": _g1("not"), "and": _g2("and"), "or": _g2("or"), "xor": _g2("xor")}
@@ -59,6 +80,7 @@ func _check_build_area(ctx: TestContext, cfg: Dictionary) -> void:
 		str(c10.get("detail", "")))
 
 	# 探针 A：4 个成品 XOR（顶层 4 槽、展开 16>8）。行为对 not/and/or 不成立，但预算行应报 16>8、槽位行不出现。
+	ctx.begin_group("build_area_budget")
 	var four_xor := {"not": _g2("xor"), "and": _g2("xor"), "or": _g2("xor"), "xor": _g2("xor")}
 	ctx.eq("4×XOR 构型展开门数", _expanded(four_xor), 16)
 	var r16: Dictionary = Ch02ChecksScript.run("power", cfg, {"answers": answers, "graphs": four_xor})
@@ -74,6 +96,7 @@ func _check_build_area(ctx: TestContext, cfg: Dictionary) -> void:
 		str((r16["report"] as GateReport).failure_codes()))
 
 	# 探针 B：仅放宽本用例槽位到 10（测试副本，不改数据），10 门手搓行为全过 → 只剩预算一条理由。
+	ctx.begin_group("build_area_isolated")
 	var wide: Dictionary = JSON.parse_string(JSON.stringify(cfg))
 	for raw_case in (wide as Dictionary).get("gate_cases", []):
 		if str((raw_case as Dictionary).get("id", "")) == "T2.5-3":

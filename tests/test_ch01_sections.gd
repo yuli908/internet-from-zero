@@ -10,16 +10,43 @@ const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
 const TOTAL_SECTIONS := 34
 const CHAR_LIMITS := {"level": 150, "binary": 150, "boolean": 150, "gate": 170, "signal": 150, "half_adder": 150}
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 227
+const EXPECT_GROUPS := {
+	"loadable": 1, "limits_lock": 1, "required_align": 6, "sections_present": 6,
+	"order": 34, "after_unlock": 34, "after_bound": 34, "text_nonempty": 34,
+	"text_cap_grade": 34, "last_after": 6, "screen_sum": 24, "fallback": 12,
+	"total_sections": 1,
+}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "数据文件可读且 loader 无错误",
+	"limits_lock": "gate 单段上限锁定 170（中栏），防止统一回 150",
+	"required_align": "每 lab 的 required gate 数与章节 gate_ids 一致",
+	"sections_present": "每 lab 必有非空 sections",
+	"order": "每段 order 在 lab 内连续 1..n",
+	"after_unlock": "首段 after=0、其余单调不减",
+	"after_bound": "每段 after ≤ required−1",
+	"text_nonempty": "每段 text 非空",
+	"text_cap_grade": "每段字数按位置分档 ≤150 / gate ≤170（去半角空格口径）",
+	"last_after": "末段与最大 after = required−1",
+	"screen_sum": "同一 after 档同屏合计 ≤260",
+	"fallback": "删掉 sections 后退回 body",
+	"total_sections": "全篇段数与数据一致",
+}
+
 const Teach = preload("res://src/ui/teaching.gd")
 
 func run(ctx: TestContext) -> void:
+	ctx.begin_group("loadable")
 	var db := TestUtil.data_db()
 	ctx.check("数据层 loader 无错误", db.errors.is_empty(), str(db.errors))
 	var labs_doc := TestUtil.labs_doc()
 	var chapter_doc := TestUtil.chapter_doc()
-	var req_by_lab := _required_by_lab(ctx, chapter_doc, labs_doc)
+	ctx.begin_group("limits_lock")
 	ctx.check("gate 单段上限为 170（中栏），不是 150", int(CHAR_LIMITS["gate"]) == 170,
 		str(CHAR_LIMITS["gate"]))
+	ctx.begin_group("required_align")
+	var req_by_lab := _required_by_lab(ctx, chapter_doc, labs_doc)
 
 	var total := 0
 	for id in LABS:
@@ -27,6 +54,7 @@ func run(ctx: TestContext) -> void:
 		var secs: Array = cfg.get("sections", [])
 		var req: int = int(req_by_lab.get(id, -1))
 		var limit := int(CHAR_LIMITS[id])
+		ctx.begin_group("sections_present")
 		ctx.check("%s 有 sections" % id, not secs.is_empty(), str(secs.size()))
 		var max_after := -1
 		var prev_after := -1
@@ -37,30 +65,38 @@ func run(ctx: TestContext) -> void:
 			var after := int(s.get("after", -1))
 			var text := str(s.get("text", ""))
 			var text_len := text.replace(" ", "").length()
+			ctx.begin_group("order")
 			ctx.eq("%s[%d] order 连续" % [id, i + 1], order, i + 1)
+			ctx.begin_group("after_unlock")
 			if i == 0:
 				ctx.eq("%s 首段 after=0" % id, after, 0)
 			else:
 				ctx.check("%s[%d] after 单调不减" % [id, i + 1], after >= prev_after,
 					"%d < %d" % [after, prev_after])
+			ctx.begin_group("after_bound")
 			ctx.check("%s[%d] after ≤ required−1" % [id, i + 1], after <= req - 1,
 				"after=%d required=%d" % [after, req])
+			ctx.begin_group("text_nonempty")
 			ctx.check("%s[%d] text 非空" % [id, i + 1], not text.strip_edges().is_empty())
-			ctx.check("%s[%d] text ≤260 字" % [id, i + 1], text_len <= 260, str(text_len))
+			ctx.begin_group("text_cap_grade")
 			ctx.check("%s[%d] text ≤%d 字（位置分档）" % [id, i + 1, limit], text_len <= limit, str(text_len))
 			screen[after] = int(screen.get(after, 0)) + text_len
 			max_after = maxi(max_after, after)
 			prev_after = after
 		total += secs.size()
 		var last_after := int((secs[secs.size() - 1] as Dictionary).get("after", -1))
+		ctx.begin_group("last_after")
 		ctx.check("%s 末段/最大 after = required−1" % id,
 			last_after == req - 1 and max_after == req - 1,
 			"last=%d max=%d required=%d" % [last_after, max_after, req])
 		# 同屏约束：同一 after 档一次显示的全部段落合计 ≤260。
+		ctx.begin_group("screen_sum")
 		for after in screen.keys():
 			ctx.check("%s after=%d 同屏合计 ≤260" % [id, int(after)],
 				int(screen[after]) <= 260, str(screen[after]))
+		ctx.begin_group("fallback")
 		_fallback_check(ctx, str(id), cfg)
+	ctx.begin_group("total_sections")
 	ctx.eq("全文段数", total, TOTAL_SECTIONS)
 
 ## required gate 数：章节 gate_ids 与 labs gate_cases 里 required=true 的条数必须一致。

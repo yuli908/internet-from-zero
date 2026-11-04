@@ -5,12 +5,23 @@ var checks := 0
 var failures := 0
 var suite := ""
 var failure_messages: Array = []
+var group := ""
+var group_counts := {}
 
 func begin(name: String) -> void:
 	suite = name
+	group = ""
+	group_counts = {}
+
+## 后续 check 归入该组；runner 用组名计数与各套件自报的 EXPECT_GROUPS 逐组比对。
+func begin_group(name: String) -> void:
+	group = name
 
 func check(label: String, cond: bool, detail: String = "") -> bool:
 	checks += 1
+	if not group.is_empty():
+		group_counts[group] = int(group_counts.get(group, 0)) + 1
+		label = "%s::%s" % [group, label]
 	if not cond:
 		failures += 1
 		var msg := "[%s] %s" % [suite, label]
