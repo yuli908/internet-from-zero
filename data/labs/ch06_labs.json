@@ -132,7 +132,7 @@
       "p1_gates": ["T6.4-1", "T6.4-2"],
       "practice": [
         {"id": "A", "level": "P1", "produce": "接磁带、读入、写内存、跳首地址；清内存后重来一遍", "judge": "三条同时：①装入后输出 8/15；②重载后结果一致；③坏字节被校验拒跑", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_UNKNOWN_TARGET(5)"], "gates": ["T6.4-1", "T6.4-2"]},
-        {"id": "B", "level": "负例", "produce": "首地址偏移 1", "judge": "程序跑飞，跳转落到空处；detail 写「首地址错」", "codes": ["5"], "gates": ["T6.4-3"]},
+        {"id": "B", "level": "负例", "produce": "首地址偏移 1", "judge": "程序跑飞，跳转落到空处；detail 写「首地址错」", "codes": ["E_UNKNOWN_TARGET(5)"], "gates": ["T6.4-3"]},
         {"id": "C", "level": "P0b", "produce": "逐字节相加取和", "judge": "与机器值一致；不算 P1", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T6.4-2"]},
         {"id": "D", "level": "quiz", "produce": "选「磁带慢且断电即失，内存必须整段装入」", "judge": "answer 对照", "codes": ["E_QUIZ(14)"], "gates": ["T6.4-4"]}
       ],

@@ -79,7 +79,6 @@ func run(ctx: TestContext) -> void:
 	_judge_loader(ctx, labs.get("loader", {}))
 	_judge_cache(ctx, labs.get("cache", {}))
 	_judge_vm(ctx, labs.get("vm", {}))
-	print("DEBUG_GROUPS ", ctx.group_counts)
 
 func _structural(ctx: TestContext, id: String, cfg: Dictionary, secs: Array) -> void:
 	var req := _required_count(cfg)
@@ -149,14 +148,18 @@ func _contract(ctx: TestContext, id: String, cfg: Dictionary, labs: Dictionary) 
 	ctx.check("%s gate id 顺序与课文提案一致" % id, _ids_ok(id, ids), str(ids))
 	ctx.begin_group("gate_codes")
 	var bad := []
-	var re := RegEx.new()
-	re.compile("(\\d+)")
+	var codes := []
 	for raw in cases:
 		for code in (raw as Dictionary).get("codes", []):
-			var m := re.search(str(code))
-			if m == null or not LabGateKit.ALLOWED_CODES.has(int(m.get_string(1))):
-				bad.append(str(code))
-	ctx.check("%s 失败码在白名单内（无 26/28）" % id, bad.is_empty(), str(bad))
+			codes.append(str(code))
+	for raw in (cfg.get("practice", []) as Array):
+		for code in (raw as Dictionary).get("codes", []):
+			codes.append(str(code))
+	for s in codes:
+		var num := _code_num(str(s))
+		if num < 0 or not LabGateKit.ALLOWED_CODES.has(num):
+			bad.append(str(s))
+	ctx.check("%s 失败码形如 E_NAME(n) 且在白名单（无 26/28）" % id, bad.is_empty(), str(bad))
 	ctx.begin_group("practice")
 	var practice: Array = cfg.get("practice", [])
 	ctx.check("%s 有实践表" % id, not practice.is_empty(), str(practice.size()))
@@ -236,6 +239,18 @@ func _codes(rep: GateReport) -> Array:
 		if not bool(c.get("ok", false)) and bool(c.get("required", true)):
 			out.append(int(c.get("code", GateResult.E_GENERIC)))
 	return out
+
+## 白名单口径：一条码必须是完整的 `E_NAME(n)`，名字与 `GateResult` 注册名一致。
+func _code_num(s: String) -> int:
+	var re := RegEx.new()
+	re.compile(r"^E_[A-Z_]+\((\d+)\)$")
+	var m := re.search(s)
+	if m == null:
+		return -1
+	var num := int(m.get_string(1))
+	if s.get_slice("(", 0) != GateResult.name_of(num):
+		return -1
+	return num
 
 # ---------------------------------------------------------------- 6.1
 
