@@ -10,6 +10,7 @@
     "res://data/labs/ch01_labs.json",
     "res://data/chapters/ch02_levels.json",
     "res://data/labs/ch02_labs.json",
-    "res://data/sim/delays.json"
+    "res://data/sim/delays.json",
+    "res://data/questions/ch01_exercises.json"
   ]
 }

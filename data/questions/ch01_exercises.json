@@ -1,0 +1,824 @@
+{
+  "version": 1,
+  "format": "ifz-questions/1",
+  "chapter": "ch01",
+  "bank": "exercises",
+  "note": "第一章 42 道练习，逐题抽取自 docs/curriculum/03-exercises-multi-solution.md（§1.1–§1.6，各 7 题）。题干/解法/评分锚点/常见错误按原文保留；rubric 权重取文档锚点，1.1-3 因锚点合计 90，补 §0.4 计算题量规的「书写规范 10」。仅 1.2-1、1.6-5 有唯一数值答案，其余交人工 rubric。",
+  "items": [
+    {
+      "id": "ch01-1.1-1",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "understanding",
+      "stem": "给定 V_IH=2.0V、V_IL=0.8V，把 0.2V、0.8V、1.5V、2.4V、3.1V 分类，并说明「禁区」的后果。",
+      "solutions": [
+        {"label": "解法 A（区间法）", "approach": "画一条数轴，标 [0,0.8] 低、(0.8,2.0) 禁区、[2.0,3.3] 高，逐点落位。"},
+        {"label": "解法 B（手册对照法）", "approach": "把每个值代入 V ≤ V_IL、V ≥ V_IH 两个不等式，直接判定。"},
+        {"label": "解法 C（边界枚举）", "approach": "只算边界 0.8 与 2.0，说明「含边界」的约定，再推其余。"}
+      ],
+      "rubric": [
+        {"dim": "分类（5/5）", "weight": 60},
+        {"dim": "后果（可能读成高也可能读成低/不确定）", "weight": 40}
+      ],
+      "common_errors": ["把 0.8V 判成禁区（未按「≤ 即合法低」）", "把 3.1V 判成「超高」（没有「超高」这个类别）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-2",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "build",
+      "stem": "按钮断开时门输入乱跳，修复它，并证明修复有效。",
+      "solutions": [
+        {"label": "解法 A（下拉电阻）", "approach": "输入对地接 10kΩ，按钮接电源。"},
+        {"label": "解法 B（上拉电阻）", "approach": "输入对电源接 10kΩ，按钮接地，逻辑极性反转后在软件/门级取反。"},
+        {"label": "解法 C（双掷开关）", "approach": "用 SPDT 开关，两端分别接高/低，输入始终有确定电位（无电阻）。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（断开后 10 秒稳定）", "weight": 50},
+        {"dim": "可解释性（为什么需要默认值）", "weight": 30},
+        {"dim": "极性说明（解法 B 的极性变化）", "weight": 20}
+      ],
+      "common_errors": ["下拉阻值过小（功耗大/按钮过流）", "只接电阻不接开关另一端，仍然浮空"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-3",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "compute",
+      "stem": "V_OH=3.0V、V_IH=2.0V、V_IL=0.8V、V_OL=0.2V，求高/低噪声容限。",
+      "solutions": [
+        {"label": "解法 A（公式法）", "approach": "NM_H=V_OH−V_IH=1.0V，NM_L=V_IL−V_OL=0.6V。"},
+        {"label": "解法 B（图示法）", "approach": "在电压轴上画四段区间，量出两段「重叠裕量」。"},
+        {"label": "解法 C（反推法）", "approach": "从「允许叠加多大噪声仍不误判」反推，得到同值。"}
+      ],
+      "rubric": [
+        {"dim": "结果 NM_H", "weight": 30},
+        {"dim": "结果 NM_L", "weight": 30},
+        {"dim": "过程（公式/图示）", "weight": 20},
+        {"dim": "边界（低侧裕量更小，更脆弱）", "weight": 10},
+        {"dim": "书写规范", "weight": 10}
+      ],
+      "common_errors": ["把 NM_H 写成 V_IH−V_OH（负数）", "把两侧容限混成一个数"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-4",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "understanding",
+      "stem": "「灯泡半亮」应归入高还是低？为什么不能作为逻辑值？",
+      "solutions": [
+        {"label": "解法 A（判决角度）", "approach": "半亮对应电压落在禁区，接收端无法保证判决，故不是合法逻辑值。"},
+        {"label": "解法 B（信息角度）", "approach": "逻辑值要求可重复、可区分；半亮状态受电源/温度影响，不可靠。"},
+        {"label": "解法 C（工程角度）", "approach": "若确实需要三级亮度，应另设编码（如两个比特/PWM），而不是把中间态当一级。"}
+      ],
+      "rubric": [
+        {"dim": "不归入任何一类", "weight": 40},
+        {"dim": "禁区/不可判定", "weight": 40},
+        {"dim": "替代编码思路（加分）", "weight": 20}
+      ],
+      "common_errors": ["答「归低，因为不够亮」（把阈值当亮度比较）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-5",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "open",
+      "stem": "用一段话说明什么是「正逻辑约定」，并解释为什么全系统必须一致；给出一个不一致会导致的具体故障。",
+      "solutions": [
+        {"label": "解法 A（定义+反例）", "approach": "高=真；若发送端正逻辑、接收端负逻辑，同一 3.3V 会被解释成相反值。"},
+        {"label": "解法 B（分层说明）", "approach": "物理层只认电压区间；逻辑层才认真/假；约定是两层之间的翻译表。"},
+        {"label": "解法 C（协议类比）", "approach": "像双方约定「0 表示成功」还是「1 表示成功」，必须写进接口文档。"}
+      ],
+      "rubric": [
+        {"dim": "定义正确", "weight": 30},
+        {"dim": "一致性原因", "weight": 40},
+        {"dim": "具体故障", "weight": 30}
+      ],
+      "common_errors": ["把「正逻辑」说成「电压必须为正」", "把约定说成物理定律"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-6",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "debug",
+      "stem": "一个与门输出随机跳变，输入开关明明没动。定位并修复。",
+      "solutions": [
+        {"label": "解法 A（探针逐点）", "approach": "先测门输入，发现悬空；再测输出，确认随手指靠近变化；补下拉。"},
+        {"label": "解法 B（替换法）", "approach": "把输入直接接低，输出稳定→证明问题在输入侧而非门本身。"},
+        {"label": "解法 C（示波器法）", "approach": "看输入波形无稳定电平，直接判定浮空。"}
+      ],
+      "rubric": [
+        {"dim": "定位（输入悬空）", "weight": 40},
+        {"dim": "根因（无默认电位）", "weight": 30},
+        {"dim": "修复有效", "weight": 20},
+        {"dim": "为何不能靠「多试几次」", "weight": 10}
+      ],
+      "common_errors": ["换门（没找到根因）", "把乱跳归因于「门坏了」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.1-7",
+      "section": "1.1",
+      "task_ids": ["T-1.1", "T-1.2"],
+      "type": "compute",
+      "stem": "5V 系统，要求低侧噪声容限 ≥0.8V、高侧 ≥1.0V，V_OL=0.3V、V_OH=4.6V，给出可行的 V_IL/V_IH 并解释取舍。",
+      "solutions": [
+        {"label": "解法 A（从裕量反推）", "approach": "V_IL ≥ V_OL+0.8=1.1V；V_IH ≤ V_OH−1.0=3.6V；取 V_IL=1.2V、V_IH=3.4V，中间留禁区。"},
+        {"label": "解法 B（对称设计）", "approach": "以 2.5V 为中心，上下各留 1.1V/1.4V，得到 V_IL=1.4、V_IH=3.6。"},
+        {"label": "解法 C（保守设计）", "approach": "把禁区加宽，取 V_IL=1.0、V_IH=3.8，牺牲一部分抗噪换更大的判决余量（需检查是否满足下限）。"}
+      ],
+      "rubric": [
+        {"dim": "满足两条不等式", "weight": 50},
+        {"dim": "具体值", "weight": 20},
+        {"dim": "禁区越宽越抗噪但越难驱动", "weight": 30}
+      ],
+      "common_errors": ["只给一组数不验算", "把 V_IH 设得比 V_IL 还低"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-1",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "compute",
+      "stem": "1011₂ = ?，写出位权展开。",
+      "answer_value": 11,
+      "tol": 0.0,
+      "solutions": [
+        {"label": "解法 A（位权求和）", "approach": "8+0+2+1=11。"},
+        {"label": "解法 B（逐位累乘）", "approach": "从高位起 (((1×2+0)×2+1)×2+1)=11（霍纳法）。"},
+        {"label": "解法 C（分组法）", "approach": "1011 = 1000+0011 = 8+3=11。"}
+      ],
+      "rubric": [
+        {"dim": "结果 11", "weight": 50},
+        {"dim": "位权展开过程（2³…2⁰ 或霍纳步骤）", "weight": 50}
+      ],
+      "common_errors": ["把 1011 当十进制读成 1011", "漏掉 0 位的权"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-2",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "compute",
+      "stem": "0x2F 转十进制与二进制。",
+      "solutions": [
+        {"label": "解法 A（按权展开）", "approach": "2×16+15=47。"},
+        {"label": "解法 B（分组）", "approach": "2→0010、F→1111，得 0010 1111；再按位权转十进制。"},
+        {"label": "解法 C（十进制中转）", "approach": "先 2×16+15=47，再除二取余。"}
+      ],
+      "rubric": [
+        {"dim": "十进制 47", "weight": 50},
+        {"dim": "二进制 0010 1111（分组不丢前导 0）", "weight": 50}
+      ],
+      "common_errors": ["F 当成 16", "四位组写成三位（111）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-3",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "understanding",
+      "stem": "给出两条「二进制胜出」的工程理由，并举一个真实的非二进制反例。",
+      "solutions": [
+        {"label": "解法 A（可靠性主线）", "approach": "两态裕量大、器件便宜；反例 Setun。"},
+        {"label": "解法 B（生态主线）", "approach": "标准单元库/EDA/验证方法围绕二值建立；反例 TLC/QLC 闪存。"},
+        {"label": "解法 C（成本主线）", "approach": "同样可靠性目标下，三态需要更精密器件与检测电路；反例 ENIAC 十进制计数环。"}
+      ],
+      "rubric": [
+        {"dim": "工程理由一", "weight": 25},
+        {"dim": "工程理由二", "weight": 25},
+        {"dim": "反例", "weight": 30},
+        {"dim": "理由必须是工程角度而非物理必然", "weight": 20}
+      ],
+      "common_errors": ["只写「因为计算机只懂 0/1」", "反例编造（如「苏联造过四进制」）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-4",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "understanding",
+      "stem": "判断「因为电路只有通断，所以只能用二进制」，并说明。",
+      "solutions": [
+        {"label": "解法 A（反例驳斥）", "approach": "三态器件、多电平存储存在，通断只是近似。"},
+        {"label": "解法 B（逻辑驳斥）", "approach": "前提「只有通断」本身不成立——晶体管是连续器件，通断是判决后的抽象。"},
+        {"label": "解法 C（结论区分）", "approach": "结论「通常用二进制」正确，但理由错误；不能因为结论对就给对。"}
+      ],
+      "rubric": [
+        {"dim": "判错", "weight": 40},
+        {"dim": "指出结论对/理由错", "weight": 30},
+        {"dim": "给出反例", "weight": 30}
+      ],
+      "common_errors": ["判对", "只反驳不说明"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-5",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "compute",
+      "stem": "8 位三进制能表示多少状态？等效多少 bit？",
+      "solutions": [
+        {"label": "解法 A（幂运算）", "approach": "3⁸=6561；log₂6561≈12.68 bit。"},
+        {"label": "解法 B（逐位折算）", "approach": "每位 log₂3≈1.585，乘 8 得 12.68。"},
+        {"label": "解法 C（反推位数）", "approach": "13 位二进制 = 8192 才够，12 位 = 4096 不够，故约 12.68 bit（说明「bit 可以是小数」）。"}
+      ],
+      "rubric": [
+        {"dim": "状态数 6561", "weight": 40},
+        {"dim": "等效位数 12.68（或 12.7/约 12.68）", "weight": 40},
+        {"dim": "说明 bit 是信息量单位可为小数", "weight": 20}
+      ],
+      "common_errors": ["把 8 位三进制当 8 bit", "算出 24 bit（把每位当 3 bit）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-6",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "compute",
+      "stem": "把 0–15 写成二进制与三进制，指出各需几位，并说明「位数少」是否等于「更省」。",
+      "solutions": [
+        {"label": "解法 A（枚举表）", "approach": "0–15 二进制 4 位；三进制需 3 位（3³=27）。"},
+        {"label": "解法 B（对数估算）", "approach": "ceil(log₂16)=4；ceil(log₃16)=3。"},
+        {"label": "解法 C（成本核算）", "approach": "三进制位数少，但每位需要三态器件与更小裕量；省不省取决于单器件成本，不是位数。"}
+      ],
+      "rubric": [
+        {"dim": "位数正确（二进制 4 位、三进制 3 位）", "weight": 40},
+        {"dim": "枚举表/对数估算", "weight": 20},
+        {"dim": "位数≠成本", "weight": 40}
+      ],
+      "common_errors": ["把「三进制 3 位」直接等同于「更省」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.2-7",
+      "section": "1.2",
+      "task_ids": ["T-1.3", "T-1.4"],
+      "type": "open",
+      "stem": "假设有一种免费、绝对可靠的四态器件，每符号 2 bit。你会把 CPU 改成四进制吗？给出两种立场并说明失效条件。",
+      "solutions": [
+        {"label": "解法 A（支持改造）", "approach": "互连位数减半、引脚/布线压力下降；失效条件：现有工具链、编译器、标准单元全部要重做，生态成本压倒收益。"},
+        {"label": "解法 B（维持二进制）", "approach": "逻辑仍用二值，存储用四态；失效条件：若片内互连成为绝对瓶颈且生态可重建，则改造收益可能胜出。"},
+        {"label": "解法 C（混合方案）", "approach": "接口二值、存储多值、计算二值；失效条件：编解码开销超过互连节省。"}
+      ],
+      "rubric": [
+        {"dim": "支持改造立场", "weight": 25},
+        {"dim": "维持二进制立场", "weight": 25},
+        {"dim": "每立场一个失效条件", "weight": 25},
+        {"dim": "区分信息密度/工程成本/生态", "weight": 25}
+      ],
+      "common_errors": ["只给一个立场", "把「理论上更优」直接等同于「应该采用」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-1",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "understanding",
+      "stem": "把「白天且有卡，或夜间且有管理员陪同」写成表达式，并定义变量。",
+      "solutions": [
+        {"label": "解法 A（直接映射）", "approach": "D∧C ∨ N∧G。"},
+        {"label": "解法 B（先列场景）", "approach": "列举 4 种可进场景，再合并为表达式。"},
+        {"label": "解法 C（否定式）", "approach": "先写「不能进」的条件，再取非得可进（需用德摩根展开）。"}
+      ],
+      "rubric": [
+        {"dim": "变量定义清晰", "weight": 20},
+        {"dim": "表达式正确", "weight": 50},
+        {"dim": "括号/优先级无歧义", "weight": 30}
+      ],
+      "common_errors": ["写成 D∧(C∨N)∧G（优先级错）", "变量未定义"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-2",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "compute",
+      "stem": "写出 A∨(B∧¬C) 的 8 行真值表。",
+      "solutions": [
+        {"label": "解法 A（逐行代入）", "approach": "按 ABC=000…111 顺序算。"},
+        {"label": "解法 B（分列法）", "approach": "先算 ¬C、B∧¬C，再或 A。"},
+        {"label": "解法 C（卡诺/集合）", "approach": "先画集合图，再转表（仅作校验）。"}
+      ],
+      "rubric": [
+        {"dim": "8 行真值表", "weight": 70},
+        {"dim": "行序规范", "weight": 10},
+        {"dim": "中间列", "weight": 20}
+      ],
+      "common_errors": ["漏 C=0 的行", "把 ¬C 算成 C"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-3",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "understanding",
+      "stem": "区分「或」与「排他或」，各举一个生活例子。",
+      "solutions": [
+        {"label": "解法 A（真值表）", "approach": "OR 在 11 为 1；XOR 在 11 为 0。"},
+        {"label": "解法 B（语言例子）", "approach": "OR：「有学生证或教师证可入内」（两证都有也能进）；XOR：「套餐二选一」。"},
+        {"label": "解法 C（电路例子）", "approach": "OR 用于「任一报警触发」；XOR 用于「两开关控制同一灯」（楼梯开关）。"}
+      ],
+      "rubric": [
+        {"dim": "定义正确", "weight": 40},
+        {"dim": "例子一", "weight": 20},
+        {"dim": "例子二", "weight": 20},
+        {"dim": "指出日常语言常混用", "weight": 20}
+      ],
+      "common_errors": ["把「或」的例子举成二选一（自相矛盾）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-4",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "compute",
+      "stem": "用韦恩图证明 ¬(A∧B)=¬A∨¬B。",
+      "solutions": [
+        {"label": "解法 A（集合图）", "approach": "交集之外 = 至少不在一个集合里 = 两个补集的并。"},
+        {"label": "解法 B（真值表）", "approach": "4 行逐一比对，左右相同。"},
+        {"label": "解法 C（代数）", "approach": "由 ¬(A∧B)=¬A∨¬B 的对偶式反向验证（需说明这是公理/定理地位）。"}
+      ],
+      "rubric": [
+        {"dim": "韦恩图正确", "weight": 40},
+        {"dim": "文字说明", "weight": 30},
+        {"dim": "指出对偶式（加分）", "weight": 30}
+      ],
+      "common_errors": ["只写公式不解释", "把并/交写反"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-5",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "understanding",
+      "stem": "给出一个「不是命题」的句子，说明为什么，并改写成命题。",
+      "solutions": [
+        {"label": "解法 A（祈使句）", "approach": "「请关门」无真值；改写「门是关着的」。"},
+        {"label": "解法 B（含自由变量）", "approach": "「x>3」无真值；改写「当 x=5 时，x>3」。"},
+        {"label": "解法 C（含模糊词）", "approach": "「今天很热」无确定真值；改写「今天气温≥35℃」。"}
+      ],
+      "rubric": [
+        {"dim": "例子正确", "weight": 40},
+        {"dim": "原因", "weight": 40},
+        {"dim": "改写可用", "weight": 20}
+      ],
+      "common_errors": ["举疑问句却说「它是假的」", "改写后仍含模糊词"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-6",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "debug",
+      "stem": "玩家写了 D∧C ∨ N∧G，但「白天有卡且有管理员」时门不开。定位问题。",
+      "solutions": [
+        {"label": "解法 A（真值表逐行）", "approach": "发现该行 D=1,C=1,N=0,G=1 时表达式为 0，与需求「白天有卡即可」不符。"},
+        {"label": "解法 B（场景回放）", "approach": "用游戏日志回放该场景，定位到变量 N 被错误地要求为 1。"},
+        {"label": "解法 C（最小反例）", "approach": "构造只差一个变量的两组输入，二分定位到具体子项。"}
+      ],
+      "rubric": [
+        {"dim": "定位到子项", "weight": 40},
+        {"dim": "根因（把「或」写成「且」或变量绑错）", "weight": 30},
+        {"dim": "修复后全用例通过", "weight": 20},
+        {"dim": "补一条回归用例", "weight": 10}
+      ],
+      "common_errors": ["直接重写整个表达式但不说明错在哪（最多 60 分）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.3-7",
+      "section": "1.3",
+      "task_ids": ["T-1.5", "T-1.6"],
+      "type": "open",
+      "stem": "「三人表决，至少两人同意才通过；但主持人有一票否决」。给出表达式，并提供两种实现思路。",
+      "solutions": [
+        {"label": "解法 A（先多数后否决）", "approach": "M=(A∧B)∨(A∧C)∨(B∧C)；Pass=M∧¬V（V=主持人否决）。"},
+        {"label": "解法 B（先否决再多数的等价式）", "approach": "Pass=(A∧B∧¬V)∨(A∧C∧¬V)∨(B∧C∧¬V)，展开后与 A 等价。"},
+        {"label": "解法 C（门级复用）", "approach": "先搭 2-of-3 多数门，再与 ¬V 相与；多数门内部可用 NAND 复用。"}
+      ],
+      "rubric": [
+        {"dim": "逻辑正确", "weight": 40},
+        {"dim": "两种实现", "weight": 30},
+        {"dim": "说明两者等价/门数差异", "weight": 20},
+        {"dim": "失效预测（V 未定义时）", "weight": 10}
+      ],
+      "common_errors": ["把否决写成 ∨V", "多数门写成三个 and 相加漏项"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-1",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "compute",
+      "stem": "写出 AND/OR/NOT 真值表。",
+      "solutions": [
+        {"label": "解法 A（标准两列）", "approach": "按 AB=00,01,10,11。"},
+        {"label": "解法 B（行为描述转表）", "approach": "先写「什么时候输出 1」，再补其余行。"},
+        {"label": "解法 C（开关类比转表）", "approach": "串联/并联/常闭，逐组合记录。"}
+      ],
+      "rubric": [
+        {"dim": "三表全对", "weight": 70},
+        {"dim": "行序", "weight": 10},
+        {"dim": "NOT 单输入", "weight": 20}
+      ],
+      "common_errors": ["OR 的 11 行写 0（混成 XOR）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-2",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "build",
+      "stem": "只用一个 NAND 实现 NOT。",
+      "solutions": [
+        {"label": "解法 A（输入短接）", "approach": "A NAND A。"},
+        {"label": "解法 B（接高电平）", "approach": "一端接 A，一端接逻辑 1，输出 ¬A（需保证高电平合法）。"},
+        {"label": "解法 C（NOR 替代）", "approach": "用 NOR 短接同样得到 NOT（若题设允许 NOR）。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（黑盒验收）", "weight": 60},
+        {"dim": "资源（门数=1）", "weight": 20},
+        {"dim": "可解释性（为什么短接等于非）", "weight": 20}
+      ],
+      "common_errors": ["把输出接回输入（形成锁存器，行为不符）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-3",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "build",
+      "stem": "只用 NAND 实现 AND。",
+      "solutions": [
+        {"label": "解法 A（NAND + NOT）", "approach": "¬(A NAND B)，2 个 NAND。"},
+        {"label": "解法 B（德摩根变形）", "approach": "¬(¬A ∨ ¬B)，用 NAND 组合实现，门数可能更多（允许，但需说明）。"},
+        {"label": "解法 C（三 NAND 冗余）", "approach": "多一级缓冲，行为等价但延迟更大，用于观察「等价不等于最优」。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（黑盒验收）", "weight": 50},
+        {"dim": "资源（门数 2）", "weight": 15},
+        {"dim": "可解释性（最后必须反相）", "weight": 25},
+        {"dim": "冗余解代价说明", "weight": 10}
+      ],
+      "common_errors": ["直接用 NAND 当 AND（11 行错）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-4",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "build",
+      "stem": "只用 NAND 实现 OR。",
+      "solutions": [
+        {"label": "解法 A（双反相再 NAND）", "approach": "(¬A) NAND (¬B)，3 个 NAND。"},
+        {"label": "解法 B（把 NAND 当反相器 + 德摩根）", "approach": "先 A NAND A、B NAND B，再 NAND，结构同 A 但画法不同。"},
+        {"label": "解法 C（4 NAND 版）", "approach": "多一级反相，行为等价；用于比较延迟。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（黑盒验收）", "weight": 50},
+        {"dim": "资源（门数 3）", "weight": 20},
+        {"dim": "可解释性（德摩根）", "weight": 30}
+      ],
+      "common_errors": ["只反相一个输入", "把输出再反相（得到 AND）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-5",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "understanding",
+      "stem": "为什么两个门输出不能直接接在一起实现「或」？给出正确做法。",
+      "solutions": [
+        {"label": "解法 A（电气解释）", "approach": "推挽输出高/低会互相灌电流，可能过流发热。"},
+        {"label": "解法 B（逻辑解释）", "approach": "两个输出的「或」是逻辑运算，必须由或门完成；导线不执行逻辑。"},
+        {"label": "解法 C（工程解释）", "approach": "若确实需要「线或」，需开漏输出 + 上拉（特定器件支持），不是通用做法。"}
+      ],
+      "rubric": [
+        {"dim": "指出冲突", "weight": 40},
+        {"dim": "正确做法（或门/开漏）", "weight": 40},
+        {"dim": "线或条件", "weight": 20}
+      ],
+      "common_errors": ["答「可以，只是电压会叠加」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-6",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "debug",
+      "stem": "一个「三人多数」电路，输入 110 时输出 0，应为 1。定位。",
+      "solutions": [
+        {"label": "解法 A（真值表比对）", "approach": "列出期望表与实测表，找出不符行，定位到某个 AND 实际接成 OR。"},
+        {"label": "解法 B（分段探针）", "approach": "从输出往前逐级测，找到第一处与期望不符的节点。"},
+        {"label": "解法 C（替换法）", "approach": "用已知正确的门替换可疑门，观察是否恢复。"}
+      ],
+      "rubric": [
+        {"dim": "定位", "weight": 40},
+        {"dim": "根因", "weight": 30},
+        {"dim": "修复", "weight": 20},
+        {"dim": "补测全 8 行", "weight": 10}
+      ],
+      "common_errors": ["只改输出反相器「蒙对」部分用例"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.4-7",
+      "section": "1.4",
+      "task_ids": ["T-1.7", "T-1.8"],
+      "type": "open",
+      "stem": "分别用 NAND 和 NOR 实现 NOT/AND/OR，比较门数与级数，说明为什么工业界更常见 NAND。",
+      "solutions": [
+        {"label": "解法 A（实测比较）", "approach": "NAND: 1/2/3；NOR: 1/3/2（OR 用 NOR+反相，AND 用双反相再 NOR）；比较总数与级数。"},
+        {"label": "解法 B（器件比较）", "approach": "CMOS NAND 与 NOR 的晶体管数与迁移率差异；NOR 的 PMOS 串联更慢。"},
+        {"label": "解法 C（生态比较）", "approach": "标准单元库、教学传统、74 系列历史。"}
+      ],
+      "rubric": [
+        {"dim": "两种实现正确", "weight": 40},
+        {"dim": "门数/级数表", "weight": 30},
+        {"dim": "原因至少两条", "weight": 30}
+      ],
+      "common_errors": ["只算一种", "把「NOR 也能实现」当成「NOR 更优」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-1",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "compute",
+      "stem": "在给定时序图上标出安全采样窗口。",
+      "solutions": [
+        {"label": "解法 A（目测稳定区）", "approach": "避开跳变沿与毛刺，取中间平坦段。"},
+        {"label": "解法 B（按建立/保持算）", "approach": "以时钟沿为基准，向前 t_su、向后 t_h，取交集。"},
+        {"label": "解法 C（扫描法）", "approach": "在仿真里移动采样点，记录首个出错与恢复位置，反推窗口。"}
+      ],
+      "rubric": [
+        {"dim": "窗口位置正确", "weight": 60},
+        {"dim": "标出 t_su/t_h", "weight": 20},
+        {"dim": "窗口越窄越危险", "weight": 20}
+      ],
+      "common_errors": ["把采样点放在上升沿正中", "忽略毛刺"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-2",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "compute",
+      "stem": "指出 A∨¬A 输出中的毛刺，说明产生条件与方向。",
+      "solutions": [
+        {"label": "解法 A（路径分析）", "approach": "A 直接到或门，¬A 多一级反相；A 1→0 时两输入短暂同为 0。"},
+        {"label": "解法 B（波形观察）", "approach": "在下降沿后出现窄低脉冲，宽度≈反相器延迟。"},
+        {"label": "解法 C（仿真扫描）", "approach": "遍历输入跳变方向，只有 1→0 出现，0→1 不出现。"}
+      ],
+      "rubric": [
+        {"dim": "定位", "weight": 40},
+        {"dim": "方向", "weight": 20},
+        {"dim": "原因（路径延迟不同）", "weight": 40}
+      ],
+      "common_errors": ["说「或门坏了」", "认为两个方向都有毛刺"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-3",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "compute",
+      "stem": "时钟周期 10ns，组合逻辑最坏延迟 7ns，t_su=1.5ns，t_h=0.5ns，判断是否满足并算裕量。",
+      "solutions": [
+        {"label": "解法 A（不等式）", "approach": "10 ≥ 7+1.5=8.5，满足，裕量 1.5ns。"},
+        {"label": "解法 B（时间轴）", "approach": "画一个周期，标数据到达 7ns、采样 10ns，间距 3ns > 1.5ns。"},
+        {"label": "解法 C（反推最高频率）", "approach": "f_max≈1/(7+1.5)=117.6MHz，当前 100MHz 可行。"}
+      ],
+      "rubric": [
+        {"dim": "判断是否满足", "weight": 40},
+        {"dim": "裕量", "weight": 30},
+        {"dim": "反推频率（加分）", "weight": 30}
+      ],
+      "common_errors": ["把 t_h 也加进建立检查", "把周期当频率"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-4",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "understanding",
+      "stem": "解释为什么不能无限提高时钟频率，至少给两个原因。",
+      "solutions": [
+        {"label": "解法 A（时序）", "approach": "最慢路径 + 建立/保持决定上限。"},
+        {"label": "解法 B（功耗/散热）", "approach": "动态功耗 ∝CV²f，频率升高带来散热与供电压力。"},
+        {"label": "解法 C（可靠性）", "approach": "高频下噪声、串扰、抖动影响更大，误码率上升。"}
+      ],
+      "rubric": [
+        {"dim": "原因一", "weight": 40},
+        {"dim": "原因二", "weight": 40},
+        {"dim": "联系降频/流水线/缩短路径", "weight": 20}
+      ],
+      "common_errors": ["只说「会发热」（只覆盖功耗）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-5",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "understanding",
+      "stem": "采样点落在毛刺上，输出会怎样？为什么下游无法自动纠正？",
+      "solutions": [
+        {"label": "解法 A（判决角度）", "approach": "毛刺是真实合法电平，下游只看到 0/1，无法知道「这是毛刺」。"},
+        {"label": "解法 B（时序角度）", "approach": "毛刺宽度可能满足建立/保持，被当作有效数据锁存。"},
+        {"label": "解法 C（系统角度）", "approach": "错误会进入状态，后续计算基于错误值，可能放大。"}
+      ],
+      "rubric": [
+        {"dim": "输出错误", "weight": 40},
+        {"dim": "下游无法区分", "weight": 40},
+        {"dim": "错误会传播", "weight": 20}
+      ],
+      "common_errors": ["认为「毛刺太短，寄存器不会理它」（未考虑时序违规）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-6",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "debug",
+      "stem": "电路 99% 时间正确，偶尔输出错一位。定位。",
+      "solutions": [
+        {"label": "解法 A（调相位）", "approach": "移动采样点，发现错误消失，定位到采样窗口。"},
+        {"label": "解法 B（降频）", "approach": "降频后错误消失，说明是时序裕量不足。"},
+        {"label": "解法 C（示波器触发）", "approach": "用异常触发捕获出错瞬间，看到采样落在跳变沿。"}
+      ],
+      "rubric": [
+        {"dim": "定位", "weight": 40},
+        {"dim": "根因（时序/毛刺）", "weight": 30},
+        {"dim": "修复（移采样/降频/改逻辑）", "weight": 20},
+        {"dim": "防复发（加裕量检查）", "weight": 10}
+      ],
+      "common_errors": ["把偶发错误归因于「接触不良」而不验证"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.5-7",
+      "section": "1.5",
+      "task_ids": ["T-1.9", "T-1.10"],
+      "type": "open",
+      "stem": "一条路径太慢导致时序违例。给出三种修复方案，比较代价。",
+      "solutions": [
+        {"label": "解法 A（降频）", "approach": "最简单，性能下降；失效条件：性能目标不可降。"},
+        {"label": "解法 B（流水线）", "approach": "插入寄存器，吞吐提高但延迟增加、面积/功耗上升；失效条件：反馈环无法切分。"},
+        {"label": "解法 C（逻辑重构/缩短路径）", "approach": "减少级数或并行化；代价是设计复杂度；失效条件：关键路径无法再拆。"}
+      ],
+      "rubric": [
+        {"dim": "降频方案", "weight": 20},
+        {"dim": "流水线方案", "weight": 20},
+        {"dim": "逻辑重构方案", "weight": 20},
+        {"dim": "比较维度（性能/面积/功耗/复杂度）", "weight": 30},
+        {"dim": "失效条件", "weight": 10}
+      ],
+      "common_errors": ["只给「降频」", "把流水线说成「没有代价」"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-1",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "compute",
+      "stem": "写出 A、B、Sum、Carry 四列真值表。",
+      "solutions": [
+        {"label": "解法 A（穷举）", "approach": "4 行逐一算。"},
+        {"label": "解法 B（先写输出条件）", "approach": "Sum=不同，Carry=同为 1，再填表。"},
+        {"label": "解法 C（算术验证）", "approach": "用 A+B 的十进制结果对照 Carry Sum 二进制。"}
+      ],
+      "rubric": [
+        {"dim": "4 行全对", "weight": 70},
+        {"dim": "11 行正确", "weight": 20},
+        {"dim": "列名", "weight": 10}
+      ],
+      "common_errors": ["11 行 Sum=1（用 OR）", "Carry 与 Sum 交换"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-2",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "build",
+      "stem": "用门搭半加器，通过 4 组输入。",
+      "solutions": [
+        {"label": "解法 A（XOR+AND）", "approach": "标准解，2 个门（XOR 内部另算）。"},
+        {"label": "解法 B（NAND 全实现）", "approach": "用 5 个 NAND 实现 XOR + 1 个 NAND 反相得 AND（共 6 个，允许）。"},
+        {"label": "解法 C（或+与非组合）", "approach": "Sum=(A∨B)∧¬(A∧B)、Carry=A∧B，门数更多但直观。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（黑盒 4 组输入）", "weight": 50},
+        {"dim": "表达式正确", "weight": 25},
+        {"dim": "资源（门数/级数记录）", "weight": 15},
+        {"dim": "可解释性（Sum 为什么是 XOR）", "weight": 10}
+      ],
+      "common_errors": ["Carry 用 OR", "Sum 用 OR"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-3",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "understanding",
+      "stem": "解释 1+1=10₂，并说明它与 TRUE AND TRUE=TRUE 为什么不矛盾。",
+      "solutions": [
+        {"label": "解法 A（位权）", "approach": "10₂=1×2+0=2，与十进制 1+1=2 同值。"},
+        {"label": "解法 B（进位）", "approach": "一位装不下 2，向高位进 1，余 0。"},
+        {"label": "解法 C（代数系统）", "approach": "算术有进位规则，布尔代数没有；两套系统不同公理。"}
+      ],
+      "rubric": [
+        {"dim": "位权/进位", "weight": 50},
+        {"dim": "区分两套系统", "weight": 40},
+        {"dim": "举例混淆 bug（加分）", "weight": 10}
+      ],
+      "common_errors": ["说「二进制里 1+1 应该是 0」（漏进位）", "把逻辑真当成数值 1 直接相加"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-4",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "build",
+      "stem": "用两个半加器 + 或门搭全加器（输入 A、B、Cin，输出 Sum、Cout）。",
+      "solutions": [
+        {"label": "解法 A（标准结构）", "approach": "S1=A⊕B、C1=A∧B；Sum=S1⊕Cin、C2=S1∧Cin；Cout=C1∨C2。"},
+        {"label": "解法 B（直接表达式）", "approach": "Sum=A⊕B⊕Cin、Cout=(A∧B)∨(Cin∧(A⊕B))，用门直接实现。"},
+        {"label": "解法 C（NAND 版）", "approach": "全部用 NAND 重画，行为等价。"}
+      ],
+      "rubric": [
+        {"dim": "正确性（8 组输入全对）", "weight": 60},
+        {"dim": "结构与表达式正确", "weight": 25},
+        {"dim": "Cout 合并正确", "weight": 15}
+      ],
+      "common_errors": ["两个 Carry 用 AND 合并（应为 OR）", "Cin 只进一个半加器"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-5",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "compute",
+      "stem": "每级进位延迟 2ns，8 位行波进位最坏延迟多少？与位数是什么关系？",
+      "answer_value": 16,
+      "tol": 0.0,
+      "solutions": [
+        {"label": "解法 A（线性）", "approach": "8×2=16ns（不含首级和与门），近似线性。"},
+        {"label": "解法 B（逐级累加）", "approach": "画出进位链，逐级相加。"},
+        {"label": "解法 C（对比超前进位）", "approach": "说明理论可降到 O(log n) 量级，但门数增加。"}
+      ],
+      "rubric": [
+        {"dim": "16ns", "weight": 50},
+        {"dim": "线性关系", "weight": 30},
+        {"dim": "改进方向（超前进位）", "weight": 20}
+      ],
+      "common_errors": ["把 8 位当 8ns（漏乘每级延迟）", "认为延迟与位数无关"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-6",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "debug",
+      "stem": "半加器在 1+1 时 Sum 亮、Carry 不亮。定位并修复。",
+      "solutions": [
+        {"label": "解法 A（真值表）", "approach": "只有 11 行错，Sum 用了 OR（该为 0），Carry 可能接错门。"},
+        {"label": "解法 B（探针）", "approach": "测 XOR 输出与 AND 输出，发现 Sum 端实际接的是 OR。"},
+        {"label": "解法 C（替换）", "approach": "把 Sum 门换成已知 XOR，验证恢复。"}
+      ],
+      "rubric": [
+        {"dim": "定位", "weight": 40},
+        {"dim": "根因（OR 当 XOR / Carry 未接）", "weight": 30},
+        {"dim": "修复", "weight": 20},
+        {"dim": "全 4 组回归", "weight": 10}
+      ],
+      "common_errors": ["只把 Sum 反相（00 行又错）"],
+      "hints": []
+    },
+    {
+      "id": "ch01-1.6-7",
+      "section": "1.6",
+      "task_ids": ["T-1.11", "T-1.12"],
+      "type": "open",
+      "stem": "设计 2 位加法器，给出两种结构并比较延迟/门数。",
+      "solutions": [
+        {"label": "解法 A（全加器 + 半加器）", "approach": "低位半加器，高位全加器；延迟 1 级进位。"},
+        {"label": "解法 B（两个全加器）", "approach": "低位 Cin 接 0；结构统一、可扩展，门数略多。"},
+        {"label": "解法 C（行波 vs 并行前缀）", "approach": "2 位可用并行前缀减少一级，但门数增加；说明「小位数不值得」。"}
+      ],
+      "rubric": [
+        {"dim": "功能正确", "weight": 40},
+        {"dim": "两种结构", "weight": 30},
+        {"dim": "延迟/门数比较", "weight": 20},
+        {"dim": "扩展性说明", "weight": 10}
+      ],
+      "common_errors": ["两位直接并排相加不接进位（01+01 得 10 但 11+01 错）"],
+      "hints": []
+    }
+  ]
+}

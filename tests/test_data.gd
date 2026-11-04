@@ -18,7 +18,7 @@ const EXPECT_GROUPS := {
 	"chapter_reward_payout": 5, "tutorial": 1, "loadable": 1,
 }
 const GROUP_DESCRIPTIONS := {
-	"manifest": "manifest 文件清单 10 项、版本 2",
+	"manifest": "manifest 文件清单 11 项、版本 2",
 	"item_catalog": "目录条目总数 86",
 	"item_names": "每个物品都有非空 name",
 	"item_taxonomy": "文档物品 77 / 旧别名 7、gold 是货币而 scrap 不是",
@@ -61,7 +61,7 @@ func run(ctx: TestContext) -> void:
 	var ch: ChapterRuntime = db.chapter
 
 	ctx.begin_group("manifest")
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 10)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 11)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.begin_group("item_catalog")

@@ -84,10 +84,10 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("CH02 起始金币模式", str(lv.get("start_gold_mode", "")), "carry")
 	ctx.eq("开局物品存在", _missing_item({"items": lv.get("start_items", {})}, cat), "")
 
-	# ---- manifest 登记：8 → 10 ----
+	# ---- manifest 登记：8 → 10 → 11（CH01 练习题库）----
 	var files: Array = TestUtil.read_json("res://data/manifest.json").get("files", [])
 	ctx.begin_group("manifest")
-	ctx.eq("manifest 10 文件", files.size(), 10)
+	ctx.eq("manifest 11 文件", files.size(), 11)
 	ctx.check("manifest 含 ch02_levels", "res://data/chapters/ch02_levels.json" in files)
 	ctx.check("manifest 含 ch02_labs", "res://data/labs/ch02_labs.json" in files)
 

@@ -1,15 +1,25 @@
 extends RefCounted
 
 ## M4-G5：题库 `ifz-questions/1` 的加载 / 字段校验 / 评分确定性。
-## fixture 只放在 `tests/fixtures/questions/`，不进 `data/`（正式题目由教学组交付）。
+## fixture 只放在 `tests/fixtures/questions/`（锁接口行为，不进 `data/`）；
+## 正式 CH01 练习题库在 `data/questions/ch01_exercises.json`（42 题，docs/curriculum/03）。
 
 const FIXTURE := "res://tests/fixtures/questions/ch01_exercises.json"
+const REAL_BANK := "res://data/questions/ch01_exercises.json"
+const MANIFEST := "res://data/manifest.json"
+const SECTIONS := ["1.1", "1.2", "1.3", "1.4", "1.5", "1.6"]
+const SECTION_GROUPS := {
+	"1.1": "sec_1_1", "1.2": "sec_1_2", "1.3": "sec_1_3",
+	"1.4": "sec_1_4", "1.5": "sec_1_5", "1.6": "sec_1_6",
+}
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 37
+const EXPECT := 221
 const EXPECT_GROUPS := {
 	"loadable": 1, "valid_doc": 6, "scoring": 14, "unknown_item": 4,
-	"validation": 9, "error_codes": 3,
+	"validation": 9, "error_codes": 3, "real_bank": 9, "manifest": 1,
+	"sec_1_1": 29, "sec_1_2": 29, "sec_1_3": 29,
+	"sec_1_4": 29, "sec_1_5": 29, "sec_1_6": 29,
 }
 const GROUP_DESCRIPTIONS := {
 	"loadable": "fixture 文件存在且 JSON 可解析成字典",
@@ -18,6 +28,14 @@ const GROUP_DESCRIPTIONS := {
 	"unknown_item": "未知题 id 不判过、错误码 E_UNKNOWN_ITEM、得分 0",
 	"validation": "每类非法文档（重复 id / 缺 stem / 非法 type / 解太少 / rubric 权重 / bank / format）被拒",
 	"error_codes": "错因码数量与首末码（C1–C9）",
+	"real_bank": "正式题库存在可解析、format/chapter/bank 正确、恰 42 题、id 唯一、section 在 1.1–1.6、校验零错",
+	"manifest": "manifest 的 files 已登记 CH01 练习题库",
+	"sec_1_1": "1.1 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
+	"sec_1_2": "1.2 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
+	"sec_1_3": "1.3 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
+	"sec_1_4": "1.4 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
+	"sec_1_5": "1.5 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
+	"sec_1_6": "1.6 恰 7 题；每题 type 合法、解 ≥2、rubric 权重和 100、section 与题号前缀一致",
 }
 
 func run(ctx: TestContext) -> void:
@@ -29,6 +47,7 @@ func run(ctx: TestContext) -> void:
 	_test_unknown(ctx, doc)
 	_test_validation(ctx, doc)
 	_test_error_codes(ctx)
+	_test_real_bank(ctx)
 
 func _test_valid_doc(ctx: TestContext, doc: Dictionary) -> void:
 	var q := QuestionBank.from_doc(doc)
@@ -132,11 +151,74 @@ func _test_error_codes(ctx: TestContext) -> void:
 	ctx.eq("M4-G5 首个错因码", str(codes[0]), "C1")
 	ctx.eq("M4-G5 末个错因码", str(codes[8]), "C9")
 
+func _test_real_bank(ctx: TestContext) -> void:
+	var raw := _load_json(REAL_BANK)
+	var q := QuestionBank.from_doc(raw)
+	ctx.begin_group("real_bank")
+	ctx.check("CH01 正式题库文件存在", FileAccess.file_exists(REAL_BANK), REAL_BANK)
+	ctx.check("CH01 正式题库可解析", not raw.is_empty(), REAL_BANK)
+	ctx.eq("CH01 正式题库 format", str(raw.get("format", "")), QuestionBank.FORMAT)
+	ctx.eq("CH01 正式题库 chapter", str(raw.get("chapter", "")), "ch01")
+	ctx.eq("CH01 正式题库 bank", str(raw.get("bank", "")), "exercises")
+	ctx.eq("CH01 正式题库恰 42 题", q.items.size(), 42)
+	var seen := {}
+	var dups: Array = []
+	var outside: Array = []
+	for raw_it in q.items:
+		if not (raw_it is Dictionary):
+			continue
+		var it: Dictionary = raw_it
+		var id := str(it.get("id", ""))
+		if seen.has(id):
+			dups.append(id)
+		seen[id] = true
+		if not SECTIONS.has(str(it.get("section", ""))):
+			outside.append(id)
+	ctx.check("CH01 题目 id 全局唯一", dups.is_empty(), str(dups))
+	ctx.check("CH01 题目的 section 都在 1.1–1.6", outside.is_empty(), str(outside))
+	ctx.eq("CH01 正式题库校验零错", q.load_errors.size(), 0)
+
+	ctx.begin_group("manifest")
+	var files: Array = _load_json(MANIFEST).get("files", [])
+	ctx.check("manifest 已登记 CH01 练习题库", files.has(REAL_BANK), str(files))
+
+	for sec in SECTIONS:
+		_test_section(ctx, q, str(sec))
+
+func _test_section(ctx: TestContext, q: QuestionBank, sec: String) -> void:
+	ctx.begin_group(str(SECTION_GROUPS[sec]))
+	var count := 0
+	for raw_it in q.items:
+		if not (raw_it is Dictionary):
+			continue
+		var it: Dictionary = raw_it
+		if str(it.get("section", "")) != sec:
+			continue
+		count += 1
+		var id := str(it.get("id", ""))
+		var typ := str(it.get("type", ""))
+		ctx.check("%s 的 type 合法（%s）" % [id, typ], QuestionBank.TYPES.has(typ), typ)
+		ctx.check("%s 至少两解" % id, (it.get("solutions", []) as Array).size() >= 2,
+			str((it.get("solutions", []) as Array).size()))
+		ctx.eq("%s 的 rubric 权重和 100" % id, _rubric_total(it), 100)
+		ctx.check("%s 的 section 与题号前缀一致" % id, id.begins_with("ch01-%s-" % sec), id)
+	ctx.eq("%s 恰 7 题" % sec, count, 7)
+
+func _rubric_total(it: Dictionary) -> int:
+	var total := 0
+	for raw_r in (it.get("rubric", []) as Array):
+		if raw_r is Dictionary:
+			total += int((raw_r as Dictionary).get("weight", 0))
+	return total
+
 func _errs(doc: Dictionary) -> Array:
 	return QuestionBank.from_doc(doc).validate()
 
 func _load_fixture() -> Dictionary:
-	var f := FileAccess.open(FIXTURE, FileAccess.READ)
+	return _load_json(FIXTURE)
+
+func _load_json(path: String) -> Dictionary:
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return {}
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
