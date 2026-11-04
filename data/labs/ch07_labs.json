@@ -1,0 +1,169 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/18-ch07-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T7.x-n 与 after 按课文提案落库；缺可判口径的 gate 挂 pending，不猜数。",
+  "pending_kinds": {
+    "sample_phase": "采样相位判据需扩接口（位窗口 + 采样 tick）；18 §6-4 的 ±10% 位宽容差只是初值，未校准。先挂 pending 不进分母，不以初值冒充定稿。"
+  },
+  "labs": {
+    "serial_basics": {
+      "id": "serial_basics",
+      "title": "7.1 并行 vs 串行",
+      "body": "并行快但线多，串行用一根线把「同时」换成「轮流」。线上只有电压，接收端必须在正确时刻按位宽采样；位中心离两侧跳变沿最远，是最稳的采样点。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 八根线一起走，还是轮流走", "text": "八根线一起走，叫并行；一根线按次序走，叫串行。并行快，但线一多，每根都要单独的驱动与插头，长距离上成本与串扰一起涨。串行只留一根数据线加一根地线，把「同时」换成「轮流」——这一章的全部麻烦，都从「轮流」开始。"},
+        {"order": 2, "after": 0, "title": "线上没有 0 和 1，只有电压", "text": "线上没有 0 和 1，只有电压随时间变高变低。发送端按约定把高电平记作 1、低电平记作 0；接收端每隔一段时间看一次电压，高于阈值算 1，低于算 0。所以「传比特」其实是「在正确时刻看对电平」——时刻错，电平再干净也读错。"},
+        {"order": 3, "after": 1, "title": "波特率 · 一位占多宽", "text": "波特率是每秒传多少位。9600 bps，一位占 1/9600 秒，约 104 微秒。发送端用分频器把时钟切成这个宽度：每一位拉高或拉低并保持一整位；接收端必须按同样的宽度去读，两边宽度不一致，读到后面就越偏越远。"},
+        {"order": 4, "after": 2, "title": "采样点 · 为什么必须落在位中心", "text": "接收端没有发送端的时钟，只能按约定宽度自己数：每位数到一半就采一次，那一刻叫采样点。位中心离两侧跳变沿最远，噪声与延迟最难把它推过界；越靠近沿，电压还在爬，值不确定。采样点落在中心，是这一章所有「能收到」的前提。"},
+        {"order": 5, "after": 3, "title": "验收 · 双通道看位宽与采样点", "text": "验收：设 9600 bps，用双通道示波器同时看发送线与接收采样点。要求三样——①实测位宽与 9600 对应（公差内）；②采样点落在位中心 ±10% 位宽；③把采样点挪到跳变沿，同一字节必须读错（能红才算真的会看）。三样都对，才算读懂波特率与采样时刻。"}
+      ],
+      "p1": "设 9600 bps，双通道示波器标位宽与采样点",
+      "p1_gates": ["T7.1-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "用分频器设位宽、接发送线与采样探针，标出位中心并采一个字节", "judge": "三条同时：①实测位宽与 9600 对应；②采样点位于位中心 ±10% 位宽；③采样点挪到跳变沿后同一字节读错", "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T7.1-1"]},
+        {"id": "B", "level": "负例", "produce": "把采样相位拖到上升沿/下降沿上", "judge": "同一输入多次读数不一致或读成反值；detail 写「采样点落在跳变沿」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.1-2"]},
+        {"id": "C", "level": "P0b", "produce": "代入 1/9600 求位宽与半位宽", "judge": "与实测 ±5%；不算 P1；detail 写「位宽换算错」", "codes": ["E_DELAY_MISMATCH(9)"], "gates": ["T7.1-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「并行线多、长距离成本与串扰大，串行用时间换线数」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T7.1-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T7.1-1", "title": "9600 位宽与位中心采样，挪到沿必须读错", "kind": "sample_phase", "required": true, "status": "pending",
+         "thresholds": {"phase_tolerance": {"status": "pending", "initial": 0.10, "reason": "18 §6-4：±10% 为初值，待技术侧校准后写进 gate_cases"}},
+         "pending_reason": "采样相位判据需扩接口（位窗口 + 采样 tick）；±10% 位宽容差为 18 §6-4 初值，未校准。先挂 pending 不进分母，不以初值冒充定稿。",
+         "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.1-2", "title": "采样点放在跳变沿：重复读数不一致或读成反值", "kind": "edge_sample", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.1-3", "title": "一位与半位：1/9600 换算", "kind": "period_calc", "required": true,
+         "expect_bit_us": 104.1667, "expect_half_us": 52.0833, "tolerance": 0.05,
+         "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)"]},
+        {"id": "T7.1-4", "title": "远距离为什么用串行", "kind": "quiz", "required": true,
+         "quiz": {"question": "远距离传输为什么更常用串行而不是并行？", "options": ["并行线多、长距离成本与串扰大，串行用时间换线数", "串行每一位更快，所以总时间更短", "并行不能表示 0 和 1", "串行不需要地线"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先确认探针接在发送线上：示波器全空就是没接线；只有快速切换的位错、慢位全对，通常是采样点落在沿上。",
+      "misconception": "把「降速不出错」当经验；真正的前提是位宽一致且采样点落在位中心。",
+      "grants": {"items": {"M02": 1}, "blueprint": ["KN-SER-01"]},
+      "grants_note": "M02 线缆升级件与本节知识卡随 gate 发放"
+    },
+    "frame4": {
+      "id": "frame4",
+      "title": "7.2 帧格式",
+      "body": "帧 = 边界 + 数据 + 校验。本节用 1 起始 + 4 数据 + 1 校验 + 1 停止的 7 位帧；起始位对齐计时器，停止位收回高电平，校验位取 4 个数据位的异或。帧检查器要能让正常帧过、坏帧拒，并说清哪一段错。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 一串位怎么切成一个字节", "text": "线上一直在传位，接收端怎么知道哪几位属于同一个字节？靠帧。帧 = 边界 + 数据 + 校验：起始位说明「从这里开始」，停止位说明「到这里结束」，校验位让它有机会发现中途被噪声改了一位。没有帧，收到的只是一串电平。"},
+        {"order": 2, "after": 0, "title": "起始位 · 拉低那一下把两边对齐", "text": "空闲时线保持高电平。要发帧，先把线拉低一整位——这就是起始位。接收端等的就是这个下降沿：一出现就清零计数、按位宽重新对齐，后面每一位都从自己的中心被采。起始位不是数据，它的唯一作用是把两端的计时器对齐。"},
+        {"order": 3, "after": 1, "title": "4 位帧 · 起止、数据、校验", "text": "本节用 4 位帧：1 位起始、4 位数据、1 位校验、1 位停止，共 7 位。数据先发低位。校验位取 4 个数据位的异或：数据里 1 的个数是奇是偶，收方一算就知道。停止位把线拉回高电平，也给下一帧留出间隔。"},
+        {"order": 4, "after": 2, "title": "帧检查器 · 该过的过、该拒的拒", "text": "帧要能被检查，不是画出来就算。把字段表交给帧检查器：每段的起止位置、位宽、电平都要对；再喂三个向量——正常帧必须通过，改坏一位校验必须拒收，缺停止位必须拒收。拒收要说清是哪一段错，不能只说「帧不对」。"},
+        {"order": 5, "after": 3, "title": "验收 · 一帧通过、两帧被拒", "text": "验收：在帧编辑器里摆出这 7 位，接上检查器，发一帧正常帧通过；再把校验位翻掉、把停止位去掉，两帧都必须被拒并报出出错字段。最后把字段表写进帧蓝图——7.4 的双机就按这张表收发。蓝图不是文档，是下一节要接的东西。"}
+      ],
+      "p1": "摆出 7 位帧并接帧检查器，正常帧过、坏帧拒",
+      "p1_gates": ["T7.2-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "在帧编辑器里设字段位置与位宽，连到检查器，发正常帧 + 翻校验帧 + 缺停止位帧", "judge": "四条同时：①字段区间/位宽/电平全对；②正常帧通过；③校验翻位被拒并报「校验」字段；④缺停止位被拒并报「停止」字段", "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T7.2-1"]},
+        {"id": "B", "level": "负例", "produce": "停止位那一位保持低", "judge": "正常帧被判「帧未结束」，下一帧与它粘连；detail 写「停止位缺失」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.2-2"]},
+        {"id": "C", "level": "P0b", "produce": "对 3 组数据位算异或", "judge": "3/3 与机器值一致；不算 P1；detail 写「校验位算错」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.2-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「它只负责对齐两端的计时器」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T7.2-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T7.2-1", "title": "字段表 + 正常帧过 + 校验翻/缺停止拒并报字段", "kind": "frame_fields", "required": true,
+         "fields": [
+           {"name": "start", "start": 0, "width": 1},
+           {"name": "data", "start": 1, "width": 4},
+           {"name": "parity", "start": 5, "width": 1},
+           {"name": "stop", "start": 6, "width": 1}
+         ],
+         "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T7.2-2", "title": "停止位接成低电平：单帧看似对，下一帧粘连", "kind": "stop_low", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.2-3", "title": "3 组数据位的异或校验", "kind": "parity_calc", "required": true,
+         "vectors": [
+           {"id": "v1", "data": [1, 0, 1, 0]},
+           {"id": "v2", "data": [1, 1, 1, 0]},
+           {"id": "v3", "data": [0, 0, 1, 1]}
+         ],
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T7.2-4", "title": "起始位为什么不算数据", "kind": "quiz", "required": true,
+         "quiz": {"question": "起始位为什么不算数据位？", "options": ["它只负责对齐两端的计时器", "它的电平总是 0，不能表示 1", "它属于校验位的一部分", "它只在接收端存在"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "字段表先把校验位宽写成 1；校验位宽写成 2 会让正常帧也过不了。停止位不拉高，单帧看着对，连发两帧就粘连。",
+      "misconception": "只测正常帧就交；不喂坏帧，测不出拒收。",
+      "grants": {"items": {"M02": 1}, "blueprint": ["KN-FRM-01"]},
+      "grants_note": "帧蓝图与知识卡随 gate 发放"
+    },
+    "uart": {
+      "id": "uart",
+      "title": "7.3 UART 收发",
+      "body": "发送器是一只移位寄存器，接收器从起始沿重新数到位中心再采样。把接收位周期调成 1.3 倍，采样点逐位后移 30%，误差累加到帧尾才越界；修法是按同一波特率分频并在每个起始沿重新对齐，而不是只挪一个采样点。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 发送器就是一只移位寄存器", "text": "发送器是一个移位寄存器：把这一帧要发的位装进去，按位宽逐位推到线上，先低后高，位与位之间不留缝。装填、移位、输出各占一拍；线上看到的就是 7.2 那种带起止位的帧。收发器只认位、不认字节——一个字节要分两趟装。"},
+        {"order": 2, "after": 0, "title": "接收器 · 跟着起始沿重新数", "text": "接收器反过来：等起始沿，从那里起按位宽数到半位，采第一位；以后每过一整位再采一次。它不信任自己的时钟与发送端一致，所以每一位都从起始沿重新起算。这样即使两边有微小误差，也不会一位一位攒起来，把最后一位采到隔壁。"},
+        {"order": 3, "after": 1, "title": "故意偏 30% · 误码从帧尾开始", "text": "把接收端的位周期调成发送端的 1.3 倍，采样点就逐位后移 30%。单看一位，30% 还在位内，照样读对；但误差会累加，到帧尾跨过位的边界，采到的是下一位。误码不是「突然坏了」，是偏移攒到越界——要能指着第几位说出它从哪开始错。"},
+        {"order": 4, "after": 2, "title": "修 · 对齐位宽，不是挪一个点", "text": "修的时候别只挪一个采样点。挪一位只是把这一位的偏差盖住，下一位照样偏。正确做法是让接收端按发送端同一波特率分频，并在每个起始沿重新对齐；再把 30% 偏移撤掉，同一字节必须原样收回。能复现、能修好，两件事都要做。"},
+        {"order": 5, "after": 3, "title": "验收 · 先复现，再修正", "text": "验收：自发自收一个字节，先正常收对；再把接收位周期改成 1.3 倍，必须复现误码并报出首个错位的位号；最后改回同一波特率并重新对齐，同一字节必须完全一致。只报「收到的不对」不算过，要报到第几位、以及为什么从那里开始错。"}
+      ],
+      "p1": "接发送器与接收器，自发自收；位周期偏 30% 复现后修正",
+      "p1_gates": ["T7.3-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "装帧、发一位、接收端按起始沿对齐；先同频收对，再把位周期调 1.3×，再改回", "judge": "四条同时：①同频时字节逐位一致；②1.3× 时误码复现；③报出首个错位位号与机器一致；④改回后同一字节再次一致", "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)"], "gates": ["T7.3-1"]},
+        {"id": "B", "level": "负例", "produce": "不改位周期，只把最后一次采样拖后", "judge": "单字节仍全对 → 判「未复现误码」；detail 写「只挪点位未改位周期」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.3-2"]},
+        {"id": "C", "level": "P0b", "produce": "一位约 104 µs，30% 约 31 µs，7 位帧末累计约 2.1 位", "judge": "与机器值 ±5%；不算 P1；detail 写「偏移累计算错」", "codes": ["E_DELAY_MISMATCH(9)"], "gates": ["T7.3-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「本地时钟不保证与发送端一致，逐位累计会越界」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T7.3-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T7.3-1", "title": "同频收对、1.3× 复现误码、报首个错位、改回一致", "kind": "uart_offset", "required": true,
+         "byte": 165, "offset_ratio": 1.3, "ratio_tolerance": 0.01,
+         "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.3-2", "title": "只挪一位采样点 30%：单字节仍全对", "kind": "single_point_shift", "required": true,
+         "byte": 165, "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.3-3", "title": "30% 偏移累计：一位 104 µs、偏移 31 µs、7 位约 2.1 位", "kind": "offset_calc", "required": true,
+         "expect_bit_us": 104.1667, "expect_offset_us": 31.25, "expect_accum_bits": 2.1, "tolerance": 0.05,
+         "codes": ["E_UNCONNECTED(3)", "E_DELAY_MISMATCH(9)"]},
+        {"id": "T7.3-4", "title": "为什么每个起始沿都重新对齐", "kind": "quiz", "required": true,
+         "quiz": {"question": "接收端为什么要在每个起始沿重新对齐？", "options": ["本地时钟不保证与发送端一致，逐位累计会越界", "起始沿的电平比数据位更干净", "只有起始沿才能采到 1", "这样可以把波特率省掉"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看接收端有没有接起始沿；只挪最后一个采样点时单字节仍全对，这正是「偏 30% 就会坏」的想当然。",
+      "misconception": "把 30% 偏移当成每一位都会立刻错；误码是累加到帧尾才越界。",
+      "grants": {"items": {"M02": 1}, "blueprint": ["KN-UART-01"]},
+      "grants_note": "UART 蓝图与知识卡随 gate 发放"
+    },
+    "two_machine": {
+      "id": "two_machine",
+      "title": "7.4 双机互通",
+      "body": "两台机交叉收发并共地，两端设同一波特率，一个字节拆两帧发（低四位再高四位）。验收看两端位宽一致、双向字节逐位一致、坏帧被拒并报帧号、重发后送达。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 三根线把两台机接上", "text": "两台机器只连三根线：发送接对方接收、接收接对方发送、地线共地。交叉接，是因为每台机的「出」只能进对方的「入」；不共地，两边量的电压没有同一参照，读出的高低就没有意义。先单向通，再双向通。"},
+        {"order": 2, "after": 0, "title": "同频 · 两端都得是 9600", "text": "两端必须同频：都用 7.3 的分频设成 9600 bps。分频系数差一点，单帧也许看不出，连发几帧就会在帧尾错位。所以验收先看两端实测位宽，再看字节——位宽不一致时字节碰巧对，不能算通。"},
+        {"order": 3, "after": 1, "title": "一个字节要拆两帧发", "text": "7.2 的帧只有 4 位数据，装不下一个字节。办法是拆两帧：先发低四位，再发高四位，收方按顺序拼回。以 0xA5 为例，低半字节是 5、高半字节是 A；哪一帧丢了或坏了，拼回来的就不是 0xA5，而是一个看着像数的错值。"},
+        {"order": 4, "after": 2, "title": "噪声 · 坏帧必须被拒", "text": "线缆不是理想的：M02 升级件带来延迟与噪声。注入一次噪声，让某一帧的校验位对不上；接收方必须拒收这一帧并报帧号，而不是把坏数据当好的收下。能拒收，才说明前面的帧格式与校验不是为了好看。"},
+        {"order": 5, "after": 3, "title": "验收 · 双向字节对，坏帧拒收", "text": "验收：两台机各设 9600，双向各发一个字节（0xA5 与 0x3C），两端拼回的字节必须逐位一致；再注入一次噪声，坏帧被拒并报出帧号，重发后送达。位宽、双向、拒收三样都在，M02 升级件才算立住。"}
+      ],
+      "p1": "两台机双向互发一个字节，噪声下拒收并重发",
+      "p1_gates": ["T7.4-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "接三根线、两端设 9600、双向发 0xA5/0x3C；注入一次噪声后重发", "judge": "四条同时：①两端实测位宽一致；②双向拼回字节逐位一致；③坏帧被拒并报帧号；④重发后同一字节送达", "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"], "gates": ["T7.4-1"]},
+        {"id": "B", "level": "负例", "produce": "一端 9600、一端 1.3×", "judge": "单帧偶对，连发两帧后帧尾错位，字节错；detail 写「两端位宽不一致」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.4-2"]},
+        {"id": "C", "level": "负例", "produce": "校验位不看，直接拼字节", "judge": "坏帧被当好数据，拼出错误字节；detail 写「坏帧未拒收」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T7.4-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「两端要量同一个电压参照，否则高低没有意义」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T7.4-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T7.4-1", "title": "双向 0xA5/0x3C 字节一致；坏帧拒收并重发送达", "kind": "two_machine", "required": true,
+         "byte_a": 165, "byte_b": 60,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T7.4-2", "title": "两端分频不一致：单帧偶对，两帧后错位", "kind": "baud_mismatch", "required": true,
+         "ratio": 1.3, "ratio_tolerance": 0.05,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.4-3", "title": "收到就收不校验：坏帧被当好数据", "kind": "no_checksum", "required": true,
+         "byte": 165, "flip_nibble": "low", "flip_bit": 0,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T7.4-4", "title": "为什么必须共地", "kind": "quiz", "required": true,
+         "quiz": {"question": "两台机器为什么必须共地？", "options": ["两端要量同一个电压参照，否则高低没有意义", "共地才能提高波特率", "不共地就无法产生起始位", "地线负责传数据"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先确认接收线也接了：只接发送时单向都收不到；两端分频差 30% 时第一帧常碰巧对，第二帧开始错。",
+      "misconception": "只看单帧字节对就判通；位宽不一致时碰巧对，不能算通。",
+      "grants": {"items": {"M02": 2}, "blueprint": ["KN-2M-01"]},
+      "grants_note": "M02 升级件与双机知识卡随 gate 发放"
+    }
+  }
+}
