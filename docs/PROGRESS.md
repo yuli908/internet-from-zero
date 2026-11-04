@@ -497,6 +497,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   CH02 节点齐全（13 卡 / 6 引用技能）、奖励取自 `CH02-CMOS` 且删节点副本才回落兜底。
   全量 **2368 checks / 0 failures**。
 
+### 2.29 接任巡检：CH05–CH19 课文、CH05/06 数据、waveform_align、题库与实验室编辑器（2026-11-05）
+
+- 全量测试实测：**37 套件 / `SUITE_TOTAL 4090` + runner 自检 2 = 4092 checks，0 failures**（`scripts/run_tests.ps1`，Godot 4.4.1 console exe，headless）。此前文档写的 2033 已过期。
+- **CH05/CH06 数据与判定**：`data/labs/ch05_labs.json`（4 节 / 21 段）、`data/labs/ch06_labs.json`（6 节 / 30 段）可读；`src/core/ch05_checks.gd`、`ch06_checks.gd` 的 16 个已落地 kind 与 5 个 pending kind 由 `tests/test_ch05.gd`（210 checks）、`tests/test_ch06.gd`（307 checks）逐条判绿/判红，含 P1 判据反例、分母现算与 sections 回退。
+- **章节注册 / UI 可达性**：**未完成**。`data/chapters/` 仍只有 `ch01_levels.json`、`ch02_levels.json`；`ChapterRegistry` 只认 `*_levels.json`，因此 `ch05_labs.json` / `ch06_labs.json` 虽在磁盘上，却不会进入 `labs_by_chapter`，`DataDB.use_chapter("ch05"/"ch06")`、`--chapter=ch05` 与 UI 切章均不可达；两份 labs 也未登记进 `data/manifest.json`。补齐需要 `ch05/ch06_levels.json` + `skilltree.json` 的 CH05/CH06 知识/技能/里程碑节点；CH03/CH04 尚未落库，本章进度链也接不过去。
+- **waveform_align**：已完成。`src/core/waveform_align.gd` 导出期望模型（终值/四阶段起止拍/逐拍拍号），`tests/test_waveform_align.gd` 35 checks 覆盖全对、单拍错、终值错、区间错、填表式提交被拒与 `Ch05Checks` 分发；5.1 的 `pending_kinds` 为空。
+- **实验室编辑器真实文件系统**：已完成。`tests/test_lab_phase2_ui.gd` 120 checks 中 `editor_fs` 组要求根为宿主绝对路径（非 `user://` 兜底）、相对路径被拒、不可用不降级，并实际校验种子文件 `home/user/main.c`、`home/user/notes.txt`、`etc/hostname` 存在；UI 源码断言显示实际根路径。
+- **42 题题库**：已完成。`data/questions/ch01_exercises.json` 恰 42 题、id 唯一、section 在 1.1–1.6、校验零错；`QuestionBank.score` 对选项题/数值题判 100/0 且确定性，未知题与搭建题不自动编分；`data/manifest.json` 已登记该文件（`tests/test_questions.gd` 221 checks）。
+- **CH07 之后课文**：已完成。`docs/curriculum/18–31` 覆盖 CH07 4 单元、CH08 3、CH09 5、CH10 4、CH11 4、CH12 5、CH13 3、CH14 3、CH15 4、CH16 4、CH17 3、CH18 4、CH19 5、终章 F1–F3，与 `docs/design/15-curriculum-master-outline.md` 幕 III–V 的 16/19/19 单元逐节对齐；各自带 lab 提案、前置与校验口径。这些课文对应的 `data/labs/ch07+` 与 `ch07+_checks.gd` 尚未落库（课文文件内已注明 gate 为提案）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -506,7 +516,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 预算与 tick 已实测（`tests/bench_sim.gd` + `scripts/bench.ps1`）：50/50 规模 p95 3.32–4.03 ms 达标；细化档 70 门 4.69 ms 仍达标、**80 门 5.39 ms 起超预算**；"降速不丢事件"仍由 `SimEngine` 的 tick 推进与单 tick 上限保证 | 原 200 门来自 `docs/simulation/06` 估算、从未验证；实测后以数据为准 |
 | 4 | 内嵌 Linux、宿主编译器桥接（汇编/C/Java/Python）、沙箱进程隔离与资源限制 | 均未实现，仅有 ADR 设计（0004） | M1 范围克制在 L0–L1 |
 | 5 | 存档版本迁移 | 信封 v3 + **迁移注册表**（`SaveCodec.MIGRATIONS`，v1→v2→v3 串联）；`tests/test_save.gd` 断言 `migrated_from=1/2`、`scrap`→`gold` 改名、未知字段保留；v4+ 存档被明确拒绝而非尝试迁移 | 只有一次结构调整时不做框架是克制；货币改名带来第二次结构变化，遂补注册式迁移器 |
-| 6 | 练习：文档 42 道、每题 ≥2 解 | 第一章 24 条 gate（每节 4 条）+ 黑盒多解验收（XOR 两种结构、半加器）；题库与逐题评分表未落地 | M1 只覆盖第一章 |
+| 6 | 练习：文档 42 道、每题 ≥2 解 | 第一章 24 条 gate（每节 4 条）+ 黑盒多解验收（XOR 两种结构、半加器）；**CH01 42 题题库与逐题评分已落地**（§2.29），其余章节题库未交付 | 题库接口在 M4 已就绪；CH01 本体 2026-11-05 已登记进 manifest，其余等教学组 |
 | 7 | 电路编辑：设计台 HUD/自由布线（拖拽、吸附、撤销重做） | 点击式编辑器（点空白放门、点端口连线、右键断线/删门），不支持拖拽 | 先保证可操作与可判定 |
 | 8 | 引导浮层：原实现为右下浮动面板 | 会遮挡实验操作区；已改为标题栏下方文档流内横条（`main.gd::_build_tutorial`） | 浮层遮挡与"提示不覆盖工作台"的设计硬规则冲突 |
 | 9 | 截图（无明确后端要求） | 截图只能在 GUI 后端生成（headless 无渲染）；验收用窗口模式 1600×900 自动截图后退出 | headless 的 viewport 无纹理可读 |
@@ -554,7 +564,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 第一章每节物品奖励入库 | **机制已完成（2026-11-04）；数据待策划** | 见 §2.11：`PlayerState.grant_items` 幂等 + 原子校验 + `dry_run`，`tests/test_rewards.gd` 28 项；`ch01_levels.json` 一行未改，等策划奖励表定稿 |
 | 冒险三档（`EXPLAIN/SYNC/MASK`）开关 | **字段已完成（M4，2026-11-04）；行为与 UI 开关未完成** | 见 §2.19：`Difficulty` + `PlayerState.settings.difficulty` + 存档往返/回落测试；**不改仿真行为**，`SYNC/MASK` 语义留 M5；开关绘制待 UI 会话 |
 | 错误码编号（`docs/simulation/07` §5 的 0–18） | **未完成** | 现为字符串错误 `IFZ_E_*` |
-| 42 道练习题库与逐题评分表 | **接口已完成（M4）；题目未交付** | 见 §2.18：`QuestionBank` 加载/校验/评分 + `tests/test_questions.gd`；`data/questions/` 与 42 题本体等教学组，M4 只用 `tests/fixtures/` 3 条样本锁行为 |
+| 42 道练习题库与逐题评分表 | **已完成（2026-11-05）** | 见 §2.18、§2.29：`data/questions/ch01_exercises.json` 恰 42 题，`QuestionBank` 加载/校验/评分经 `tests/test_questions.gd` 221 checks 验证，`manifest.json` 已登记；其余章节题库未交付 |
+| CH05/CH06 章节注册与 UI 可达性 | **未完成** | 两份 labs 数据与判定已落地（§2.29），但缺 `ch05/ch06_levels.json`、`skilltree.json` 的 CH05/CH06 节点与 manifest 登记；CH03/CH04 未落库，章节进度链无法到达 |
 | 6 节脚本化走查（UI 真实链路 → 验收 → 知识树 → 存档 → 重启读档） | **已完成（2026-11-04）** | 见 §2.5：`--walkthrough` 72 项 0 失败，`--verify-walkthrough` 36 项一致；物品奖励本章未定义，仅断言不变 |
 | 6 节真人鼠标走查（操作 → 验收 → 知识树 completed → 存档 → 重启续玩） | **需人工** | 脚本走查绕过鼠标点击/连线动作，真人交互仍需按 `docs/design/08` 走一遍 |
 | 截图冒烟之外的交互验证（拖拽/撤销不出现在 M1）、引导 6 步真实走查 | **需人工** | 需真人按 `docs/design/08` 走一遍 |
@@ -623,7 +634,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 - UI 按新契约渲染诊断文本与提示阶梯：**待 UI 会话接回**（`src/ui/` 本会话未改）；
 - 正式 `docs/curriculum/05-failure-diagnostics.md` 交付后，只重映射 `GateResult.TAG_MAP`（偏差 24）；
 - CH02 的 gate 与奖励数值：等 `docs/design/11-ch02-content-spec.md` 定稿；
-- 42 题正式题库：等教学组 `docs/curriculum/` 交付（`data/questions/`、`manifest.json` 由交付方登记）；
+- CH05/CH06 章节注册与 UI 可达：等 `ch05/ch06_levels.json` 与 `skilltree.json` 的 CH05/CH06 节点；CH03/CH04 未落库，当前只能停在 ch02；
 - `SYNC/MASK` 的实际采样语义：留 M5 后续；
 - 原生 GDExtension、ALU 8 行向量比对（`alu4` 仍只比对 0/8，见偏差 17/22）。
 
@@ -632,7 +643,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 2033 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 4092 checks, 0 failures（37 套件）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
