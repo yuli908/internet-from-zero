@@ -144,32 +144,60 @@ static func _opt_string(d: Dictionary, key: String) -> String:
 func is_objective_done(state: PlayerState, obj_id: String) -> bool:
 	return state.is_objective_done(obj_id)
 
+func objective_active(obj_id: String) -> bool:
+	## 版本内可完成度：`content_status == "deferred"` 的节不计入分母（转正后分母会变）。
+	var lab_id := str(objective(obj_id).get("lab", ""))
+	if lab_id.is_empty():
+		return true
+	return content_status(lab_id) == "ready"
+
+func active_objective_ids() -> Array:
+	var out := []
+	for id in objective_order:
+		if objective_active(str(id)):
+			out.append(id)
+	return out
+
 func complete_objective(state: PlayerState, obj_id: String) -> Dictionary:
 	if not objectives.has(obj_id):
 		return {"ok": false, "error": "目标不存在", "newly": false}
 	if state.is_objective_done(obj_id):
 		return {"ok": true, "error": "", "newly": false, "all_done": all_done(state)}
+	# 延后节不产生任何完成记录：不是让 gate 显示 pending，而是根本不给记 pass。
+	if not objective_active(obj_id):
+		return {"ok": false, "error": "该实验内容暂未开放", "newly": false, "all_done": all_done(state)}
 	var newly := state.complete_objective(obj_id)
 	return {"ok": true, "error": "", "newly": newly, "all_done": all_done(state)}
 
 func all_done(state: PlayerState) -> bool:
-	for id in objective_order:
+	for id in active_objective_ids():
 		if not state.is_objective_done(str(id)):
 			return false
 	return true
 
 func next_objective(state: PlayerState) -> Dictionary:
-	for id in objective_order:
+	for id in active_objective_ids():
 		if not state.is_objective_done(str(id)):
 			return objectives[str(id)]
 	return {}
 
 func progress(state: PlayerState) -> Dictionary:
+	var ids := active_objective_ids()
 	var done := 0
-	for id in objective_order:
+	for id in ids:
 		if state.is_objective_done(str(id)):
 			done += 1
-	return {"done": done, "total": objective_order.size()}
+	return {"done": done, "total": ids.size()}
+
+func chapter_reward_key() -> String:
+	return "chapter_reward:%s" % id()
+
+func chapter_complete_flag() -> String:
+	return "chapter_complete:%s" % id()
+
+func chapter_reward_claimable(state: PlayerState) -> bool:
+	## 章末奖励一次性：全部可完成节做完，且未领过。
+	return all_done(state) and not state.has_flag(chapter_reward_key())
 
 func dsl_errors() -> Array:
 	var errs := []

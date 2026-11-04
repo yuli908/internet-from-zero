@@ -70,17 +70,16 @@ func complete_lab(lab_id: String) -> Dictionary:
 
 func _finish_chapter() -> void:
 	var p := GameState.player
-	var key := "chapter_reward:%s" % runtime().id()
-	if p.has_flag(key):
+	if not runtime().chapter_reward_claimable(p):
 		return
-	p.set_flag(key, true)
-	p.set_flag("chapter_complete:%s" % runtime().id(), true)
+	p.set_flag(runtime().chapter_reward_key(), true)
+	p.set_flag(runtime().chapter_complete_flag(), true)
 	var reward: Dictionary = runtime().data.get("complete_reward", {})
 	p.add_gold(int(reward.get("gold", 0)))
 	p.add_xp(int(reward.get("xp", 0)))
-	Knowledge.unlock("CH01")
+	Knowledge.unlock(runtime().id().to_upper())
 	EventBus.chapter_completed.emit(runtime().id())
-	EventBus.toast("章节完成！从电压到半加器，你重新发明了计算。", "ok")
+	EventBus.toast("章节完成！%s" % runtime().title(), "ok")
 	EventBus.fire("chapter_completed:%s" % runtime().id())
 	SaveManager.autosave()
 

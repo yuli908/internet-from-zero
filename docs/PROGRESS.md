@@ -422,9 +422,26 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   与玩家可见 `deferred_reason`；新增 `ChapterRuntime.lab_content_available(lab_id) -> {available, reason}`，
   并让既有 `lab_unlocked` / `lab_lock_reason` 先判内容可用性——**整节禁入**，不是让 4 个 gate 显示 pending。
   `replace` 段已标 `deferred`，技能树节点 `SK-REPLACE` 保留（看得见、点不进）。
-- 注意：`power`（2.5）的 `requires` 是 `replace`，2.4 延后后 2.5 连带被前置锁住——章节 5/5 暂时不可达，
-  待决策（改前置或给延后节占位规则），本轮未擅改。
+- 注意：`power`（2.5）的 `requires` 已由 `replace` 改为 `nand`——2.5 只教功耗计算（`P=αCV²f`），
+  只需"手上有一个门"，不依赖被优化过的电路；2.4 因此成为侧枝而非主链必经（见 §2.25）。
 - 测试：新增 **22 checks**（售出端 11、内容锁定 11）；全量 **2274 checks / 0 failures**（25 套件）。
+
+### 2.25 2.5 解耦 + 版本内可完成度（2026-11-04）
+
+- `ch02_levels.json`：`power` 的 `requires` 改为 `["nand"]`。结构错误修正，不是放水：
+  2.4 教的是结构优化（更少门实现同样功能），2.5 教的是功耗计算，把 2.4 当 2.5 前置等于把侧枝塞进主链中间。
+- **完成度口径**：`ChapterRuntime.progress/all_done/next_objective` 只统计
+  `content_status == "ready"` 的节（`active_objective_ids`/`objective_active`）。
+  当前 CH02 是 **4/4 可完成**，章末 25 g 与 `CH02-CMOS` 可正常发放；2.4 转正后分母变 5，需补做。
+  这是**版本内可完成度**，跨版本会变，不是永久豁免。
+- **拒绝占位通过**：`complete_objective` 对 deferred 节直接返回 `ok=false`（"该实验内容暂未开放"），
+  不写任何完成记录。
+- 奖励一次性：新增 `chapter_reward_claimable`（`all_done` 且未领），`ChapterFlow._finish_chapter` 改用之；
+  章节知识节点按 `runtime().id()` 解锁（原先硬编码 `CH01`，CH02 完成会错解锁）。
+- **2.4 分支类型**：`docs/design/02-chapter-tree.md` 的 MUST/OPT/CHAL 只作用于章节，lab 级没有类型字段，
+  本轮**未自造字段**；UI 目前可用依赖图判定侧枝（2.4 已无后继），正式标注字段缺口见偏差 29。
+- 测试：新增 **22 checks**（2.5 解耦 2 + 完成度 14 + 面积口径 6）；
+  全量 **2296 checks / 0 failures**（25 套件）。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -458,7 +475,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 26 | `bound_first` 首件绑定不可回收 | **已真修（2026-11-04）**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 读取 `granted:<lab>`，已领过的 lab 返回空奖励表，重复刷关不再发放（见 §2.23）；`G01–G04` 与 `M01/M09/G12` 同口径；**售出端已收口**（§2.24：`EconomyCore.sell` 拒卖绑定件，不扣件、不加金币） | 原 `test_economy` 的 "sell M01" 断言与绑定数据冲突，已改用非绑定 `M08` 验证出售路径，check 数不减 |
 | 27 | CH02 技能树 24 个节点 / `start_gold_mode: carry` | 只在 `ch02_levels.json` 引用 `SK-TR…SK-POWER` 与 `milestone CH02-1…5`，**未新增 `skilltree.json` 节点**；`start_gold_mode` 字段已写入但 `ChapterRuntime` 未实现 carry 逻辑，按规格回落 `start_gold 0` | 新增 24 节点会让 `tests/test_data.gd` 的"36 节点"断言退；M5 任务只授权 ch02 两份数据 + manifest |
 | 28 | CH02 `static_current` / `rail_margin` | **`rail_margin` 已落地**（18/20）：`_judge_rail` 按逻辑输出反算 V_high/V_low，落 `E_RAIL_MARGIN`(20)，无器件层依赖；`static_current` 仍 `E_PENDING` + `required=false`（2 条 gate：`T2.2-3`、`T2.4-4`，**不算通过**） | 不写永远通过的假 gate；`rail_margin` 只需离散分压算术，故先落地；稳态电流仍等最小 L1 电流模型 |
-| 29 | 2.4 正式内容延后（等器件级网表），需在配置里标"待解锁" | lab 条目新增 `content_status`（`ready`/`deferred`，缺省 `ready`）与玩家可见 `deferred_reason`；`ChapterRuntime.lab_content_available` 返回 `{available, reason}`，`lab_unlocked`/`lab_lock_reason` 先判内容可用性 → **整节禁入**，不是 gate 全 pending；`replace` 已置 `deferred`，技能树 `SK-REPLACE` 保留（见 §2.24） | 半开的节会让玩家做完看不到分；`deferred_reason` 只写面向玩家的话。**遗留决策**：2.5 `requires: ["replace"]`，延后期间 2.5 连带锁死，章末 5/5 不可达——需你定是改 2.5 前置，还是给延后节占位规则 |
+| 29 | 2.4 正式内容延后（等器件级网表），需在配置里标"待解锁" | lab 条目新增 `content_status`（`ready`/`deferred`，缺省 `ready`）与玩家可见 `deferred_reason`；`ChapterRuntime.lab_content_available` 返回 `{available, reason}`，`lab_unlocked`/`lab_lock_reason` 先判内容可用性 → **整节禁入**，不是 gate 全 pending；`replace` 已置 `deferred`，技能树 `SK-REPLACE` 保留（见 §2.24） | 半开的节会让玩家做完看不到分；`deferred_reason` 只写面向玩家的话。**已处置**：`power` 前置改 `["nand"]`，2.4 变侧枝；完成度按 ready 节计（4/4，见 §2.25）。**仍缺字段**：lab 级"必修/选修/挑战"类型（`docs/design/02` 的 MUST/OPT/CHAL 只到章节层），本轮未自造 |
+| 30 | 2.5 `build_area` 的 8 门预算 | 门数按**展开后**统计：成品 XOR 记 4 门（`GATE_EXPAND_WEIGHTS`），`BUILD_AREA_GATE_BUDGET = 8` 为唯一来源；槽位（`slots`）与门数（`max_total_gates`）两条约束分开判定 | 顶层件数口径会把成品 XOR 记 1，`4 ≤ 8` 恒真、预算静默失效；已用测试钉死（成品 XOR=4、全用现成门=7 过、4 个成品 XOR=16 落 `E_AREA`） |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

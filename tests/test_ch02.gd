@@ -179,6 +179,25 @@ func run(ctx: TestContext) -> void:
 	var p_slot: Dictionary = Ch02ChecksScript.run("power", p_narrow, {"answers": {"power_mw": 0.05445, "ratio": 0.5, "T2.5-4": 1}, "graphs": p_graphs})
 	ctx.check("2.5 槽位不足真失败", not bool((p_slot["report"] as GateReport).all_required_passed()))
 	ctx.check("2.5 槽位不足落 E_AREA", GateResult.E_AREA in (p_slot["report"] as GateReport).failure_codes())
+	# 面积口径：成品 XOR 必须按展开 4 门计，否则 8 门预算会静默失效
+	var budget: int = Ch02ChecksScript.BUILD_AREA_GATE_BUDGET
+	var xor_used: int = Ch02ChecksScript.expanded_gate_count(_g2("xor"))
+	ctx.eq("2.5 成品 XOR 展开计 4 门", xor_used, 4)
+	ctx.eq("2.5 全用现成门 = 1+1+1+4 = 7 门",
+		Ch02ChecksScript.expanded_gate_count(_g1("not")) + Ch02ChecksScript.expanded_gate_count(_g2("and"))
+		+ Ch02ChecksScript.expanded_gate_count(_g2("or")) + xor_used, 7)
+	ctx.check("2.5 7 门在预算内且过判据",
+		7 <= budget and _code_of(p_ok["report"] as GateReport, "T2.5-3") == "OK")
+	# 4 个成品 XOR 摊上板：4×4=16 门，必须落 E_AREA（顶层件数口径会算成 4 而假通过）
+	var p_xor4: Dictionary = p_cfg.duplicate(true)
+	for raw in (p_xor4["gate_cases"] as Array):
+		if str(raw.get("id", "")) == "T2.5-3":
+			raw["targets"] = ["xor", "xor", "xor", "xor"]
+	var p_four: Dictionary = Ch02ChecksScript.run("power", p_xor4,
+		{"answers": {"power_mw": 0.05445, "ratio": 0.5, "T2.5-4": 1}, "graphs": {"xor": _g2("xor")}})
+	ctx.check("2.5 四个成品 XOR = %d 门超预算" % (4 * xor_used), 4 * xor_used > budget)
+	ctx.check("2.5 四个成品 XOR 真失败", not bool((p_four["report"] as GateReport).all_required_passed()))
+	ctx.check("2.5 四个成品 XOR 落 E_AREA", GateResult.E_AREA in (p_four["report"] as GateReport).failure_codes())
 
 	# ---- trace 接线：判定 kind 能落到统一事件流 ----
 	var sim := SimCircuit.new("ch02_judge")

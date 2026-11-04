@@ -60,3 +60,33 @@ func run(ctx: TestContext) -> void:
 	ctx.check("旧数据缺字段仍可进入", ch.lab_unlocked(st, "level")
 		and bool(ch.lab_content_available("level").get("available", false)))
 	ctx.eq("技能树节点照常保留", ch2.lab("replace").get("skill_node", ""), "SK-REPLACE")
+
+	# ---- 2.5 不再以 2.4 为前置：deferred 期间照常可进可做 ----
+	ctx.check("2.4 deferred 时 2.5 可进入", ch2.lab_unlocked(st2, "power"))
+	ctx.check("2.5 目标可完成", bool(ch2.complete_objective(st2, "obj_power").get("ok", false)))
+
+	# ---- 版本内可完成度：deferred 不计入分母 ----
+	var st3 := PlayerState.new()
+	ctx.eq("ch02 分母只算 ready 节", ch2.progress(st3), {"done": 0, "total": 4})
+	ctx.eq("下一目标跳过 deferred", str(ch2.next_objective(st3).get("id", "")), "obj_transistor")
+	ctx.check("未完成不可领章末奖", not ch2.chapter_reward_claimable(st3))
+	var rej := ch2.complete_objective(st3, "obj_replace")
+	ctx.check("deferred 不产生任何完成记录",
+		not bool(rej.get("ok", true)) and not st3.is_objective_done("obj_replace"))
+	for oid in ["obj_transistor", "obj_inverter", "obj_nand", "obj_power"]:
+		ctx.check("完成 ready 节: %s" % str(oid),
+			bool(ch2.complete_objective(st3, str(oid)).get("ok", false)))
+	ctx.eq("ch02 完成度 4/4", ch2.progress(st3), {"done": 4, "total": 4})
+	ctx.check("4/4 即全完成", ch2.all_done(st3))
+	ctx.check("章末奖励可发放", ch2.chapter_reward_claimable(st3))
+	# 2.4 转正模拟：分母变 5 → 4/5，且已领奖励不重复发放
+	var ready_doc: Dictionary = TestUtil.read_json("res://data/chapters/ch02_levels.json")
+	for l in (ready_doc["labs"] as Array):
+		if str(l.get("id", "")) == "replace":
+			l.erase("content_status")
+			l.erase("deferred_reason")
+	var ch2r := ChapterRuntime.from_doc(ready_doc)
+	ctx.eq("2.4 转正后分母 5", ch2r.progress(st3), {"done": 4, "total": 5})
+	ctx.check("2.4 转正后仍需补做", not ch2r.all_done(st3))
+	st3.set_flag(ch2r.chapter_reward_key(), true)
+	ctx.check("已领奖励不重复发放", not ch2r.chapter_reward_claimable(st3))

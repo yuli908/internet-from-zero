@@ -15,6 +15,12 @@ const PENDING_REASONS := {
 	"static_current": "L1 仿真层只输出逻辑值，没有稳态电流模型（规格要求 50 tick 平均 Idd）",
 }
 
+## 2.5 的板子门数预算：唯一来源（判据与测试都从这里取，不得另写 8）。
+const BUILD_AREA_GATE_BUDGET := 8
+
+## 面积按"展开后"统计：一个成品 XOR = NOT 1 + AND 1 + OR 1 + XOR 4。
+const GATE_EXPAND_WEIGHTS := {LogicGates.Type.XOR: 4}
+
 static func run(_lab_id: String, cfg: Dictionary, inputs: Dictionary = {}, tracker: GateAttemptTracker = null) -> Dictionary:
 	var rep := GateReport.new()
 	var pending := []
@@ -345,7 +351,7 @@ static func _judge_power_ratio(rep: GateReport, tracker: GateAttemptTracker, c: 
 static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 		cid: String, title: String, required: bool, graphs: Dictionary) -> void:
 	var slots := int(c.get("slots", 4))
-	var budget := int(c.get("max_total_gates", -1))
+	var budget := int(c.get("max_total_gates", BUILD_AREA_GATE_BUDGET))
 	var targets: Array = c.get("targets", [])
 	var ok := targets.size() <= slots
 	var lines := []
@@ -363,7 +369,7 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 		var tid := str(t.get("id", ""))
 		var g: CircuitGraph = graphs.get(tid, null)
 		var res := BlackBox.check_target(g, str(t.get("target", "")), t.get("input_ids", ["a", "b"]), ["out"])
-		var used := BlackBox.gate_count(g) if g != null else 0
+		var used := expanded_gate_count(g)
 		total_gates += used
 		if bool(res.get("ok", false)):
 			lines.append("%s ✓(%d门)" % [tid, used])
@@ -379,6 +385,15 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 	LabChecks._emit(rep, tracker, code, cid, title, ok, {"slots": slots, "max_total_gates": budget},
 		"%d/%d 槽，总门数 ≤%d" % [targets.size(), slots, budget], lines,
 		"%s（%d 槽 / %d 目标 / %d 门）" % [", ".join(lines), slots, targets.size(), total_gates], required)
+
+static func expanded_gate_count(graph: CircuitGraph) -> int:
+	## 面积/门数按"展开后"统计，而不是顶层件数：成品 XOR 记 4 个门。
+	if graph == null:
+		return 0
+	var total := 0
+	for id in graph.gate_ids():
+		total += int(GATE_EXPAND_WEIGHTS.get(graph.gate_type(str(id)), 1))
+	return total
 
 static func _judge_rail(rep: GateReport, tracker: GateAttemptTracker, cfg: Dictionary,
 		c: Dictionary, cid: String, title: String, required: bool,

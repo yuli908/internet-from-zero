@@ -124,7 +124,7 @@
         {"id": "T2.5-1", "title": "算出 P ≈ 0.0545 mW（±5%）", "kind": "power_calc", "alpha": 0.5, "c_f": 1e-11, "vdd": 3.3,
          "f_hz": 1000000, "expect_mw": 0.0545, "tol": 0.05, "required": true},
         {"id": "T2.5-2", "title": "频率减半 → 功耗比 0.50（±2%）", "kind": "power_ratio", "f_from": 1000000, "f_to": 500000, "expect_ratio": 0.5, "tol": 0.02, "required": true},
-        {"id": "T2.5-3", "title": "1 块 PCB（4 槽）放下 4 个门且各自真值表全过", "kind": "build_area", "slots": 4, "targets": ["not", "and", "or", "xor"], "max_total_gates": 8, "required": true},
+        {"id": "T2.5-3", "title": "1 块 PCB（4 槽）放下 4 个门且各自真值表全过", "kind": "build_area", "slots": 4, "targets": ["not", "and", "or", "xor"], "required": true},
         {"id": "T2.5-4", "title": "选择题：为什么静态功耗近似为 0", "kind": "quiz",
          "quiz": {
            "question": "CMOS 门在稳态几乎不耗电，原因是？",
