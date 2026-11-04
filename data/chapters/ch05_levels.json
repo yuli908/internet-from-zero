@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "id": "ch05",
+  "number": 5,
+  "title": "第五章 · 让它跑起来",
+  "subtitle": "数据通路、指令集、程序与时钟上限",
+  "source": "docs/curriculum/17-ch05-06-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH05-MUD"},
+  "next_chapter": "ch06",
+  "labs": [
+    {"id": "datapath", "order": 1, "title": "5.1 数据通路与四阶段", "subtitle": "PC、内存、IR、寄存器堆、ALU", "data_key": "datapath", "requires": [], "objective": "obj_datapath", "knowledge": "KN-DP-01", "milestone": "CH05-1", "knowledge_cards": ["KN-DP-01"], "skill_node": "SK-DATAPATH", "gate_ids": ["T5.1-1", "T5.1-2", "T5.1-3", "T5.1-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "isa", "order": 2, "title": "5.2 指令集", "subtitle": "16 行控制表就是 16 条指令", "data_key": "isa8", "requires": ["datapath"], "objective": "obj_isa", "knowledge": "KN-ISA-01", "milestone": "CH05-2", "knowledge_cards": ["KN-ISA-01", "KN-ISA-02"], "skill_node": "SK-ISA", "gate_ids": ["T5.2-1", "T5.2-2", "T5.2-3", "T5.2-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "program", "order": 3, "title": "5.3 程序", "subtitle": "循环靠跳回，边界靠停机", "data_key": "first_program", "requires": ["isa"], "objective": "obj_program", "knowledge": "KN-PROG-01", "milestone": "CH05-3", "knowledge_cards": ["KN-PROG-01", "KN-PROG-02"], "skill_node": "SK-PROGRAM", "gate_ids": ["T5.3-1", "T5.3-2", "T5.3-3", "T5.3-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "timing", "order": 4, "title": "5.4 时钟上限", "subtitle": "一拍的预算与首坏拍", "data_key": "clock_limit", "requires": ["program"], "objective": "obj_timing", "knowledge": "KN-TIM-01", "milestone": "CH05-4", "knowledge_cards": ["KN-TIM-01", "KN-TIM-02"], "skill_node": "SK-TIMING", "gate_ids": ["T5.4-1", "T5.4-2", "T5.4-3", "T5.4-4", "T5.4-5"], "reward": {"gold": 35, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_datapath", "title": "把五件接成圈，单步 LDI 并让波形与阶段标注对齐", "lab": "datapath", "knowledge": "KN-DP-01"},
+    {"id": "obj_isa", "title": "补一行控制表、跑 16 条指令并拒绝空码", "lab": "isa", "knowledge": "KN-ISA-01"},
+    {"id": "obj_program", "title": "写出循环程序，验证输出、回跳次数与停机", "lab": "program", "knowledge": "KN-PROG-01"},
+    {"id": "obj_timing", "title": "从级数与单级延迟推出时钟上限，并定位首坏拍", "lab": "timing", "knowledge": "KN-TIM-01"}
+  ]
+}

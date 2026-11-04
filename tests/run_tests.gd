@@ -43,6 +43,9 @@ const SUITES := [
 	"res://tests/test_ch02_body.gd",
 	"res://tests/test_ch02_sections.gd",
 	"res://tests/test_waveform_align.gd",
+	"res://tests/test_ch03.gd",
+	"res://tests/test_ch04.gd",
+	"res://tests/test_chapters_03_06.gd",
 	"res://tests/test_ch05.gd",
 	"res://tests/test_ch06.gd",
 ]

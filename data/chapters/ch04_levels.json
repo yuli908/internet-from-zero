@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "id": "ch04",
+  "number": 4,
+  "title": "第四章 · 把动作交给选择",
+  "subtitle": "多路选择、ALU、控制、存储与总线",
+  "source": "docs/curriculum/16-ch04-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH04-ALU"},
+  "next_chapter": "ch05",
+  "labs": [
+    {"id": "mux", "order": 1, "title": "4.1 多路选择", "subtitle": "先选再合，不能并联", "data_key": "mux", "requires": [], "objective": "obj_mux", "knowledge": "KN-MUX-01", "milestone": "CH04-1", "knowledge_cards": ["KN-MUX-01", "KN-MUX-02"], "skill_node": "SK-MUX", "gate_ids": ["T4.1-1", "T4.1-2", "T4.1-3", "T4.1-4"], "reward": {"gold": 30, "xp": 15}},
+    {"id": "alu8", "order": 2, "title": "4.2 ALU-8", "subtitle": "八条算路共享操作数", "data_key": "alu8", "requires": ["mux"], "objective": "obj_alu8", "knowledge": "KN-ALU-01", "milestone": "CH04-2", "knowledge_cards": ["KN-ALU-01", "KN-ALU-02"], "skill_node": "SK-ALU", "gate_ids": ["T4.2-1", "T4.2-2", "T4.2-3", "T4.2-4"], "reward": {"gold": 35, "xp": 18}},
+    {"id": "control_unit", "order": 3, "title": "4.3 控制单元", "subtitle": "先有表，再有门", "data_key": "control_unit", "requires": ["alu8"], "objective": "obj_control_unit", "knowledge": "KN-CTRL-01", "milestone": "CH04-3", "knowledge_cards": ["KN-CTRL-01", "KN-CTRL-02"], "skill_node": "SK-CTRL", "gate_ids": ["T4.3-1", "T4.3-2", "T4.3-3", "T4.3-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "memory", "order": 4, "title": "4.4 存储、地址与层次", "subtitle": "地址管个数，数据管宽度", "data_key": "memory", "requires": ["control_unit"], "objective": "obj_memory", "knowledge": "KN-MEM2-01", "milestone": "CH04-4", "knowledge_cards": ["KN-MEM2-01", "KN-MEM2-02", "KN-MEM2-03"], "skill_node": "SK-MEM", "gate_ids": ["T4.4-1", "T4.4-2", "T4.4-3", "T4.4-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "io_bus", "order": 5, "title": "4.5 IO 端口、总线与三态", "subtitle": "同一时刻只有一个司机", "data_key": "io_bus", "requires": ["memory"], "objective": "obj_io_bus", "knowledge": "KN-BUS-01", "milestone": "CH04-5", "knowledge_cards": ["KN-BUS-01", "KN-BUS-02", "KN-BUS-03"], "skill_node": "SK-BUS", "gate_ids": ["T4.5-1", "T4.5-2", "T4.5-3", "T4.5-4"], "reward": {"gold": 30, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_mux", "title": "做出 2 选 1 与 8 选 1，并解释并联为何冲突", "lab": "mux", "knowledge": "KN-MUX-01"},
+    {"id": "obj_alu8", "title": "搭 ALU-8，64 个断言全过且操作码只进选择端", "lab": "alu8", "knowledge": "KN-ALU-01"},
+    {"id": "obj_control_unit", "title": "填控制真值表，非法码全部控制信号为 0", "lab": "control_unit", "knowledge": "KN-CTRL-01"},
+    {"id": "obj_memory", "title": "搭 256×8 阵列并扩成 512 字节，读写可回读", "lab": "memory", "knowledge": "KN-MEM2-01"},
+    {"id": "obj_io_bus", "title": "制造并诊断一次总线争用，再用端口映射点亮设备", "lab": "io_bus", "knowledge": "KN-BUS-01"}
+  ]
+}

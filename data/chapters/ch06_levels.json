@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "id": "ch06",
+  "number": 6,
+  "title": "第六章 · 让它面向人",
+  "subtitle": "字符、输入、声音、装入、缓存与虚存",
+  "source": "docs/curriculum/17-ch05-06-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH06-STACK"},
+  "next_chapter": "",
+  "labs": [
+    {"id": "charset", "order": 1, "title": "6.1 字符与像素", "subtitle": "字节、ASCII 与 UTF-8", "data_key": "charset", "requires": [], "objective": "obj_charset", "knowledge": "KN-CHR-01", "milestone": "CH06-1", "knowledge_cards": ["KN-CHR-01"], "skill_node": "SK-DEVICE", "gate_ids": ["T6.1-1", "T6.1-2", "T6.1-3", "T6.1-4"], "reward": {"gold": 30, "xp": 15}},
+    {"id": "keyboard", "order": 2, "title": "6.2 键盘与输入", "subtitle": "轮询 vs 中断", "data_key": "keyboard", "requires": ["charset"], "objective": "obj_keyboard", "knowledge": "KN-KBD-01", "milestone": "CH06-2", "knowledge_cards": ["KN-KBD-01"], "skill_node": "SK-IO", "gate_ids": ["T6.2-1", "T6.2-2", "T6.2-3", "T6.2-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "sound", "order": 3, "title": "6.3 声音", "subtitle": "频率、分频与音阶", "data_key": "sound", "requires": ["keyboard"], "objective": "obj_sound", "knowledge": "KN-SND-01", "milestone": "CH06-3", "knowledge_cards": ["KN-SND-01"], "skill_node": "SK-IO", "gate_ids": ["T6.3-1", "T6.3-2", "T6.3-3", "T6.3-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "loader", "order": 4, "title": "6.4 装入器", "subtitle": "从磁带进内存再跑", "data_key": "loader", "requires": ["sound"], "objective": "obj_loader", "knowledge": "KN-LOAD-01", "milestone": "CH06-4", "knowledge_cards": ["KN-LOAD-01"], "skill_node": "SK-LOADER", "gate_ids": ["T6.4-1", "T6.4-2", "T6.4-3", "T6.4-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "cache", "order": 5, "title": "6.5 缓存", "subtitle": "命中率与平均访问时间", "data_key": "cache", "requires": ["loader"], "objective": "obj_cache", "knowledge": "KN-CACHE-01", "milestone": "CH06-5", "knowledge_cards": ["KN-CACHE-01"], "skill_node": "SK-CACHE", "gate_ids": ["T6.5-1", "T6.5-2", "T6.5-3", "T6.5-4"], "reward": {"gold": 35, "xp": 18}},
+    {"id": "vm", "order": 6, "title": "6.6 虚存", "subtitle": "页表、换页与超配", "data_key": "vm", "requires": ["cache"], "objective": "obj_vm", "knowledge": "KN-VM-01", "milestone": "CH06-6", "knowledge_cards": ["KN-VM-01"], "skill_node": "SK-VM", "gate_ids": ["T6.6-1", "T6.6-2", "T6.6-3", "T6.6-4"], "reward": {"gold": 35, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_charset", "title": "用字节往返 ASCII 与 UTF-8，并解释端序", "lab": "charset", "knowledge": "KN-CHR-01"},
+    {"id": "obj_keyboard", "title": "对比轮询与中断，跑通两次按键并保存现场", "lab": "keyboard", "knowledge": "KN-KBD-01"},
+    {"id": "obj_sound", "title": "用分频系数产生指定频率，并验证音阶比例", "lab": "sound", "knowledge": "KN-SND-01"},
+    {"id": "obj_loader", "title": "按表头装入程序，校验和通过后才运行", "lab": "loader", "knowledge": "KN-LOAD-01"},
+    {"id": "obj_cache", "title": "比较两段访问的命中率与平均访问时间", "lab": "cache", "knowledge": "KN-CACHE-01"},
+    {"id": "obj_vm", "title": "用页表把 1.5 倍地址空间映射到物理页框，并解释超配", "lab": "vm", "knowledge": "KN-VM-01"}
+  ]
+}

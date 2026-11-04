@@ -5,7 +5,7 @@ const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
 ## 数据完整性：物品、价格、配方、双树、章节、实验配置、gate 用例。
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 615
+const EXPECT := 619
 const EXPECT_GROUPS := {
 	"manifest": 2, "item_catalog": 1, "item_names": 86, "item_taxonomy": 5,
 	"price_refs": 98, "price_values": 4, "recipe_count": 1, "recipe_outputs": 77,
@@ -13,12 +13,12 @@ const EXPECT_GROUPS := {
 	"chapter_meta": 5, "start_items": 2, "chapter_prereq": 3, "lab_config": 6,
 	"gate_case_counts": 6, "gate_case_kinds": 24, "gate_id_alignment": 6,
 	"lab_node_refs": 37, "lab_reward": 6, "gate_total": 1, "sim_config": 15,
-	"lab_limits": 4, "chapter_registry": 6, "ch02_labs": 4, "ch02_runtime": 5,
+	"lab_limits": 4, "chapter_registry": 10, "ch02_labs": 4, "ch02_runtime": 5,
 	"grid_count": 2, "ch02_node_refs": 27, "ch02_totals": 2, "tree_integrity": 2,
 	"chapter_reward_payout": 5, "tutorial": 1, "loadable": 1,
 }
 const GROUP_DESCRIPTIONS := {
-	"manifest": "manifest 文件清单 11 项、版本 2",
+	"manifest": "manifest 文件清单 19 项、版本 2",
 	"item_catalog": "目录条目总数 86",
 	"item_names": "每个物品都有非空 name",
 	"item_taxonomy": "文档物品 77 / 旧别名 7、gold 是货币而 scrap 不是",
@@ -61,7 +61,7 @@ func run(ctx: TestContext) -> void:
 	var ch: ChapterRuntime = db.chapter
 
 	ctx.begin_group("manifest")
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 11)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 19)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.begin_group("item_catalog")
@@ -119,10 +119,10 @@ func run(ctx: TestContext) -> void:
 			ctx.check("recipe %s skill %s" % [rid, need], kg.nodes.has(need))
 
 	ctx.begin_group("skill_tree")
-	ctx.eq("skill node count", kg.nodes.size(), 62)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 14)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 32)
-	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 16)
+	ctx.eq("skill node count", kg.nodes.size(), 142)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 41)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 67)
+	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 34)
 	ctx.check("CH01 milestone exists", kg.nodes.has("CH01"))
 	ctx.check("KN-ELEC-01 exists", kg.nodes.has("KN-ELEC-01"))
 	ctx.check("SK-LEVEL exists", kg.nodes.has("SK-LEVEL"))
@@ -218,9 +218,13 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 穿过接缝：从 DataDB 入口直达 CH02，证明章节注册表真的被读 ----
 	ctx.begin_group("chapter_registry")
-	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02"])
+	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06"])
 	ctx.check("注册表含 ch01", db.has_chapter("ch01"))
 	ctx.check("注册表含 ch02", db.has_chapter("ch02"))
+	ctx.check("注册表含 ch03", db.has_chapter("ch03"))
+	ctx.check("注册表含 ch04", db.has_chapter("ch04"))
+	ctx.check("注册表含 ch05", db.has_chapter("ch05"))
+	ctx.check("注册表含 ch06", db.has_chapter("ch06"))
 	ctx.eq("ch02 章号", int(db.chapter_meta("ch02").get("number", 0)), 2)
 	ctx.eq("默认章节来自注册表", db.default_chapter_id(), "ch01")
 	ctx.eq("兼容 labs 指向默认章节", db.labs, db.labs_for("ch01"))
@@ -293,7 +297,10 @@ func run(ctx: TestContext) -> void:
 	ctx.begin_group("tree_integrity")
 	ctx.check("节点 ID 唯一", dup_ids.is_empty(), str(dup_ids))
 	var gate_ids := {}
-	for c in [ch, ch02_rt]:
+	for cid in db.chapter_ids():
+		var c: ChapterRuntime = db.runtime_for(str(cid))
+		if c == null:
+			continue
 		for lid in c.lab_order:
 			for gid in (c.lab(str(lid)).get("gate_ids", []) as Array):
 				gate_ids[str(gid)] = true

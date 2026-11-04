@@ -10,6 +10,14 @@
     "res://data/labs/ch01_labs.json",
     "res://data/chapters/ch02_levels.json",
     "res://data/labs/ch02_labs.json",
+    "res://data/chapters/ch03_levels.json",
+    "res://data/labs/ch03_labs.json",
+    "res://data/chapters/ch04_levels.json",
+    "res://data/labs/ch04_labs.json",
+    "res://data/chapters/ch05_levels.json",
+    "res://data/labs/ch05_labs.json",
+    "res://data/chapters/ch06_levels.json",
+    "res://data/labs/ch06_labs.json",
     "res://data/sim/delays.json",
     "res://data/questions/ch01_exercises.json"
   ]

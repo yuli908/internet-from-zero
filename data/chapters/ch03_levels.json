@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "id": "ch03",
+  "number": 3,
+  "title": "第三章 · 加法的代价",
+  "subtitle": "从全加器到时钟与双稳态",
+  "source": "docs/curriculum/15-ch03-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH03-ADDER"},
+  "next_chapter": "ch04",
+  "labs": [
+    {"id": "full_adder", "order": 1, "title": "3.1 全加器", "subtitle": "两只半加器 + 一个或门", "data_key": "full_adder", "requires": [], "objective": "obj_full_adder", "knowledge": "KN-FA-01", "milestone": "CH03-1", "knowledge_cards": ["KN-FA-01", "KN-FA-02"], "skill_node": "SK-FA", "gate_ids": ["T3.1-1", "T3.1-2", "T3.1-3", "T3.1-4"], "reward": {"gold": 30, "xp": 15}},
+    {"id": "adder8", "order": 2, "title": "3.2 八位加法器", "subtitle": "行波进位与第 9 位", "data_key": "adder8", "requires": ["full_adder"], "objective": "obj_adder8", "knowledge": "KN-ADDR-01", "milestone": "CH03-2", "knowledge_cards": ["KN-ADDR-01", "KN-ADDR-02"], "skill_node": "SK-ADDER8", "gate_ids": ["T3.2-1", "T3.2-2", "T3.2-3", "T3.2-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "clock_edge", "order": 3, "title": "3.3 时钟与边沿", "subtitle": "一拍、频率与沿采样", "data_key": "clock_edge", "requires": ["adder8"], "objective": "obj_clock_edge", "knowledge": "KN-CLK-01", "milestone": "CH03-3", "knowledge_cards": ["KN-CLK-01", "KN-CLK-02", "KN-CLK-03"], "skill_node": "SK-CLOCK", "gate_ids": ["T3.3-1", "T3.3-2", "T3.3-3", "T3.3-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "bistable_reg", "order": 4, "title": "3.4 双稳态与寄存器", "subtitle": "正反馈、保持与写使能", "data_key": "bistable_reg", "requires": ["clock_edge"], "objective": "obj_bistable_reg", "knowledge": "KN-MEM-01", "milestone": "CH03-4", "knowledge_cards": ["KN-MEM-01", "KN-MEM-02", "KN-MEM-03"], "skill_node": "SK-REG", "gate_ids": ["T3.4-1", "T3.4-2", "T3.4-3", "T3.4-4"], "reward": {"gold": 35, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_full_adder", "title": "用两只半加器与一个或门搭出全加器，8 行全过", "lab": "full_adder", "knowledge": "KN-FA-01"},
+    {"id": "obj_adder8", "title": "把八只全加器叠成行波进位加法器，接出 C8", "lab": "adder8", "knowledge": "KN-ADDR-01"},
+    {"id": "obj_clock_edge", "title": "解释一拍与频率，并用短 T 演示采样失败", "lab": "clock_edge", "knowledge": "KN-CLK-01"},
+    {"id": "obj_bistable_reg", "title": "用交叉反相器保持 10 tick，并加上 WE 做成 8 位寄存器", "lab": "bistable_reg", "knowledge": "KN-MEM-01"}
+  ]
+}
