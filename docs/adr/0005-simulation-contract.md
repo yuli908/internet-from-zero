@@ -16,8 +16,8 @@
 |---|---|---|---|---|---|
 | **L0a** 模拟电平 | `src/core/voltage_model.gd` + `src/ui/widgets/level_gauge.gd` | `data/labs/ch01_labs.json` 的 `voltage{v_low_max,v_high_min,min,max,step}` + `gate_cases` | **无求解器**：阈值判读 `judge(v, low, high) -> "0"/"1"/"X"`，纯静态 | 滑杆 → 实时判读条、灯泡、预设按钮；`LabChecks.voltage` 判定 4 条用例 | ✅ 已落地（判读带，非 RC 求解） |
 | **L0b** 数字电平 | `src/sim/sim_value.gd` | `String` 位串（`"0"/"1"/"X"` 或位串）；`GATE_DELAY` 常量 | 三值 Kleene：`X AND 0 = 0`、`X OR 1 = 1`，其余含 X → X | 探针值、`SimCircuit.history`、`glitches` | ✅ 已落地 |
-| **L1** 门级 | `src/sim/sim_circuit.gd`、`sim_engine.gd`、`sim_delays.gd`；拓扑来自 `src/core/circuit_graph.gd` | `data/sim/delays.json`（唯一延迟来源）+ `CircuitGraph.nodes{kind,gate,a,b}` | `SimEngine`：整数 tick + `(tick, seq)` 最小堆；传输延迟 + 惯性过滤（输出不变则不写线网） | `circuit_editor` 采集拓扑与输入；`waveform` 画波形；`BlackBox` 跑向量 | ✅ 已落地（≤200 门预算内） |
-| **L2** 组合电路 | 仅 `BlackBox` + `CircuitGraph` 的"模块级行为验收" | 目标函数名（`and/or/not/xor`、半加器 `sum/carry`） | 复用 L1 的 `settle()`；`measure_settle()` 给稳定时间 | `LabChecks.gate / half_adder`（只判行为，不看拓扑） | ⚠️ **占位**：无模块封装、无 `t_settle` 上界声明、无结构级组件库 |
+| **L1** 门级 | `src/sim/sim_circuit.gd`、`sim_engine.gd`、`sim_delays.gd`；拓扑来自 `src/core/circuit_graph.gd` | `data/sim/delays.json`（唯一延迟来源）+ `CircuitGraph.nodes{kind,gate,a,b}` | `SimEngine`：整数 tick + `(tick, seq)` 最小堆；传输延迟 + 惯性过滤（输出不变则不写线网） | `circuit_editor` 采集拓扑与输入；`waveform` 画波形；`BlackBox` 跑向量 | ✅ 已落地（≤50 门/50 DFF，实测） |
+| **L2** 组合电路 | `src/sim/sim_module.gd`：半加器 / 全加器 / 8 位行波加法器 / 2:1 与 4:1 选择器，`t_settle` 由延迟表推导；`BlackBox` 继续做模块级行为验收 | 模块 `name/inputs/outputs/t_settle` + 内部展开为 L1 门 | 复用 L1 的 `settle()`；`measure_settle()` 实测稳定时间 | `LabChecks.gate / half_adder`（只判行为，不看拓扑） | ✅ 已落地（`tests/test_l2.gd`） |
 | **L3** 时序电路 | 只有延迟表里的 `dff{setup,hold,clk_to_q}` | `delays.json` 的 `dff` 段 | 无 DFF/时钟实现 | 无 | ⚠️ **占位**（仅常量） |
 | **L4** 寄存器/ALU/CPU | 无 | 无微码表 | 无 | 无 | ⚠️ **占位**（`docs/simulation/01` §6 微码表为准） |
 | **L5** 总线/IO | 无 | 无 | 无 | 无 | ⚠️ **占位** |
@@ -61,7 +61,7 @@ M1 的实体只有三种：输入节点、门、输出节点；组件只有 `{ki
 
 ## 5. 性能预算与"降速不丢事件"
 
-- 预算：60 FPS、仿真 5 ms/帧、4 tick/帧；GDScript 上限 200 门 / 200 DFF（**估算**，未实测；见 ADR 0002 §5）。
+- 预算：60 FPS、仿真 5 ms/帧、4 tick/帧；2026-11-04 实测后 GDScript 上限为 **50 门 / 50 DFF**（200 门 p95 17.78 ms，见 ADR 0002 §2.1 与 `docs/PROGRESS.md` §2.2）。
 - 实现方式：
   - `SimDelays.configure(data/sim/delays.json)` 在启动期读入 `gate_delay / dff / frame / limits` 四段；
     `ticks_per_frame()` / `budget_ms()` / `max_events_per_tick()` / `gdscript_gate_limit()` 是唯一访问口。
@@ -84,6 +84,6 @@ M1 的实体只有三种：输入节点、门、输出节点；组件只有 `{ki
 
 ## 7. 复审触发条件
 
-1. 开始实现 L2 模块封装 → 需先定 `t_settle` 声明与模块等价性测试。
+1. 开始实现 L2 模块封装 → 需先定 `t_settle` 声明与模块等价性测试。**（已于 2026-11-04 完成：`src/sim/sim_module.gd`、`tests/test_l2.gd`；`t_settle` 由 `SimDelays` 推导并实测校验）**
 2. 开始实现 L3 → 需同时改存档格式（ADR 0003）与 `TraceSink`。
 3. 下沉原生（ADR 0002）→ 错误码与 `ifz-sim/1` 必须同时落地，并保证 GDScript/C++ 同向量一致。

@@ -27,9 +27,9 @@
 - [x] D3 三值（含 X）随机向量固定种子（seed=1，8 组），结果锁定（`tests/test_lab_checks.gd` 半加器 random_x）。
 
 ## E. 性能与范围边界
-- [x] E1 GDScript 门级上限 ≤200 门/200 DFF 已写入数据与校验（`data/labs/ch01_labs.json` 的 `max_gates`）。
+- [x] E1 GDScript 门级上限 **≤50 门/50 DFF**（2026-11-04 实测，原 200 门估算下调）已写入数据与校验（`data/sim/delays.json`、`tests/test_data.gd`；见 `docs/PROGRESS.md` §2.2）。
 - [x] E2 `SimEngine` 单 tick 超限显式失败，不静默丢事件（`tests/test_sim.gd`）。
-- [x] E3 M1 未实现 CPU/网络/加密功能（`src/` 无 L2+ 实现，仅 ADR 0005 占位）。
+- [x] E3 M1 未实现 L3+（CPU/网络/加密功能）；L2 组合层已在 M2 落地（`src/sim/sim_module.gd` + `tests/test_l2.gd`）。
 - [x] E4 `native/` 只有脚手架，未编译；`docs/PROGRESS.md` 标**未完成/需人工**。
 
 ## F. 文档与提交
@@ -41,6 +41,6 @@
 
 ## G. 仍需人工（不计入通过）
 - [ ] G1 6 节真实点击走查（操作 → 验收 → 知识树 completed → 重启读档）。
-- [ ] G2 性能基准关（64/256/1024 门，5 ms/帧实测）。
+- [x] G2 性能基准关（50–400 门 / DFF，5 ms/帧实测）已完成（2026-11-04，`docs/PROGRESS.md` §2.2）。
 - [ ] G3 GDExtension 动态库构建与接入。
 - [ ] G4 真实 GitHub Actions 跑通。
