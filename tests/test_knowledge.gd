@@ -25,9 +25,9 @@ func run(ctx: TestContext) -> void:
 	var db: Node = TestUtil.data_db()
 	var kg: KnowledgeGraph = db.skill_graph
 	ctx.begin_group("node_counts")
-	ctx.eq("node count", kg.nodes.size(), 142)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 41)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 67)
+	ctx.eq("node count", kg.nodes.size(), 167)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 52)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 74)
 
 	ctx.begin_group("gate_lock")
 	var st := PlayerState.new()
@@ -76,7 +76,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("poor cannot unlock binary", not bool(kg.can_unlock(poor, "binary").get("ok", false)))
 
 	ctx.begin_group("progress_effects")
-	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), 142)
+	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), 167)
 	ctx.check("progress done grew", int(kg.progress(st).get("done", 0)) >= 3)
 	ctx.check("demorgan node exists", kg.nodes.has("demorgan"))
 	ctx.check("bargain effect", str(kg.node("bargain").get("effects", {})).contains("price_discount"))

@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "id": "ch07",
+  "number": 7,
+  "title": "第七章 · 让线说话",
+  "subtitle": "串行、帧、UART 与双机互通",
+  "source": "docs/curriculum/18-ch07-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH07-SERIAL"},
+  "next_chapter": "ch08",
+  "labs": [
+    {"id": "serial_basics", "order": 1, "title": "7.1 并行 vs 串行", "subtitle": "位宽、波特率与采样点", "data_key": "serial_basics", "requires": [], "objective": "obj_serial_basics", "knowledge": "KN-SER-01", "milestone": "CH07-1", "knowledge_cards": ["KN-SER-01"], "skill_node": "SK-SERIAL", "gate_ids": ["T7.1-1", "T7.1-2", "T7.1-3", "T7.1-4"], "reward": {"gold": 30, "xp": 15}},
+    {"id": "frame4", "order": 2, "title": "7.2 帧格式", "subtitle": "起始、数据、校验、停止", "data_key": "frame4", "requires": ["serial_basics"], "objective": "obj_frame4", "knowledge": "KN-FRM-01", "milestone": "CH07-2", "knowledge_cards": ["KN-FRM-01"], "skill_node": "SK-FRAME", "gate_ids": ["T7.2-1", "T7.2-2", "T7.2-3", "T7.2-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "uart", "order": 3, "title": "7.3 UART 收发", "subtitle": "移位、对齐与 30% 偏移", "data_key": "uart", "requires": ["frame4"], "objective": "obj_uart", "knowledge": "KN-UART-01", "milestone": "CH07-3", "knowledge_cards": ["KN-UART-01"], "skill_node": "SK-UART", "gate_ids": ["T7.3-1", "T7.3-2", "T7.3-3", "T7.3-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "two_machine", "order": 4, "title": "7.4 双机互通", "subtitle": "共地、双向与坏帧拒收", "data_key": "two_machine", "requires": ["uart"], "objective": "obj_two_machine", "knowledge": "KN-2M-01", "milestone": "CH07-4", "knowledge_cards": ["KN-2M-01"], "skill_node": "SK-2MACHINE", "gate_ids": ["T7.4-1", "T7.4-2", "T7.4-3", "T7.4-4"], "reward": {"gold": 35, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_serial_basics", "title": "设 9600 bps，标出位宽与位中心采样点，并演示沿采样读错", "lab": "serial_basics", "knowledge": "KN-SER-01"},
+    {"id": "obj_frame4", "title": "搭 7 位帧并接检查器，正常帧过、校验翻与缺停止位被拒", "lab": "frame4", "knowledge": "KN-FRM-01"},
+    {"id": "obj_uart", "title": "自发自收一个字节，复现 1.3× 偏移误码并修正", "lab": "uart", "knowledge": "KN-UART-01"},
+    {"id": "obj_two_machine", "title": "两台机双向互发 0xA5/0x3C，坏帧拒收后重发送达", "lab": "two_machine", "knowledge": "KN-2M-01"}
+  ]
+}

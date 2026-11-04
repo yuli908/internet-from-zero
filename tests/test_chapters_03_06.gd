@@ -15,14 +15,14 @@ const EXPECT_GROUPS := {
 }
 const GROUP_DESCRIPTIONS := {
 	"loadable": "DataDB 可读",
-	"order": "章节顺序 ch01..ch06",
+	"order": "章节顺序 ch01..ch08",
 	"chapter_loaded": "四章均被注册表装载且章号正确",
 	"use_chapter": "use_chapter 逐章可达",
 	"labs_nonempty": "labs_by_chapter 非空且数量正确",
 	"runtime": "四章运行时可取且 lab_order 对齐",
 	"manifest": "8 个新数据文件全部登记，且每章 levels+labs 成对",
 	"levels_ids": "levels 文档 id/number 与注册表一致",
-	"next_chain": "ch03→ch04→ch05→ch06，终章无 next",
+	"next_chain": "ch03→ch04→ch05→ch06→ch07",
 	"gate_dangling": "每章 gate_ids 全部能在本章用例中找到",
 	"node_refs": "每章里程碑/知识卡/技能节点都存在",
 	"gate_count": "每章实验各 4 条 gate",
@@ -48,7 +48,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("DataDB 可读", db != null and db.chapter_ids().size() >= 6)
 
 	ctx.begin_group("order")
-	ctx.check("章节顺序 ch01..ch06", db.chapter_ids() == ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06"],
+	ctx.check("章节顺序 ch01..ch08", db.chapter_ids() == ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06", "ch07", "ch08"],
 		str(db.chapter_ids()))
 
 	for cid in ["ch03", "ch04", "ch05", "ch06"]:
@@ -84,7 +84,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s levels+labs 成对登记" % cid,
 			files.has("res://data/chapters/%s_levels.json" % cid)
 			and files.has("res://data/labs/%s_labs.json" % cid))
-	ctx.check("manifest 19 项", files.size() == 19, str(files.size()))
+	ctx.check("manifest 23 项", files.size() == 23, str(files.size()))
 
 	for cid in ["ch03", "ch04", "ch05", "ch06"]:
 		ctx.begin_group("levels_ids")
@@ -97,7 +97,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("ch03→ch04", str(ChapterRegistry.levels_doc("ch03").get("next_chapter", "")) == "ch04")
 	ctx.check("ch04→ch05", str(ChapterRegistry.levels_doc("ch04").get("next_chapter", "")) == "ch05")
 	ctx.check("ch05→ch06", str(ChapterRegistry.levels_doc("ch05").get("next_chapter", "")) == "ch06")
-	ctx.check("ch06 无 next", str(ChapterRegistry.levels_doc("ch06").get("next_chapter", "")) == "")
+	ctx.check("ch06→ch07", str(ChapterRegistry.levels_doc("ch06").get("next_chapter", "")) == "ch07")
 
 	for cid in ["ch03", "ch04", "ch05", "ch06"]:
 		ctx.begin_group("gate_dangling")

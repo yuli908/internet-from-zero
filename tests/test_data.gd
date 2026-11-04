@@ -61,7 +61,7 @@ func run(ctx: TestContext) -> void:
 	var ch: ChapterRuntime = db.chapter
 
 	ctx.begin_group("manifest")
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 19)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 23)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.begin_group("item_catalog")
@@ -119,10 +119,10 @@ func run(ctx: TestContext) -> void:
 			ctx.check("recipe %s skill %s" % [rid, need], kg.nodes.has(need))
 
 	ctx.begin_group("skill_tree")
-	ctx.eq("skill node count", kg.nodes.size(), 142)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 41)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 67)
-	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 34)
+	ctx.eq("skill node count", kg.nodes.size(), 167)
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 52)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 74)
+	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 41)
 	ctx.check("CH01 milestone exists", kg.nodes.has("CH01"))
 	ctx.check("KN-ELEC-01 exists", kg.nodes.has("KN-ELEC-01"))
 	ctx.check("SK-LEVEL exists", kg.nodes.has("SK-LEVEL"))
@@ -218,7 +218,7 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 穿过接缝：从 DataDB 入口直达 CH02，证明章节注册表真的被读 ----
 	ctx.begin_group("chapter_registry")
-	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06"])
+	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06", "ch07", "ch08"])
 	ctx.check("注册表含 ch01", db.has_chapter("ch01"))
 	ctx.check("注册表含 ch02", db.has_chapter("ch02"))
 	ctx.check("注册表含 ch03", db.has_chapter("ch03"))

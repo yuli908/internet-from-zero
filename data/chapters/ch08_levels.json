@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "id": "ch08",
+  "number": 8,
+  "title": "第八章 · 让消息走远",
+  "subtitle": "协议、握手与抓包",
+  "source": "docs/curriculum/19-ch08-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {"gold": 25, "xp": 50, "badge": "CH08-PROTO"},
+  "next_chapter": "ch09",
+  "labs": [
+    {"id": "protocol_editor", "order": 1, "title": "8.1 协议编辑器", "subtitle": "三层字段与包的一生", "data_key": "protocol_editor", "requires": [], "objective": "obj_protocol_editor", "knowledge": "KN-PROTO-01", "milestone": "CH08-1", "knowledge_cards": ["KN-PROTO-01"], "skill_node": "SK-PROTOCOL", "gate_ids": ["T8.1-1", "T8.1-2", "T8.1-3", "T8.1-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "handshake", "order": 2, "title": "8.2 握手与超时", "subtitle": "状态机、帧号与丢包重发", "data_key": "handshake", "requires": ["protocol_editor"], "objective": "obj_handshake", "knowledge": "KN-HAND-01", "milestone": "CH08-2", "knowledge_cards": ["KN-HAND-01"], "skill_node": "SK-HANDSHAKE", "gate_ids": ["T8.2-1", "T8.2-2", "T8.2-3", "T8.2-4"], "reward": {"gold": 30, "xp": 16}},
+    {"id": "capture", "order": 3, "title": "8.3 抓包", "subtitle": "三份快照、逐层对照与报告", "data_key": "capture", "requires": ["handshake"], "objective": "obj_capture", "knowledge": "KN-CAP-01", "milestone": "CH08-3", "knowledge_cards": ["KN-CAP-01"], "skill_node": "SK-CAPTURE", "gate_ids": ["T8.3-1", "T8.3-2", "T8.3-3", "T8.3-4"], "reward": {"gold": 35, "xp": 18}}
+  ],
+  "objectives": [
+    {"id": "obj_protocol_editor", "title": "定义三层字段，走完一次包的一生并三节点转发", "lab": "protocol_editor", "knowledge": "KN-PROTO-01"},
+    {"id": "obj_handshake", "title": "画三状态三事件握手，丢包后重发同一帧并送达", "lab": "handshake", "knowledge": "KN-HAND-01"},
+    {"id": "obj_capture", "title": "抓三份快照对齐帧号，逐层与发送端比对并写报告", "lab": "capture", "knowledge": "KN-CAP-01"}
+  ]
+}
