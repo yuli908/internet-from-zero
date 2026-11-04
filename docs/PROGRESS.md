@@ -1,15 +1,24 @@
 # 进度与偏差（PROGRESS）
 
-- 里程碑：**M1 · 第一章 6 节垂直切片**
+- 里程碑：**M1 已验收；M2 进行中**（断点顺序：三处文档裁决 → A 性能基准 → B L2 → C 存档迁移 → D 6 节走查）
 - 基线日期：2026-11-04
 - 口径：只有**跑过、有证据**的项才标"已完成"；没验证的一律标"需人工"或"未完成"，不写成通过。
-- 证据目录：`artifacts/shots/`（11 张截图）、`artifacts/logs/`（导入/测试/冒烟日志）
+- 证据目录：`artifacts/shots/`（11 张截图）、`artifacts/logs/`（导入/测试/冒烟/基准日志）
 
 ## 1. 一句话结论
 
 M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 + 24 条 gate + 多解黑盒 + L0a/L0b/L1 仿真；
-`RESULT: 920 checks, 0 failures`。**没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、性能实测、题库与逐题评分、
-更远版本的前向迁移（当前只有 v1→v2→v3 迁移链）、真实 CI 验证——这些要么只有 ADR，要么完全没有。
+`RESULT: 920 checks, 0 failures`。
+
+M2 进度（顺序固定，不跳步）：
+
+1. 三处文档裁决（77 配方 / `test_gate_cases` 并入 `test_lab_checks` / 货币「金币 g」）——**已完成**（提交 `9807371`）。
+2. **A 性能基准关——已完成**：实测 **200 门/200 DFF p95 = 17.8 ms**，远超 5 ms/帧；
+   GDScript 安全上限实为 **50 门/50 DFF**（p95 4.4 ms），60 门起超预算。
+   `data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 由 200 下调为 50（偏差 2、3、14 见下）。
+3. **B L2 组合层 / C 存档迁移框架补全 / D 6 节脚本走查——未完成**（见 §4）。
+
+M1 **没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、题库与逐题评分、真实 CI 验证——这些要么只有 ADR，要么完全没有。
 
 ## 2. 已完成（附验证方式）
 
@@ -29,13 +38,45 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 
 `bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `black_box` / `lab_checks`
 
+### 2.2 A 性能基准关实测（2026-11-04）
+
+复现命令（headless，Godot 4.4.1）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
+# 细化档位：.\scripts\bench.ps1 -Sizes "50,60,70,80,90,100" -Frames 400
+```
+
+场景定义（最坏全翻转，`tests/bench_sim.gd`）：N 个门全部挂在同一条 `fast` 线上、每 tick 翻转一次，
+门类型按 buf/not/nand/and/xor/or/nor/xnor 轮换（覆盖 1–5 tick 延迟）；另建 N 级 DFF 移位链，每帧一个时钟沿。
+4 tick/帧，预热 80 帧后统计 600 帧，取每帧 `SimCircuit.run(4)` 的墙钟耗时。
+
+| 规模（门 / DFF） | p50 ms | p95 ms | p99 ms | max ms | 每帧事件峰值 | 判定（p95 ≤ 5 ms） |
+|---|---|---|---|---|---|---|
+| 50 / 50 | 2.62 | **4.11** | 4.58 | 10.82 | 206 | OK |
+| 100 / 100 | 5.61 | 7.62 | 9.88 | 12.96 | 406 | OVER |
+| 200 / 200 | 12.60 | **17.78** | 23.11 | 32.89 | 806 | OVER |
+| 300 / 300 | 20.14 | 28.49 | 34.38 | 39.33 | 1206 | OVER |
+| 400 / 400 | 28.62 | 38.49 | 47.40 | 53.15 | 1606 | OVER |
+
+细化档位（400 帧）用于定位临界点：50 → p95 4.37 ms（OK）；60 → p95 5.03 ms（首个 OVER）；
+80 → 6.10 ms；100 → 8.28 ms。
+
+**结论（只陈述实测）**：
+
+- GDScript **守不住** 设计目标 200 门/200 DFF @ 4 tick/帧：p95 为预算的 3.6 倍（17.78 ms vs 5 ms）。
+- 安全边界取 **50 门 / 50 DFF**；首个超限档为 60 门（p95 5.03 ms）。>50 门或 >50 DFF 即触发原生下沉（ADR 0002 §2.1）。
+- 成本近似线性：200 规模 806 事件/帧 ≈ 15.6 µs/事件，瓶颈在事件引擎热路径（字典事件对象 + `Callable.callv` + 堆比较 + 每次改值写 `history`），不是单个门函数。
+- 玩法影响：第一章每节网表 ≤12 门、半加器 ≤8 门，均在 50 以内，M1 交互不受影响。
+- 未做：原生 GDExtension（按指令"先测后做"）；也未做引擎热路径重写（预估 1.5–2× 提升，未实测，不作为结论）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
 |---|---|---|---|
 | 1 | L0a 模拟电平：模拟电路求解（RC 固定子步长） | 电压判读带 + 阈值判定（`src/core/voltage_model.gd`、`ui/widgets/level_gauge.gd`），不做连续时间电路求解 | M1 只要求 L0–L1 接口与确定性 tick；连续求解器属后续里程碑 |
-| 2 | 门级仿真宿主允许 C++/Rust GDExtension | 纯 GDScript（`src/sim/`），≤200 门满足预算；`native/` 仅有脚手架、未编译 | 先保证可运行与可测；性能实测与原生移植列为需人工/后续 |
-| 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 按设计约束实现，**尚未实测**；超标策略"降速不丢事件"已体现在 `SimEngine` 的 tick 推进与单 tick 上限 | 未建立基准关；数值来自 `docs/simulation/06` 的估算 |
+| 2 | 门级仿真宿主允许 C++/Rust GDExtension | 纯 GDScript（`src/sim/`）；2026-11-04 实测后修正口径：GDScript 在 **50 门/50 DFF** 内守 5 ms，200 门 p95 17.8 ms；`native/` 仅有脚手架、未编译 | 先保证可运行与可测；实测证明 200 门必须原生（§2.2、偏差 14） |
+| 3 | 性能预算：5 ms/帧、4 tick/帧、≤200 门/200 DFF | 预算与 tick 已实测（`tests/bench_sim.gd` + `scripts/bench.ps1`）：50/50 规模 p95 4.11 ms 达标，60 门起超预算；"降速不丢事件"仍由 `SimEngine` 的 tick 推进与单 tick 上限保证 | 原 200 门来自 `docs/simulation/06` 估算、从未验证；实测后以数据为准 |
 | 4 | 内嵌 Linux、宿主编译器桥接（汇编/C/Java/Python）、沙箱进程隔离与资源限制 | 均未实现，仅有 ADR 设计（0004） | M1 范围克制在 L0–L1 |
 | 5 | 存档版本迁移 | 信封 v3 + **迁移注册表**（`SaveCodec.MIGRATIONS`，v1→v2→v3 串联）；`tests/test_save.gd` 断言 `migrated_from=1/2`、`scrap`→`gold` 改名、未知字段保留；v4+ 存档被明确拒绝而非尝试迁移 | 只有一次结构调整时不做框架是克制；货币改名带来第二次结构变化，遂补注册式迁移器 |
 | 6 | 练习：文档 42 道、每题 ≥2 解 | 第一章 24 条 gate（每节 4 条）+ 黑盒多解验收（XOR 两种结构、半加器）；题库与逐题评分表未落地 | M1 只覆盖第一章 |
@@ -46,6 +87,7 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 | 11 | CH01 里程碑额外奖励 | CH01 里程碑不额外给金币（奖励在 lab 的 `reward` 里）；章末 `complete_reward` 为 `gold 0 / xp 50`，另由 `data/skilltree.json` 的 `CH01` 节点发放 `gold_award 25 / xp_award 50` | 里程碑奖励与 lab 奖励分开配置，避免重复发放 |
 | 12 | 首位玩家初始资源 | 初始金币 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_gold/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
 | 13 | 货币单位 | 货币单位曾是 `scrap`（废铁），已按负责人裁决改为 **`gold`（金币，单位 g）**；`scrap` 降级为普通材料/回收物（`kind=material`）；旧档通过存档 v3 迁移（`scrap`→`gold`）兼容 | 与 `docs/design/03` §3「金币 g」口径统一；单字货币让材料与通货语义混淆 |
+| 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限 **50 门/50 DFF**（p95 4.11 ms），60 门即 5.03 ms。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 
@@ -58,7 +100,7 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| 性能基准关（64/256/1024 门、全翻转场景、5 ms/帧实测） | **需人工** | 数值仍是 `docs/simulation/06` 的估算；未实测就不能对外宣称 200 门 |
+| 性能基准关（全翻转场景、5 ms/帧实测） | **已完成（2026-11-04）** | 见 §2.2：200 门/200 DFF p95 17.78 ms（超预算 3.6×）；安全上限 50 门/50 DFF（p95 4.11 ms）。`scripts/bench.ps1` 可复现，产物 `artifacts/logs/bench.json` |
 | 原生 GDExtension（编译、与 GDScript 同向量、接入 `project.godot`） | **未完成** | `native/` 只有脚手架：核心自检 `ifz_selftest` 已在 MinGW g++ 15.1 + CMake 下编译并通过（1/1），但 **GDExtension 动态库未构建**，MSVC 未验证，未接入 `project.godot` |
 | 延迟常量三方一致校验（`delays.json` == `docs/simulation/03` == 原生头文件） | **未完成** | 当前靠人工核对，CI 无此步骤 |
 | 存档前向迁移框架（注册式迁移器 + fixture + 迁移链契约测试） | **未完成** | 见偏差 5；v2→v3 之前必须补 |
@@ -88,21 +130,22 @@ M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 +
 | 原生脚手架与启动日志 | 需求：`native/ifz_native.gdextension` 必须存在 | Godot 会自动扫描项目里所有 `.gdextension`，dll 未构建时会打印 3 行 `ERROR: GDExtension dynamic library not found`（实测）；已加 `native/.gdignore` 抑制（实测带/不带：0 vs 5 处 ERROR） | 属脚手架副作用；启用原生时必须删 `.gdignore`。`scripts/selfcheck.ps1` 会剥掉这条已知残留并单独提示 |
 | 文本编码 | — | `tests/test_lab_checks.gd` 首字节为 BOM（`\ufeff`），其余脚本无 BOM；`scripts/*.ps1` 必须带 BOM（PowerShell 5 否则按 ANSI 解码，中文注释会导致解析失败，已实测） | 不阻塞运行；统一编码需与代码负责人协调 |
 
-## 6. 下一步（M2 建议顺序）
+## 6. 下一步（M2 剩余顺序，已完成的打叉）
 
-1. **性能基准关**（需人工，1 天）：固定场景 + 计时，产出 `artifacts/logs/bench.log`，回填上限。
-2. **手动走查 + 存档续玩**（需人工，0.5 天）：按 6 节各跑一遍"操作 → 验收 → 知识树 → 重启读档"。
-3. **存档迁移框架**：注册式迁移器 + v1/v2 fixture + 迁移链测试（为 M2 新字段做准备）。
-4. **L2 模块化**：半加器/全加器/加法器的 `t_settle` 声明与等价性测试；把 `BlackBox` 升级为可复用模块。
-5. **原生下沉评估**：仅在基准关超标时启动（ADR 0002 §5）。
+1. ~~性能基准关~~：已完成，见 §2.2（`scripts/bench.ps1`）。
+2. **B. L2 组合层**：半加器 → 全加器 → 8 位行波进位加法器 → 多路选择器；每级给 `t_settle` 与对参考真值表的等价性测试，L1/L2 混合可仿真。
+3. **C. 存档迁移框架补全**：把 v1→v2→v3 已有实现整理为"版本号 + 迁移函数注册表 + 未知字段保留"的通用契约，并补"旧档载入不丢进度"自动测试。
+4. **D. 6 节脚本走查**：脚本驱动 UI 走完 6 节，逐节断言知识树/金币/物品，重启进程读档一致，每节一张截图。
+5. **原生下沉**：基准关已确认超标（200 门 p95 17.8 ms），M3 启动 GDExtension（ADR 0002 §5），目标 >50 门/50 DFF 场景。
 6. **TraceSink 统一**：先把 `history/glitches` 映射进统一流，再谈回放。
 7. **题库接入**：把 `docs/curriculum/03` 的 42 道练习数据化，接 `LabChecks` 同构判定。
 
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 902 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 920 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
+powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（p50/p95/p99/max）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1      # 手动操作
 ```
 

@@ -14,9 +14,9 @@ const DEFAULT_DFF := {"setup": 2, "hold": 1, "clk_to_q": 2}
 const DEFAULT_FRAME := {"render_fps": 60, "budget_ms": 5, "ticks_per_frame": 4}
 const DEFAULT_LIMITS := {
 	"max_events_per_tick": 20000,
-	"gdscript_gates": 200,
-	"gdscript_dff": 200,
-	"require_gdextension_above": 200,
+	"gdscript_gates": 50,
+	"gdscript_dff": 50,
+	"require_gdextension_above": 50,
 }
 
 static var gate_table: Dictionary = DEFAULT_GATE.duplicate()
@@ -47,6 +47,10 @@ static func configure(doc: Dictionary) -> void:
 
 static func delay(kind: String, fallback: int = 3) -> int:
 	return int(gate_table.get(kind, fallback))
+
+static func dff_delay() -> int:
+	## clk→Q 传播延迟（tick）。setup/hold 由 L3 时序层使用，M2 只用到这一项。
+	return int(dff_table.get("clk_to_q", 2))
 
 static func max_events_per_tick() -> int:
 	return int(limits_table.get("max_events_per_tick", 20000))

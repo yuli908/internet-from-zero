@@ -24,10 +24,11 @@
   },
   "limits": {
     "max_events_per_tick": 20000,
-    "gdscript_gates": 200,
-    "gdscript_dff": 200,
-    "require_gdextension_above": 200
+    "gdscript_gates": 50,
+    "gdscript_dff": 50,
+    "require_gdextension_above": 50
   },
+  "bench_note": "2026-11-04 bench_sim.gd 实测（每 tick 全门翻转 + 每帧一个时钟沿）：50 门/50 DFF p95≈4.4ms 达标；60 门 p95≈5.0ms 起超 5ms 预算。原设计值 200 未实测，按 ADR 0002 §5 下调。",
   "relay": {
     "delay_per_stage_ticks": 3,
     "note": "第一章继电器实现的教学延迟；L1 归一化门模型仍使用 gate_delay。"

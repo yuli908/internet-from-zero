@@ -21,7 +21,7 @@ M1 的门级仿真用纯 GDScript（`src/sim/*`）落地，语义已与 Python �
 
 | 判据 | 阈值 | 依据 |
 |---|---|---|
-| 单场景门数 | `> 200 门` 或 `> 200 DFF` | `data/sim/delays.json` 的 `limits.gdscript_gates/gdscript_dff`；`require_gdextension_above = 200` |
+| 单场景门数 | `> 50 门` 或 `> 50 DFF`（原定 200，2026-11-04 实测下调，见 `docs/PROGRESS.md` §2.2） | `data/sim/delays.json` 的 `limits.gdscript_gates/gdscript_dff`；`require_gdextension_above = 50` |
 | 单 tick 事件量 | 最坏全翻转场景下，5 ms 预算内跑不完 4 tick | `docs/simulation/06` §2.3（"最坏全翻转"验法） |
 | 时序仿真 | 需要 ≥ 1000 DFF 或同一 tick 内大量边沿（寄存器堆、计数器阵列） | L3 事件密度：每边沿 ≈ 4 事件 |
 | 位宽向量化 | 8/16/32 位位串逐位运算成为热区（ALU、总线、CRC） | 脚本位运算慢一个数量级（07 §2） |

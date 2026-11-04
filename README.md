@@ -18,8 +18,9 @@
 | 6 个实验页、24 条 gate 判定 | `data/chapters/ch01_levels.json` + `src/core/lab_checks.gd`，`tests/test_lab_checks.gd` |
 | 点击式电路编辑器（放门 / 连线 / 断线 / 翻转输入） | `src/ui/widgets/circuit_editor.gd` |
 | 波形与毛刺、延迟测量 | `src/ui/widgets/waveform.gd`、`src/core/signal_lab_model.gd` |
-| 存档（信封 v2 + SHA-256 + 原子写 + `.bak` 回退） | `src/core/save_codec.gd`、`src/core/save_store.gd` |
-| 自动测试 902 项 / 12 套件 / 0 失败 | `scripts/run_tests.ps1` |
+| 存档（信封 v3 + SHA-256 + 原子写 + `.bak` 回退 + 迁移注册表） | `src/core/save_codec.gd`、`src/core/save_store.gd` |
+| 自动测试 920 项 / 12 套件 / 0 失败 | `scripts/run_tests.ps1` |
+| 性能基准（p50/p95/p99/max） | `scripts/bench.ps1`、`tests/bench_sim.gd` |
 | 11 张自动截图 | `artifacts/shots/*.png`（workbench / shop / skills / archive / diagnostics + 6 个 lab） |
 
 ## 2. 环境要求
@@ -37,6 +38,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1
 
 # 全量测试（headless）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
+
+# 性能基准（N 门 + N DFF 每 tick 全翻转，4 tick/帧，输出 p50/p95/p99/max）
+powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 
 # 自检：导入检查 → 测试 → 启动冒烟（GUI 截图 1 张）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1
@@ -136,6 +140,7 @@ RESULT: 902 checks, 0 failures
 | `scripts/run_game.ps1` | 启动游戏，透传 `--shot` 等用户参数 | 引擎返回码非 0 → `exit 1` |
 | `scripts/run_tests.ps1` | headless 全量测试，解析 `RESULT: N checks, M failures` | `M>0` 或解析不到结果 → `exit 1` |
 | `scripts/selfcheck.ps1` | 导入检查 → 全量测试 → 启动冒烟（GUI 截图 + `IFZ_BOOT data_ok=true` + 日志无 ERROR） | 任一环节 FAIL → `exit 1` |
+| `scripts/bench.ps1` | 性能基准跑批，写 `artifacts/logs/bench.json`；只留证，超预算属数据结论不判失败 | 未跑完 → `exit 1` |
 | `scripts/backup.ps1` | `git bundle create backups/<ts>.bundle --all` + robocopy 复制工作区 | 复制失败 → `exit 1`；只增不删 |
 
 日志写入 `artifacts/logs/`（`import.log`、`tests.log`、`smoke.log`）。

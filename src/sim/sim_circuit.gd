@@ -104,6 +104,26 @@ func add_gate(gate_name: String, kind: String, ins: Array, delay: int = -1) -> S
 	eng.schedule(eng.now, compute, [eng.now])
 	return gate_name
 
+func add_dff(cell_name: String, d_src: String, clk_src: String, delay: int = -1) -> String:
+	## D 触发器（上升沿采样）：
+	##  - 初值 X；clk 由 0/X→1 时把 d_src 当前值经 clk_to_q 延迟写入 Q（cell_name 本身）；
+	##  - 不是门级展开，故不会形成组合环，L3 时序层可直接复用 L1 的确定性调度。
+	if wires.has(cell_name) and wires.has(clk_src):
+		return ""
+	var d := SimDelays.dff_delay() if delay < 0 else delay
+	add_wire(cell_name, SimValue.X)
+	add_wire(str(d_src), SimValue.X)
+	add_wire(clk_src, SimValue.X)
+	var on_clk := func(old: String, _t: int) -> void:
+		if old == SimValue.ONE:
+			return
+		if probe(clk_src) != SimValue.ONE:
+			return
+		eng.schedule_after(d, Callable(self, "_write"), [cell_name, probe(str(d_src))])
+	var w: Dictionary = wires[clk_src]
+	w["listeners"].append(on_clk)
+	return cell_name
+
 func run(ticks: int) -> Dictionary:
 	return eng.run_until(eng.now + ticks)
 
