@@ -1,0 +1,121 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/19-ch08-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T8.x-n 与 after 按课文提案落库；字段位宽 field_spec 未定，对应 gate 挂 pending。",
+  "pending_kinds": {
+    "field_start_spec": "19 §0/§6-6：8.1 具体字段位宽以数据侧 field_spec 为准，尚未定；没有机器起始位真值，不猜数补 gate。"
+  },
+  "labs": {
+    "protocol_editor": {
+      "id": "protocol_editor",
+      "title": "8.1 协议编辑器",
+      "body": "一条消息要穿过三台节点，需要分成物理帧、寻址包、应用消息三层。封装自上而下加封套，解封装自下而上拆；三节点转发只读寻址层，原样带走应用载荷。验收要能回放步骤、逐层字段一致、三层都有值，并让 P07 初版入库。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 一个字节说不清「给谁、是什么」", "text": "7.4 让两台机在 9600 下收对一个字节。可消息一旦要穿过三台节点，字节本身不说明这给谁、从哪来、内容是什么。协议编辑器要做的，是把一条消息拆成几行有名字的字段，让每一层只回答一个问题。"},
+        {"order": 2, "after": 0, "title": "三层 · 每层只解决一件事", "text": "三层就够：物理帧管这一串位怎么起止，寻址包管从哪台到哪台，应用消息管这段内容是什么。每层只看自己那行字段，也不替上层翻译。封套是一层层加的，不是把三层挤进同一行。"},
+        {"order": 3, "after": 1, "title": "字段表 · 位宽与校验不是装饰", "text": "字段表写进编辑器：字段名、起始位、位宽、校验方式。位宽决定这层能表示多大范围，校验负责转发后还认得出原样；位宽不够装不下，校验漏了查不出改动。物理帧沿用 7.2 那七个位，不另造帧；具体位数以数据侧 field_spec 为准。"},
+        {"order": 4, "after": 2, "title": "包的一生 · 封装与解封装可回放", "text": "封装是自上而下逐层加封套，解封装是自下而上逐层拆。每步都留快照：哪一层、动了哪些字段、交给谁。三节点转发只读寻址层，原样带走应用载荷；谁改了应用内容，那就不叫转发。"},
+        {"order": 5, "after": 3, "title": "验收 · 转一圈，字段不坏", "text": "验收：发一条应用消息，走完封装、三节点转发、解封装。四条同时——①封装与解封装可回放，步骤和快照逐条一致；②转发后每层字段与发送端一致；③每层字段能说出它解决的那件事；④P07 初版落袋。只测两端、不回放，不算过。"}
+      ],
+      "p1": "定义三层字段，走完一次「包的一生」并三节点转发",
+      "p1_gates": ["T8.1-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "在协议编辑器里写字段名、起始位、位宽、校验；发一条应用消息，逐层封装、过三节点、逐层解封装", "judge": "四条同时：①封装/解封装步骤可回放且与快照一致；②转发后每层字段与发送端一致；③每层字段对得上它解决的那件事；④P07 初版入库", "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"], "gates": ["T8.1-1"]},
+        {"id": "B", "level": "负例", "produce": "把应用消息直接塞进物理帧，不带来源与去向", "judge": "中间节点无字段可读，转发落空或送错节点；detail 写「跳层封装，缺寻址字段」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T8.1-2"]},
+        {"id": "C", "level": "P0b", "produce": "按字段表把某层起始位写成前面各字段位宽之和", "judge": "与机器值逐字段一致；不算 P1；detail 写「起始位/位宽推算错」", "codes": ["E_TABLE_CELL(7)"], "gates": ["T8.1-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「上层换实现不必改下层，下层出错不必改上层」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T8.1-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T8.1-1", "title": "三层封装/解封装可回放；三节点转发字段与发送端一致；P07 初版", "kind": "protocol_replay", "required": true,
+         "layers": ["physical", "address", "application"], "actions": ["encap", "forward", "decap"],
+         "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T8.1-2", "title": "跳过寻址层直接封装：中间节点无字段可读", "kind": "skip_layer", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T8.1-3", "title": "算字段起始位：前面各字段位宽之和", "kind": "field_start_spec", "required": true, "status": "pending",
+         "thresholds": {"field_spec": {"status": "pending", "initial": null, "reason": "19 §6-6：8.1 具体字段位宽以数据侧 field_spec 为准，尚未定"}},
+         "pending_reason": "8.1 字段位宽 field_spec 未定，无法给出机器起始位真值；先挂 pending 不进分母，不猜数补 gate。",
+         "codes": ["E_TABLE_CELL(7)"]},
+        {"id": "T8.1-4", "title": "为什么每层只解决一件事", "kind": "quiz", "required": true,
+         "quiz": {"question": "协议为什么按层划分，每层只解决一件事？", "options": ["上层换实现不必改下层，下层出错不必改上层", "层数越多传输越快", "每层都必须重新编码整条消息", "这样就不需要校验了"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看有没有把应用消息直接塞进物理帧：缺寻址字段时中间节点读不到去向，转发就会落空。",
+      "misconception": "只测两端、不回放步骤；没有逐层快照就证明不了转发没改字段。",
+      "grants": {"items": {"P07": 1}, "blueprint": ["KN-PROTO-01"]},
+      "grants_note": "P07 协议编辑器初版与知识卡随 gate 发放"
+    },
+    "handshake": {
+      "id": "handshake",
+      "title": "8.2 握手与超时",
+      "body": "握手用空闲、已发送、已确认三个状态和发送、收到确认、超时三条事件，把「发出去」与「送到了」问清楚。确认要认帧号；超时后重发同一帧，收到确认才回空闲。丢包时停在已发送，不许因为等太久就自称成功。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 发出去不等于送到了", "text": "8.1 只保证格式对，不保证对方收到。线会丢帧，节点会忙不过来；发出去与送达之间，缺一个「你收到了吗」。握手就是用最少的来回把这件事问清楚，并在没回音时知道等多久、什么时候重来。"},
+        {"order": 2, "after": 0, "title": "状态机 · 三个状态、三条事件", "text": "用状态机写：空闲、已发送、已确认三个状态；事件只有发送、收到确认、超时三种。每条转移必须由事件触发，不许「时间到了自己跳」。状态少不要紧，边有来处、有去处，才叫状态机。"},
+        {"order": 3, "after": 1, "title": "确认认帧号，超时靠计时器", "text": "确认要认帧：回执里带的是哪一帧的号，否则重发时对不上。超时是计时器数出来的：从发出那一刻起算，阈值按一帧往返时长定初值，最终以数据侧 timeout_ticks 为准。没有计时器，就没有重试的理由。"},
+        {"order": 4, "after": 2, "title": "注入丢包 · 停在等待，不假装成功", "text": "注入一次丢包：让确认帧丢掉。状态必须停在已发送，计时器到点后重发同一帧；重发后收到确认，才回空闲。丢的是数据帧就反过来——丢的一方等，收到的一方答。状态不许因为等太久就自称成功。"},
+        {"order": 5, "after": 3, "title": "验收 · 丢包后重试成功", "text": "验收：在状态机编辑器里画完转移表，先跑一次正常握手，再注入一次丢包。四条同时——①每条转移都有事件与目标状态；②丢确认后停在已发送；③超时后重发的是同一帧号；④重发后收到确认并送达。状态机蓝图随本节产出。"}
+      ],
+      "p1": "画握手状态机并注入一次丢包",
+      "p1_gates": ["T8.2-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "在状态机编辑器摆三状态与三条事件边，跑正常握手；再丢弃一次确认帧，观察重发", "judge": "四条同时：①每条转移都有事件与目标状态；②丢确认后停在已发送；③超时后重发同一帧号；④重发收到确认并送达", "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"], "gates": ["T8.2-1"]},
+        {"id": "B", "level": "负例", "produce": "计时器到点后不重发，状态直接回空闲", "judge": "丢包下仍报「已送达」，轨迹里没有重发边；detail 写「超时未重发却回空闲」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T8.2-2"]},
+        {"id": "C", "level": "P0b", "produce": "写出「发出→等确认→超时→重发→收到确认→空闲」的状态转移序列", "judge": "与机器序列逐步一致；不算 P1；detail 写「自愈路径步骤或顺序错」", "codes": ["E_OUTPUT_MISMATCH(10)"], "gates": ["T8.2-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「太短会把正常往返延迟当丢包，触发无谓重发」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T8.2-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T8.2-1", "title": "三状态三事件；丢确认停在已发送；超时重发同帧号并送达", "kind": "handshake_fsm", "required": true,
+         "events": ["send", "ack", "timeout"], "states": ["idle", "sent", "confirmed"],
+         "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_DELAY_MISMATCH(9)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T8.2-2", "title": "超时未重发却回空闲：不得自称成功", "kind": "timeout_idle", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T8.2-3", "title": "自愈路径：发出→等确认→超时→重发→收到确认→空闲", "kind": "self_heal_path", "required": true,
+         "expected_path": ["send", "wait_ack", "timeout", "resend", "ack", "idle"],
+         "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
+        {"id": "T8.2-4", "title": "超时阈值为什么不能取零", "kind": "quiz", "required": true,
+         "quiz": {"question": "握手超时阈值为什么不能取零？", "options": ["太短会把正常往返延迟当丢包，触发无谓重发", "取零会让状态机少一个状态", "取零就无法发出帧", "取零会改变帧校验"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先看转移表里「超时」有没有事件触发；无事件的自动跳会让你找不到重发边。",
+      "misconception": "把「等得够久」当成「已送达」；没有确认就必须停在已发送并重发。",
+      "grants": {"items": {}, "blueprint": ["KN-HAND-01"]},
+      "grants_note": "状态机蓝图与知识卡随 gate 发放"
+    },
+    "capture": {
+      "id": "capture",
+      "title": "8.3 抓包",
+      "body": "抓包把同一帧在发送端、中间节点、接收端三层的字段摊开，三份快照对齐同一帧号，逐层与发送端比对。对不上时先定位哪一层变了，报告写到层名、字段名与两边的值；它不是日志，是证据。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 看不见的字段要能摊开", "text": "8.1 的字段和 8.2 的重发，运行时都看不见。抓包面板做的事，是把同一帧在每一层的字段摊开：外层怎么写、里层装了什么、中间节点有没有动过。它不是日志，是证据。"},
+        {"order": 2, "after": 0, "title": "抓一次转发 · 三份快照对齐一个帧号", "text": "抓一次三节点转发要抓三份：发送端发出时、中间节点转出时、接收端收到时。三份必须对齐到同一个帧号；没有帧号，三份快照只是一堆看着像的字节，对不上谁是谁。"},
+        {"order": 3, "after": 1, "title": "逐层展开 · 每层只解释自己那行", "text": "展开按层来：先看物理帧的起止与校验，再看寻址包的来源与去向，最后看应用消息的载荷。每层只解释自己那行，不替上层翻译内容。展开三层，不是把三层字段混成一列。"},
+        {"order": 4, "after": 2, "title": "对不上时 · 先找哪一层变了", "text": "对不上先定位哪层变了：寻址层变了而应用载荷没变，是转发改了封套；三层都对而端到端字节错，是收端解封装出了错。报告要写到第几层、哪个字段、发送端值与抓包值，不能只写「不一致」。"},
+        {"order": 5, "after": 3, "title": "验收 · 字段与发送端一致", "text": "验收：抓一次三节点转发，逐层展开三份快照。四条同时——①三份对齐同一帧号；②每层字段与发送端逐字段一致；③三层都展开且有值；④报告写出层名、字段名与两边的值。抓包报告随本节产出，P07 才算有证据。"}
+      ],
+      "p1": "抓一次三节点转发，逐层展开并写报告",
+      "p1_gates": ["T8.3-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "抓发送端、中间节点、接收端三份快照，对齐帧号，逐层展开物理帧/寻址包/应用消息", "judge": "四条同时：①三份对齐同一帧号；②每层字段与发送端逐字段一致；③三层都展开且有值；④报告写到层名、字段名与两边值", "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"], "gates": ["T8.3-1"]},
+        {"id": "B", "level": "负例", "produce": "只交接收端快照，不抓中间节点", "judge": "无法对齐转发前后，字段比对缺一侧；detail 写「只抓单点，无转发对照」", "codes": ["E_COVERAGE(13)"], "gates": ["T8.3-2"]},
+        {"id": "C", "level": "P0b", "produce": "按抓到的字段表把起始位写成前面各字段位宽之和", "judge": "与抓包实测一致；不算 P1；detail 写「起始位推算与抓包不符」", "codes": ["E_TABLE_CELL(7)"], "gates": ["T8.3-3"]},
+        {"id": "D", "level": "quiz", "produce": "选「它按层保留字段快照，能与发送端逐字段比对」", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T8.3-4"]}
+      ],
+      "gate_cases": [
+        {"id": "T8.3-1", "title": "三份快照同帧号；三层字段与发送端一致；报告写层/字段/两边值", "kind": "capture_layers", "required": true,
+         "layers": ["physical", "address", "application"], "min_frames": 3,
+         "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
+        {"id": "T8.3-2", "title": "只抓接收端一份：无法对齐转发前后", "kind": "single_snapshot", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_COVERAGE(13)"]},
+        {"id": "T8.3-3", "title": "按抓到的字段表复算起始位", "kind": "capture_start", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)"]},
+        {"id": "T8.3-4", "title": "抓包面板为什么不是日志", "kind": "quiz", "required": true,
+         "quiz": {"question": "抓包面板和普通日志的核心差别？", "options": ["它按层保留字段快照，能与发送端逐字段比对", "它只记录错误，不记录正常帧", "它会自动修好被改的字段", "它只保存接收端的一份数据"], "answer": 0},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "hint": "先确认三份快照的帧号相同；只抓接收端一份时没有转发前后的对照，字段比对缺一侧。",
+      "misconception": "只抄字节、不填层名与字段名；报告「一致」不等于机器比对通过。",
+      "grants": {"items": {}, "blueprint": ["KN-CAP-01"]},
+      "grants_note": "抓包报告与知识卡随 gate 发放"
+    }
+  }
+}
