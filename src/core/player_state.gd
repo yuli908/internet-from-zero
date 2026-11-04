@@ -20,6 +20,8 @@ var labs_completed: Dictionary = {}
 var flags: Dictionary = {}
 var tutorial_done: Dictionary = {}
 var stats: Dictionary = {"saves": 0, "play_seconds": 0.0, "ticks": 0}
+## M4：冒险三档（EXPLAIN/SYNC/MASK）。只存字段，不改仿真行为；UI 开关属 UI 会话。
+var difficulty := Difficulty.EXPLAIN
 var rng_seed := 1
 var _rng := DeterministicRng.new(1)
 
@@ -174,6 +176,7 @@ func to_dict() -> Dictionary:
 		"flags": flags.duplicate(true),
 		"tutorial_done": tutorial_done.duplicate(true),
 		"stats": stats.duplicate(true),
+		"settings": {"difficulty": difficulty},
 		"rng": _rng.to_dict(),
 	}
 
@@ -194,6 +197,11 @@ static func from_dict(d: Dictionary) -> PlayerState:
 	s.flags = _copy_dict(d.get("flags", {}))
 	s.tutorial_done = _copy_bool_dict(d.get("tutorial_done", {}))
 	s.stats = _copy_dict(d.get("stats", {"saves": 0, "play_seconds": 0.0, "ticks": 0}))
+	var settings: Variant = d.get("settings", {})
+	if settings is Dictionary:
+		s.difficulty = Difficulty.normalize(str((settings as Dictionary).get("difficulty", Difficulty.EXPLAIN)))
+	else:
+		s.difficulty = Difficulty.EXPLAIN
 	if d.has("rng") and d["rng"] is Dictionary:
 		s._rng.from_dict(d["rng"])
 	return s
