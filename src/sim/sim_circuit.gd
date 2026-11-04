@@ -20,6 +20,8 @@ var eng: SimEngine
 var wires: Dictionary = {}
 var history: Array = []
 var glitches: Array = []
+var metastable: Array = []
+var dffs: Array = []
 var input_names: Array = []
 var output_names: Array = []
 
@@ -41,12 +43,6 @@ var _g_out := PackedInt32Array()
 var _g_in0 := PackedInt32Array()
 var _g_in1 := PackedInt32Array()          # -1 = 一元
 var _g_extra: Array = []                  # >2 输入时的额外线网 id（PackedInt32Array）
-
-# ---- DFF 表（T1 会扩展 RESET/setup/hold；此处保持 M2 行为） -----------------
-var _d_q := PackedInt32Array()
-var _d_d := PackedInt32Array()
-var _d_clk := PackedInt32Array()
-var _d_delay := PackedInt32Array()
 
 # ---- 合并事件堆（type：0 = 门求值，1 = 线网写入） ---------------------------
 var _ev_t := PackedInt32Array()
@@ -121,15 +117,11 @@ func _write_id(wid: int, val: int, bits: String = "") -> void:
 	history.append({"t": eng.now, "wire": _wname[wid], "old": old, "new": next_bits})
 	if _watch.has(_wname[wid]):
 		glitches.append({"t": eng.now, "wire": _wname[wid], "value": next_bits})
-	# fanout：门事件与 DFF 事件按订阅顺序入堆
+	# fanout：门事件按订阅顺序入堆（DFF 走 SimDff 的 closure listener）
 	var fan: PackedInt32Array = _fan[wid]
 	var t_now := eng.now
 	for e in fan:
-		if e >= 0:
-			_ev_push(t_now + _g_delay[e], eng.next_seq(), 0, e, 0)
-		elif val == 2:
-			var did := -(e + 1)
-			_ev_push(t_now + _d_delay[did], eng.next_seq(), 1, _d_q[did], _wval[_d_d[did]])
+		_ev_push(t_now + _g_delay[e], eng.next_seq(), 0, e, 0)
 	# 通用 closure listeners（bind/外部），保持旧语义
 	var listeners: Array = w["listeners"]
 	if not listeners.is_empty():
@@ -182,26 +174,20 @@ func add_gate(gate_name: String, kind: String, ins: Array, delay: int = -1) -> S
 	_ev_push(eng.now, eng.next_seq(), 0, gid, 0)
 	return gate_name
 
-func add_dff(cell_name: String, d_src: String, clk_src: String, delay: int = -1) -> String:
-	## D 触发器（上升沿采样）：
-	##  - 初值 X；clk 由 0/X→1 时把 d_src 当前值经 clk_to_q 延迟写入 Q（cell_name 本身）；
-	##  - 不是门级展开，故不会形成组合环，L3 时序层可直接复用 L1 的确定性调度。
-	##  - RESET/setup/hold/METASTABLE 属 T1（`SimDff`），本函数保持 M2 行为。
+func add_dff(cell_name: String, d_src: String, clk_src: String, delay: int = -1, reset_src: String = "") -> String:
+	## D 触发器（上升沿采样 + setup/hold + 异步 RESET），语义见 `SimDff`。
+	## 保持 M2 签名与"双线已存在则不建"的既有行为，避免调用方静默改变网表。
 	if wires.has(cell_name) and wires.has(clk_src):
 		return ""
 	var d := SimDelays.dff_delay() if delay < 0 else delay
-	var q_wid := _wire_id(cell_name)
-	var dd_wid := _wire_id(str(d_src))
-	var clk_wid := _wire_id(clk_src)
-	var did := _d_q.size()
-	_d_q.append(q_wid)
-	_d_d.append(dd_wid)
-	_d_clk.append(clk_wid)
-	_d_delay.append(d)
-	var f: PackedInt32Array = _fan[clk_wid]
-	f.append(-(did + 1))
-	_fan[clk_wid] = f
+	add_wire(cell_name, SimValue.X)
+	# 必须持有实例：监听 Callable 不能独自保证 RefCounted 存活。
+	dffs.append(SimDff.attach(self, cell_name, str(d_src), clk_src, reset_src, SimDff.SETUP, SimDff.HOLD, d))
 	return cell_name
+
+func note_metastable(t: int, subject: String, reason: String) -> void:
+	## T1 先落数组；T3 的 TraceSink 接上后从这里转成 kind=METASTABLE 事件。
+	metastable.append({"t": t, "subject": subject, "reason": reason})
 
 func run(ticks: int) -> Dictionary:
 	return run_until(eng.now + ticks)
