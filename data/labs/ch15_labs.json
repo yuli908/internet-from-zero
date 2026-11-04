@@ -1,0 +1,784 @@
+{
+  "version": 2,
+  "source": "D:\\ai lm\\internet_from_zero\\docs\\curriculum\\26-ch15-lecture-copy.md",
+  "source_note": "段落按课件 §1–§4 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：符号表/ABI 照 12.3、版本规则、帧长上限 8 B、TTL 1 s。",
+  "pending_kinds": {
+    "table": "15.2 socket 句柄编号与抓包同编号映射未定；T15.2-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "library_abi": {
+      "id": "library_abi",
+      "title": "库与 ABI · 调用先对齐约定",
+      "body": "库是一组带符号的函数；调用前按 ABI 传参、取返回值，符号表说清每个符号怎么调。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 程序一半是别人写的",
+          "text": "你写的程序不是从零长出来的：接口定「能调用什么」，库给实现，驱动把外设翻成调用。三层分开，程序才不用每次重写全部。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "结构 · 头文件是承诺，库是兑现",
+          "text": "头文件只声明符号与参数，库文件才是实现，链接把两半接上。ABI 规定参数怎么传、返回值放哪、栈谁清理——照 12.3，不另立约定。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 抽库，两个程序共用",
+          "text": "把一段可复用逻辑抽成库，两个不同程序各写一份调用代码，链接同一个库文件。改库里的实现，两个程序都要跟着变，才算真共用。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 头文件摆着，实现各自复制",
+          "text": "负例：头文件摆着，两个程序却各自复制同一段实现，没链接库。改库后两个程序输出不变——「只摆着不接线」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 两个程序共用同一库",
+          "text": "验收：两个程序共用同一库，调用约定可核对。四条同时——①两个程序都链到同一符号；②参数与返回值符合 ABI；③改库后两程序同步变化；④库蓝图落袋。只在一个程序里用，不给过。"
+        }
+      ],
+      "p1": "写两个程序调同一个库函数，逐字段对照符号表与传参/返回",
+      "p1_gates": [
+        "T15.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "写 P1、P2 两个程序调同一个库函数 area(2 参)",
+          "judge": "四条同时：①符号表对；②两次传参/返回对；③重链接两边都变；④蓝图落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T15.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "符号表更新了，链接仍跳旧地址",
+          "judge": "改符号表后运行结果不变；detail 写「链接未读符号表」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T15.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "算返回地址落点与两参数顺序（A/B 传参）",
+          "judge": "与机器一致；不算 P1；detail 写「ABI 落点或顺序错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T15.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「库/接口/驱动各自职责」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T15.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T15.1-1",
+          "title": "符号表与两次调用逐字段对上：参数数、返回、库",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "prog",
+            "symbol",
+            "params",
+            "ret",
+            "lib"
+          ],
+          "expect_rows": [
+            {
+              "prog": "P1",
+              "symbol": "area",
+              "params": 2,
+              "ret": "A",
+              "lib": "libmath"
+            },
+            {
+              "prog": "P2",
+              "symbol": "area",
+              "params": 2,
+              "ret": "A",
+              "lib": "libmath"
+            }
+          ],
+          "expect_meta": {
+            "same_symbol": true,
+            "abi_ok": true,
+            "blueprint": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T15.1-2",
+          "title": "负例：符号表摆着，链接仍按旧地址跳",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "link",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T15.1-3",
+          "title": "按 A/B 传参、返回地址压 0xF0 算落点",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "ret_addr": 240,
+            "param_a_order": 1,
+            "param_b_order": 2
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T15.1-4",
+          "title": "库、接口、驱动三者怎么分",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "库、接口、驱动三者怎么分？",
+            "options": [
+              "库是带符号的可调用集合，接口是调用约定，驱动对接具体设备",
+              "三者是同一个东西的不同叫法",
+              "库负责硬件时序，驱动负责函数签名",
+              "接口是二进制文件，库是头文件"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先查符号表的 params 与 ret，再按 A/B 传参记返回地址 0xF0。",
+      "misconception": "把「能调通」当成「ABI 对了」；换个调用方就错位，说明参数顺序没按约定。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "socket_api": {
+      "id": "socket_api",
+      "title": "socket · 网络折成一个句柄",
+      "body": "open/send/recv/close 四个调用，底下仍是 8.1 的帧与 10.x 的可靠传输；句柄只是入口。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 网络在代码里是一个能读写的文件",
+          "text": "socket 把网络折成一个句柄：open 建连接，send 写，recv 读，close 关。代码里它像文件，底下仍是 8.1 的帧和 10.x 的可靠传输。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "映射 · 四个调用落到哪一层",
+          "text": "open 走到 8.2 的握手，send 把字节装进 8.1 的帧，recv 拆帧还原，close 发断开。句柄编号【假设·未校准】，T15.2-1 挂 pending，本文件不编造 API 名。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 两机传一行文本",
+          "text": "两台自制机各跑一个程序，一边 send 一行文本，另一边 recv 并打印。文本要按 6.1 编码成字节，送达后能原样读回，不是只收到一个长度。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · send 只回「已发送」，不落协议栈",
+          "text": "负例：send 只打印「已发送」，并不把字节装帧；recv 返回写死的字符串。抓包面板空白，两机对不上——「只摆着不接线」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 文本送达且可读",
+          "text": "验收：两机传一行文本，抓包逐字段对得上。四条同时——①open/send/recv/close 都落到协议栈；②文本按编码原样读回；③抓包帧与发送端一致；④socket 库蓝图落袋。只打印「已发送」，不给过。"
+        }
+      ],
+      "p1": "两机各跑一个程序，一行文本经 send/recv 原样送达并抓包",
+      "p1_gates": [
+        "T15.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "两机传一行 12 B 文本，抓包逐字段对，读回原样",
+          "judge": "四条同时：①四个调用都落栈；②文本原样读回；③抓包与发送端一致；④蓝图落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T15.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "send 只打印「已发送」，不装帧；recv 返回写死串",
+          "judge": "抓包空白、两机对不上；detail 写「socket 未落协议栈」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T15.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按帧长上限 8 B（头 2 B）算 12 B 需几帧、每帧多少负载",
+          "judge": "与机器一致；不算 P1；detail 写「帧长或负载算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T15.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「socket 只是已有协议栈的句柄」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T15.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T15.2-1",
+          "title": "四个调用逐条落到协议栈层与帧类型",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "socket 句柄编号与抓包同编号映射未定（02 未给）；不以句柄序号冒充逐帧可追溯。",
+          "thresholds": {
+            "handle_map": {
+              "status": "pending",
+              "initial": "handle=1",
+              "reason": "句柄编号规则与抓包同编号接口未批。"
+            }
+          },
+          "keys": [
+            "call",
+            "stack_layer",
+            "frame"
+          ],
+          "expect_rows": [
+            {
+              "call": "open",
+              "stack_layer": "8.2",
+              "frame": "SYN"
+            },
+            {
+              "call": "send",
+              "stack_layer": "8.1",
+              "frame": "DATA"
+            },
+            {
+              "call": "recv",
+              "stack_layer": "8.1",
+              "frame": "DATA"
+            },
+            {
+              "call": "close",
+              "stack_layer": "8.2",
+              "frame": "FIN"
+            }
+          ],
+          "expect_meta": {
+            "text_roundtrip": true,
+            "frames_match": true,
+            "blueprint": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T15.2-2",
+          "title": "负例：send 只回「已发送」，字节未装帧",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "frame_wrap",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T15.2-3",
+          "title": "按帧长上限 8 B（头 2 B）算 12 B 文本的帧数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "line_bytes": 12,
+            "payload_per_frame": 6,
+            "frames": 2
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T15.2-4",
+          "title": "socket 是新的传输层吗",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "socket 是新的传输层吗？",
+            "options": [
+              "不是，它只是把已有协议栈的调用折成一个句柄",
+              "是，socket 自带重传与握手",
+              "是，socket 绕开了 8.1 的帧格式",
+              "不是，它直接读写内存不经过协议栈"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先写一行字节数，再按帧长上限 8 B 算帧数；抓包逐字段对。",
+      "misconception": "把「send 返回成功」当成「字节已落栈」；抓包空白就是没装帧。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "version_compat": {
+      "id": "version_compat",
+      "title": "版本兼容 · 改接口不能悄悄坏",
+      "body": "版本号是承诺：主版本变即拒绝，次版本变兼容；兼容检查靠符号表与 ABI 签名。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 改接口，旧程序不能悄悄坏",
+          "text": "库改接口，旧程序不能悄悄坏掉。版本号是承诺：主版本变了，调用方必须被明确拒绝；只改实现，旧程序应照常跑。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "检查 · 靠符号表与 ABI 签名",
+          "text": "兼容检查靠 15.1 的符号表与 ABI 签名：参数个数、类型、顺序、返回值。版本规则由数据侧定稿：主版本变即拒绝，次版本变兼容。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 改参数、升版本、跑旧程序",
+          "text": "做一遍：改库函数参数并升版本，再跑旧程序。旧程序必须收到可读的兼容错误，说明缺哪个符号或参数不符，而不是读到错位数据继续跑。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 检查没接，旧程序静默读错",
+          "text": "负例：版本号改了，检查没接，旧程序按旧布局读新库，输出乱码还退出码 0。没有报错、看似成功——这种静默坏必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 旧程序被明确拒绝",
+          "text": "验收：旧程序被明确拒绝，不静默坏。四条同时——①版本号按规则变更；②兼容检查读到签名差异；③错误可读并指出符号/参数；④兼容报告落袋。只改版本号数字，不给过。"
+        }
+      ],
+      "p1": "改库函数参数并升主版本，跑旧程序，读兼容错误",
+      "p1_gates": [
+        "T15.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "改库函数参数并升主版本，跑旧程序读兼容错误",
+          "judge": "四条同时：①版本按规则变；②检查读到签名差异；③错误点出符号/参数；④报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T15.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "版本号变了，检查没接，旧程序静默读错",
+          "judge": "退出码 0 但输出乱码；detail 写「静默读错位数据」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T15.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按规则判 (1.0,1.0)(1.0,1.1)(1.0,2.0)(2.0,2.1) 四组",
+          "judge": "与机器一致；不算 P1；detail 写「主/次版本规则用错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T15.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「错误要点出符号或参数」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T15.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T15.3-1",
+          "title": "新旧程序对同一库的链接结果与错误可读",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "prog",
+            "lib_version",
+            "req_version",
+            "result",
+            "symbol"
+          ],
+          "expect_rows": [
+            {
+              "prog": "old",
+              "lib_version": "2.0",
+              "req_version": "1.0",
+              "result": "rejected",
+              "symbol": "area"
+            },
+            {
+              "prog": "new",
+              "lib_version": "2.0",
+              "req_version": "2.0",
+              "result": "linked",
+              "symbol": "area"
+            }
+          ],
+          "expect_meta": {
+            "version_rule_ok": true,
+            "sig_diff_detected": true,
+            "readable": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T15.3-2",
+          "title": "负例：版本号改了，兼容检查没接",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "compat_check",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T15.3-3",
+          "title": "按主版本变即拒绝、次版本变兼容判 4 组配对",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "compatible": 3,
+            "incompatible": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T15.3-4",
+          "title": "兼容错误为什么要可读",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "兼容错误为什么要可读？",
+            "options": [
+              "要指出缺哪个符号或参数不符，调用方才改得对",
+              "只要退出码非 0 就够，内容无所谓",
+              "可读错误会让旧程序跑得更慢",
+              "错误文本只是日志，不影响兼容判断"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先按规则判兼容，再看错误里点了哪个符号/参数。",
+      "misconception": "把「退出码 0」当成「没坏」；静默读错位数据比报错更危险。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "dns_resolve": {
+      "id": "dns_resolve",
+      "title": "DNS · 名字换地址，缓存有寿命",
+      "body": "解析器按记录类型问上游，答案进缓存并挂 TTL；过期必须重问，不能拿旧地址。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 名字到地址是分布式查询",
+          "text": "名字到地址不是查一张大表，是分布式查询：问解析器，解析器问上游，逐级拿到记录。缓存让重复查询不必再问，TTL 决定这条缓存还能活多久。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "记录 · A、AAAA、CNAME",
+          "text": "记录分三类：A 给 IPv4，AAAA 给 IPv6，CNAME 是别名。报文仍走 8.1 的字段与 10.x 的可靠传输；解析结果写回 9.1 的地址表，不另造地址空间。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 查一次，改 TTL 复测",
+          "text": "做一遍：发一次查询，读回三类记录；改 TTL 再查，过期后必须重新向上游问，不能一直吃旧缓存。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 只有一张写死的 hosts 表",
+          "text": "负例：解析器只读一张写死的 hosts 表，TTL 改成 0 仍返回缓存。名字能「解析」，但没有查询、没有过期——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 三类记录对，TTL 过期重查",
+          "text": "验收：三类记录解析正确，TTL 过期会重查。四条同时——①A/AAAA/CNAME 各解对一条；②缓存命中与未命中可区分；③TTL 到期触发重查；④解析报告落袋。只查写死的表，不给过。"
+        }
+      ],
+      "p1": "查 A/AAAA/CNAME 三类记录，观察缓存命中与 TTL 到期重查",
+      "p1_gates": [
+        "T15.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "查 A/AAAA/CNAME 三类记录，观察缓存命中与 TTL 到期重查并抓包",
+          "judge": "四条同时：①三类都可查；②缓存与直查可区分；③TTL 到期重问；④报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T15.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "缓存命中却返回过期地址，不重问",
+          "judge": "TTL 归零仍返回旧地址；detail 写「过期未重查」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T15.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按 TTL=30 s 算 10 s 后剩余与过期时刻",
+          "judge": "与机器一致；不算 P1；detail 写「TTL 减法或时刻算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T15.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「地址可能已变，过期必须重问」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T15.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T15.4-1",
+          "title": "三类记录、缓存命中、TTL 到期重查逐行对上",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "qtype",
+            "answer",
+            "cache_hit",
+            "ttl_left",
+            "requery"
+          ],
+          "expect_rows": [
+            {
+              "qtype": "A",
+              "answer": "10.0.0.1",
+              "cache_hit": false,
+              "ttl_left": 30,
+              "requery": false
+            },
+            {
+              "qtype": "AAAA",
+              "answer": "::1",
+              "cache_hit": false,
+              "ttl_left": 30,
+              "requery": false
+            },
+            {
+              "qtype": "CNAME",
+              "answer": "alias.node",
+              "cache_hit": false,
+              "ttl_left": 30,
+              "requery": false
+            },
+            {
+              "qtype": "A",
+              "answer": "10.0.0.1",
+              "cache_hit": true,
+              "ttl_left": 20,
+              "requery": false
+            },
+            {
+              "qtype": "A",
+              "answer": "10.0.0.1",
+              "cache_hit": false,
+              "ttl_left": 30,
+              "requery": true
+            }
+          ],
+          "expect_meta": {
+            "three_types": true,
+            "cache_distinct": true,
+            "ttl_requery": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T15.4-2",
+          "title": "负例：缓存命中但返回过期地址",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "upstream_query",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T15.4-3",
+          "title": "按 TTL=30 s 算 10 s 后的剩余与过期时刻",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "ttl_left_at_10s": 20,
+            "expire_at": 30
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T15.4-4",
+          "title": "为什么 TTL 到期必须重问",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么 TTL 到期必须重问？",
+            "options": [
+              "地址可能已变，过期缓存会把连接带到错地方",
+              "TTL 只是显示用的倒计时，不影响结果",
+              "重问是为了让上游服务器更忙",
+              "TTL 到期后缓存会自动改成新地址"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记 TTL 与查询时刻，再算剩余；命中与重查分开记。",
+      "misconception": "把「有缓存」当成「永远对」；TTL 到期不重查，就会拿到过期地址。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
