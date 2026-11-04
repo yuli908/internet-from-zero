@@ -3,6 +3,14 @@ extends RefCounted
 
 ## 存档编解码：版本号 + 校验和 + 迁移链。格式为信封包着 payload 字符串。
 ## 信封：{"fmt","version","algo","checksum","payload"}，payload 是 JSON 字符串。
+##
+## 迁移契约（新增 FORMAT_VERSION 时必读）：
+##  1. `MIGRATIONS` 必须覆盖 1..FORMAT_VERSION-1 的每一个版本，且不能有越界键；
+##  2. 每个迁移器必须把 `payload["version"]` 推进到下一版（v1→v2→v3 串联）；
+##  3. 迁移只做重命名/补默认值，**不得丢弃未知字段**（含顶层与 `player` 内嵌层），
+##     否则旧档里的进度会被静默丢失；
+##  4. 高于当前版本的存档一律拒绝；迁移失败返回 `ok=false`，不得返回半迁移数据。
+## `registry_errors()` 把 1 变成可测试的断言，`migrate()` 入口也会先自检。
 
 const FORMAT_VERSION := 3
 const ENVELOPE_FMT := "internet-from-zero.save"
@@ -76,7 +84,22 @@ static func decode(text: String) -> Dictionary:
 		"version": FORMAT_VERSION, "migrated_from": migrated_from,
 	}
 
+static func registry_errors() -> Array:
+	var errs: Array = []
+	for v in range(1, FORMAT_VERSION):
+		var migrator := str(MIGRATIONS.get(v, ""))
+		if migrator.is_empty():
+			errs.append("缺少 v%d 的迁移器" % v)
+	for key in MIGRATIONS.keys():
+		var k := int(key)
+		if k < 1 or k >= FORMAT_VERSION:
+			errs.append("迁移键 v%d 越界（应为 1..%d）" % [k, FORMAT_VERSION - 1])
+	return errs
+
 static func migrate(payload: Dictionary) -> Dictionary:
+	var errs := registry_errors()
+	if not errs.is_empty():
+		return _fail("迁移注册表不完整：%s" % "; ".join(PackedStringArray(errs)))
 	var p := payload.duplicate(true)
 	var from_v := int(p.get("version", 1))
 	var v := from_v

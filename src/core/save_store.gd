@@ -76,7 +76,7 @@ func _load_from(path: String, used_backup: bool, slot: int) -> Dictionary:
 	return {
 		"ok": true, "error": "", "state": state, "path": path,
 		"used_backup": used_backup, "migrated_from": int(decoded.migrated_from),
-		"version": int(decoded.version),
+		"version": int(decoded.version), "payload": decoded.payload,
 	}
 
 func slot_info(slot: int) -> Dictionary:

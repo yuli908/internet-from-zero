@@ -1,0 +1,23 @@
+{
+  "player": {
+    "slot": 2,
+    "created_at": "2026-01-01T00:00:00",
+    "updated_at": "2026-01-02T00:00:00",
+    "chapter_id": "ch01",
+    "scrap": 120,
+    "xp": 40,
+    "inventory": {"wire": 5, "resistor": 2},
+    "knowledge": {"voltage": true, "KN-ELEC-01": true},
+    "objectives": {"obj_level": true, "obj_binary": true},
+    "labs_completed": {"level": true, "binary": true},
+    "flags": {
+      "gate:T1.1-4": true,
+      "lab:level": true,
+      "chapter_reward:ch01": true
+    },
+    "tutorial_done": {"step_intro": true},
+    "stats": {"saves": 3, "play_seconds": 1234.5, "ticks": 99},
+    "rng": {"seed": 42, "state": 12345},
+    "legacy_unknown": {"foo": "bar"}
+  }
+}

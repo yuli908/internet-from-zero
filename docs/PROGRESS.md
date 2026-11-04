@@ -8,7 +8,7 @@
 ## 1. 一句话结论
 
 M1 已经**可启动、可操作、可存档、可自动测试**：6 节实验 + 24 条 gate + 多解黑盒 + L0a/L0b/L1 仿真；
-`RESULT: 1350 checks, 0 failures`。
+`RESULT: 1410 checks, 0 failures`。
 
 M2 进度（顺序固定，不跳步）：
 
@@ -19,9 +19,10 @@ M2 进度（顺序固定，不跳步）：
 3. **B L2 组合层——已完成**：半加器 → 全加器 → 8 位行波加法器 → 2:1 / 4:1 选择器；
    `t_settle` 由延迟表推导并经实测校验（HA 4 / FA 10 / ripple8 52 / mux2 7 / mux4 13 tick），
    `tests/test_l2.gd` 逐向量等价（含 X），L1/L2 混合可仿真（§2.3）。
-4. **C 存档迁移框架补全 / D 6 节脚本走查——未完成**（见 §4）。
+4. **C 存档迁移框架补全——已完成**：迁移契约可执行（`registry_errors()` + `migrate()` 自检），v1/v2 fixture 经 `SaveStore` 真实落盘读档，进度字段逐项保留（§2.4）。
+5. **D 6 节脚本走查——未完成**（见 §4）。
 
-M1 **没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、题库与逐题评分、真实 CI 验证——这些要么只有 ADR，要么完全没有。
+M1 **没有**做到：L3–L7、原生 GDExtension、沙箱与真实集成、题库与逐题评分、真实 CI 验证——这些要么只有 ADR，要么完全没有。
 
 ## 2. 已完成（附验证方式）
 
@@ -33,12 +34,12 @@ M1 **没有**做到：L2–L7、原生 GDExtension、沙箱与真实集成、题
 | 仿真 L2 组合层 | `src/sim/sim_module.gd`：半加器 → 全加器 → 8 位行波加法器 → 2:1/4:1 选择器；`t_settle` 由 `SimDelays` 推导 | `tests/test_l2.gd`：参考真值表逐向量（含 X）、实测稳定时间、L1/L2 混合 |
 | 判定层 | `LabChecks` 输出 `GateReport`，UI 只采集与展示；24 条 gate 逐条判定 | `tests/test_lab_checks.gd`：每种 lab 的"正确解全过 + 错误解失败"两条路径 |
 | 多解验收 | `BlackBox` 只判行为不判拓扑；XOR 两种结构、半加器 | `tests/test_black_box.gd`：多解通过、错误拓扑失败、`signature` 区分结构 |
-| 存档 | 信封 v3 + SHA-256 + 原子写 tmp→校验→`.bak`→rename；主文件坏则回退 `.bak`；迁移注册表串联 v1→v2→v3（未知字段保留） | `tests/test_save.gd`：篡改检测、坏 JSON 拒绝、`.bak` 回退、往返一致、v1/v2 迁移（含 `scrap`→`gold`）、v4+ 拒绝 |
+| 存档 | 信封 v3 + SHA-256 + 原子写 tmp→校验→`.bak`→rename；主文件坏则回退 `.bak`；迁移注册表串联 v1→v2→v3（未知字段保留） | `tests/test_save.gd`：篡改检测、坏 JSON 拒绝、`.bak` 回退、往返一致、v1/v2 fixture 落盘读档后进度逐项保留、迁移注册表契约、`scrap`→`gold`、v4+ 拒绝 |
 | 经济/知识/章节/引导 | 金币 + XP、商店与配方、技能树四态、章节目标与奖励、引导步骤 | `tests/test_economy/test_knowledge/test_chapter/test_tutorial.gd` |
 | UI | 工作台（6 实验卡）、6 个实验页、知识树、商店、档案、诊断；点击式电路编辑器；波形与判读条 | `artifacts/shots/*.png`（workbench/shop/skills/archive/diagnostics + lab_level…lab_half_adder） |
 | 工程化 | `README.md`、5 篇 ADR、本文件、4 个 PowerShell 脚本、CI 草案、`native/` 脚手架 | 本文档与 `scripts/selfcheck.ps1` |
 
-### 2.1 自动测试构成（13 套件，1350 项）
+### 2.1 自动测试构成（13 套件，1410 项）
 
 `bit_math` / `logic_gates` / `circuit` / `economy` / `knowledge` / `chapter` / `tutorial` / `save` / `data` / `sim` / `l2` / `black_box` / `lab_checks`
 
@@ -76,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 
 ### 2.3 B L2 组合层实测（2026-11-04）
 
-新增 `src/sim/sim_module.gd`（契约：`name / inputs / outputs / t_settle / build(circuit)`）与 `tests/test_l2.gd`，共 **430 项**新检查（总计 1350）。
+新增 `src/sim/sim_module.gd`（契约：`name / inputs / outputs / t_settle / build(circuit)`）与 `tests/test_l2.gd`，共 **430 项**新检查（当时总计 1350）。
 
 | 模块 | 结构 | 声明 `t_settle` | 实测最坏稳定时间 |
 |---|---|---|---|
@@ -92,6 +93,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - 进位链：文档原写"cout 延迟 6n=48"，那是从 **cin** 起的路径；从 **a/b** 起经第一级 s1 生成进位多 4 tick，
   故 `t_settle` 上界为 `xor+and+or+(n-1)(and+or)=52`，实测同为 52。声明值由 `SimDelays.delay()` 推导，测试同时断言推导式。
 - L1/L2 混合：半加器输出经 L1 xor 门 → 0 延迟连线 → L2 选择器，4 组输入全部正确；选择端切换后输出恒为 d1。
+
+### 2.4 C 存档迁移实测（2026-11-04）
+
+- 迁移契约变成可执行检查：`SaveCodec.registry_errors()` 校验 `MIGRATIONS` 覆盖 `1..FORMAT_VERSION-1` 且无越界键；
+  `migrate()` 入口先自检，注册表残缺时返回 `ok=false`，不返回半迁移数据。
+- 新增 fixture：`tests/data/saves/legacy_v1.json`（`player` 内嵌 + 未知字段）与 `legacy_v2.json`（扁平 + 未知字段）。
+- 不只测 `decode()`：把 fixture 编码后**真实写入 `SaveStore` 槽位再 `load_slot()`**，覆盖"旧档落盘 → 读档 → 迁移 → `PlayerState`"整条路径。
+- v1/v2 逐项断言不丢进度：`gold`（由 `scrap` 改名）、`xp`、`slot`、`created_at`、`chapter_id`、物品数量、知识、目标、
+  `labs_completed`、gate/lab/chapter 三类 flag、教程完成项、`stats`（saves/seconds/ticks）、`rng`（seed/state）；
+  未知字段（v1 内嵌、v2 顶层）原样保留，`scrap` 键已消失。
+- 新增 **60 项**检查，总计 **1410 checks / 13 套件 / 0 failures**。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -126,7 +138,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 性能基准关（全翻转场景、5 ms/帧实测） | **已完成（2026-11-04）** | 见 §2.2：200 门/200 DFF p95 17.78 ms（超预算 3.6×）；安全上限 50 门/50 DFF（p95 4.11 ms）。`scripts/bench.ps1` 可复现，产物 `artifacts/logs/bench.json` |
 | 原生 GDExtension（编译、与 GDScript 同向量、接入 `project.godot`） | **未完成** | `native/` 只有脚手架：核心自检 `ifz_selftest` 已在 MinGW g++ 15.1 + CMake 下编译并通过（1/1），但 **GDExtension 动态库未构建**，MSVC 未验证，未接入 `project.godot` |
 | 延迟常量三方一致校验（`delays.json` == `docs/simulation/03` == 原生头文件） | **未完成** | 当前靠人工核对，CI 无此步骤 |
-| 存档前向迁移框架（注册式迁移器 + fixture + 迁移链契约测试） | **未完成** | 见偏差 5；v2→v3 之前必须补 |
+| 存档前向迁移框架（注册式迁移器 + fixture + 迁移链契约测试） | **已完成（2026-11-04）** | 见 §2.4：`SaveCodec.registry_errors()`、`tests/data/saves/legacy_v1.json`、`legacy_v2.json`、`tests/test_save.gd` |
 | 沙箱、编译器桥接、L7 伴生进程与「转发」标记 | **未完成** | 仅 ADR 0004 设计，无代码 |
 | L2 组合模块封装 / `t_settle` 声明 | **已完成（2026-11-04）** | 见 §2.3：`src/sim/sim_module.gd` + `tests/test_l2.gd`（半加器/全加器/8 位行波加法器/2:1/4:1 选择器） |
 | L3 DFF 与亚稳态 / L4 CPU / L5 总线 / L6 网络 | **未完成** | 仅接口占位（ADR 0005 §2）；`delays.json` 里 `dff` 只是常量 |
@@ -158,7 +170,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 
 1. ~~性能基准关~~：已完成，见 §2.2（`scripts/bench.ps1`）。
 2. ~~B. L2 组合层~~：已完成，见 §2.3。
-3. **C. 存档迁移框架补全**：把 v1→v2→v3 已有实现整理为"版本号 + 迁移函数注册表 + 未知字段保留"的通用契约，并补"旧档载入不丢进度"自动测试。
+3. ~~C. 存档迁移框架补全~~：已完成，见 §2.4。
 4. **D. 6 节脚本走查**：脚本驱动 UI 走完 6 节，逐节断言知识树/金币/物品，重启进程读档一致，每节一张截图。
 5. **原生下沉**：基准关已确认超标（200 门 p95 17.8 ms），M3 启动 GDExtension（ADR 0002 §5），目标 >50 门/50 DFF 场景。
 6. **TraceSink 统一**：先把 `history/glitches` 映射进统一流，再谈回放。
@@ -167,7 +179,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1350 checks, 0 failures
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 1410 checks, 0 failures
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（p50/p95/p99/max）
 powershell -ExecutionPolicy Bypass -File .\scripts\run_game.ps1      # 手动操作

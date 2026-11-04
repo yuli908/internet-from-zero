@@ -69,6 +69,9 @@ func run(ctx: TestContext) -> void:
 	ctx.check("newer message", str(nres["error"]).contains("高于"))
 
 	_test_v2_migration(ctx)
+	_test_registry(ctx)
+	_test_fixture_v1(ctx)
+	_test_fixture_v2(ctx)
 	_test_store(ctx)
 	_test_determinism(ctx)
 
@@ -116,6 +119,103 @@ func _test_v2_migration(ctx: TestContext) -> void:
 	ctx.check("v2 progress knowledge kept", restored.has_knowledge("voltage") and restored.has_knowledge("KN-ELEC-01"))
 	ctx.check("v2 progress objective kept", restored.is_objective_done("obj_level"))
 	ctx.check("v2 progress lab kept", restored.is_lab_completed("level"))
+
+func _test_registry(ctx: TestContext) -> void:
+	# 契约：注册表必须覆盖 1..FORMAT_VERSION-1，且链路能把任意旧版本推到当前版本。
+	ctx.eq("registry errors", SaveCodec.registry_errors().size(), 0)
+	ctx.eq("registry entries", SaveCodec.MIGRATIONS.size(), SaveCodec.FORMAT_VERSION - 1)
+	for v in range(1, SaveCodec.FORMAT_VERSION):
+		ctx.check("registry has v%d" % v, SaveCodec.MIGRATIONS.has(v))
+		var res := SaveCodec.migrate({"version": v})
+		ctx.check("chain from v%d ok" % v, bool(res["ok"]), str(res["error"]))
+		if bool(res["ok"]):
+			ctx.eq("chain from v%d version" % v, int(res["payload"]["version"]), SaveCodec.FORMAT_VERSION)
+			ctx.eq("chain from v%d from" % v, int(res["from"]), v)
+	var fresh := SaveCodec.migrate({"version": SaveCodec.FORMAT_VERSION})
+	ctx.check("migrate latest ok", bool(fresh["ok"]), str(fresh["error"]))
+	ctx.eq("migrate latest from", int(fresh["from"]), SaveCodec.FORMAT_VERSION)
+
+func _test_fixture_v1(ctx: TestContext) -> void:
+	var fx: Dictionary = TestUtil.read_json("res://tests/data/saves/legacy_v1.json")
+	var res := _load_slot_text(ctx, SaveCodec.encode_payload(fx, 1), 6)
+	if not bool(res.get("ok", false)):
+		return
+	var p: Dictionary = res["payload"]
+	var st: PlayerState = res["state"]
+	ctx.eq("v1 fixture migrated_from", int(res["migrated_from"]), 1)
+	ctx.eq("v1 fixture version", int(p["version"]), 3)
+	ctx.check("v1 fixture no backup", not bool(res["used_backup"]))
+	ctx.eq("v1 fixture gold", st.gold, 120)
+	ctx.eq("v1 fixture xp", st.xp, 40)
+	ctx.eq("v1 fixture slot", st.slot, 6)
+	ctx.eq("v1 fixture payload slot", int(p.get("slot", -1)), 2)
+	ctx.eq("v1 fixture chapter", st.chapter_id, "ch01")
+	ctx.eq("v1 fixture created_at", st.created_at, "2026-01-01T00:00:00")
+	ctx.eq("v1 fixture wire", st.item_count("wire"), 5)
+	ctx.eq("v1 fixture resistor", st.item_count("resistor"), 2)
+	ctx.check("v1 fixture knowledge", st.has_knowledge("voltage") and st.has_knowledge("KN-ELEC-01"))
+	ctx.check("v1 fixture objectives", st.is_objective_done("obj_level") and st.is_objective_done("obj_binary"))
+	ctx.check("v1 fixture labs", st.is_lab_completed("level") and st.is_lab_completed("binary"))
+	ctx.check("v1 fixture gate flag", bool(st.get_flag("gate:T1.1-4", false)))
+	ctx.check("v1 fixture lab flag", bool(st.get_flag("lab:level", false)))
+	ctx.check("v1 fixture chapter flag", bool(st.get_flag("chapter_reward:ch01", false)))
+	ctx.check("v1 fixture tutorial", st.is_tutorial_done("step_intro"))
+	ctx.eq("v1 fixture stats saves", int(st.stats.get("saves", -1)), 3)
+	ctx.eq("v1 fixture stats ticks", int(st.stats.get("ticks", -1)), 99)
+	ctx.check("v1 fixture stats seconds", is_equal_approx(float(st.stats.get("play_seconds", -1.0)), 1234.5))
+	ctx.eq("v1 fixture rng seed", st.rng_seed, 42)
+	ctx.eq("v1 fixture rng state", st.rng().state_value(), 12345)
+	var unknown: Variant = p.get("legacy_unknown", null)
+	ctx.check("v1 fixture unknown kept", unknown is Dictionary and str((unknown as Dictionary).get("foo", "")) == "bar")
+	ctx.check("v1 fixture scrap removed", not p.has("scrap"))
+
+func _test_fixture_v2(ctx: TestContext) -> void:
+	var fx: Dictionary = TestUtil.read_json("res://tests/data/saves/legacy_v2.json")
+	var res := _load_slot_text(ctx, SaveCodec.encode_payload(fx, 2), 7)
+	if not bool(res.get("ok", false)):
+		return
+	var p: Dictionary = res["payload"]
+	var st: PlayerState = res["state"]
+	ctx.eq("v2 fixture migrated_from", int(res["migrated_from"]), 2)
+	ctx.eq("v2 fixture version", int(p["version"]), 3)
+	ctx.check("v2 fixture no backup", not bool(res["used_backup"]))
+	ctx.eq("v2 fixture gold", st.gold, 88)
+	ctx.eq("v2 fixture xp", st.xp, 30)
+	ctx.eq("v2 fixture slot", st.slot, 7)
+	ctx.eq("v2 fixture payload slot", int(p.get("slot", -1)), 3)
+	ctx.eq("v2 fixture created_at", st.created_at, "2026-02-01T00:00:00")
+	ctx.eq("v2 fixture wire", st.item_count("wire"), 4)
+	ctx.eq("v2 fixture diode", st.item_count("diode"), 1)
+	ctx.check("v2 fixture knowledge", st.has_knowledge("voltage") and st.has_knowledge("KN-ELEC-02"))
+	ctx.check("v2 fixture objective", st.is_objective_done("obj_binary"))
+	ctx.check("v2 fixture lab", st.is_lab_completed("binary"))
+	ctx.check("v2 fixture gate flag", bool(st.get_flag("gate:T1.1-1", false)))
+	ctx.check("v2 fixture lab flag", bool(st.get_flag("lab:binary", false)))
+	ctx.check("v2 fixture tutorial", st.is_tutorial_done("step_binary"))
+	ctx.eq("v2 fixture stats saves", int(st.stats.get("saves", -1)), 5)
+	ctx.eq("v2 fixture stats ticks", int(st.stats.get("ticks", -1)), 111)
+	ctx.check("v2 fixture stats seconds", is_equal_approx(float(st.stats.get("play_seconds", -1.0)), 777.0))
+	ctx.eq("v2 fixture rng seed", st.rng_seed, 9)
+	ctx.eq("v2 fixture rng state", st.rng().state_value(), 54321)
+	var unknown: Variant = p.get("legacy_unknown_top", null)
+	ctx.check("v2 fixture unknown kept", unknown is Array and (unknown as Array).size() == 3 and int((unknown as Array)[2]) == 3)
+	ctx.check("v2 fixture scrap removed", not p.has("scrap") and not st.inventory.has("scrap"))
+
+func _load_slot_text(ctx: TestContext, text: String, slot_num: int) -> Dictionary:
+	var store := SaveStore.new("user://test_saves")
+	store.ensure_dir()
+	var path := store.slot_path(slot_num)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		ctx.check("fixture slot writable", false, str(slot_num))
+		return {"ok": false, "error": "无法写槽位 %d" % slot_num, "state": null, "used_backup": false}
+	f.store_string(text)
+	f.close()
+	var res := store.load_slot(slot_num)
+	for p in [store.slot_path(slot_num), store.backup_path(slot_num), store.slot_path(slot_num) + ".tmp"]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
+	return res
 
 func _test_store(ctx: TestContext) -> void:
 	var store := SaveStore.new("user://test_saves")

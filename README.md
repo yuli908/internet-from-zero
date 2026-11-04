@@ -19,7 +19,7 @@
 | 点击式电路编辑器（放门 / 连线 / 断线 / 翻转输入） | `src/ui/widgets/circuit_editor.gd` |
 | 波形与毛刺、延迟测量 | `src/ui/widgets/waveform.gd`、`src/core/signal_lab_model.gd` |
 | 存档（信封 v3 + SHA-256 + 原子写 + `.bak` 回退 + 迁移注册表） | `src/core/save_codec.gd`、`src/core/save_store.gd` |
-| 自动测试 1350 项 / 13 套件 / 0 失败 | `scripts/run_tests.ps1` |
+| 自动测试 1410 项 / 13 套件 / 0 失败 | `scripts/run_tests.ps1` |
 | 性能基准（p50/p95/p99/max） | `scripts/bench.ps1`、`tests/bench_sim.gd` |
 | 11 张自动截图 | `artifacts/shots/*.png`（workbench / shop / skills / archive / diagnostics + 6 个 lab） |
 
