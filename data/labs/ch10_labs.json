@@ -1,0 +1,725 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/21-ch10-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T10.x-n 按课文提案落库；吞吐 ≥2× 为【假设】初值，挂 pending 不进分母。",
+  "pending_kinds": {
+    "table": "10.3 窗口 4 吞吐 ≥2× 在课文标【假设】，最终以数据侧阈值为准；无校准数据，先挂 pending 不进分母。"
+  },
+  "labs": {
+    "seq_reorder": {
+      "id": "seq_reorder",
+      "title": "序号与重排 · 到达不等于按序",
+      "body": "给帧编号、按号放回原位；乱序经缓冲重排，缺号要报出具体序号。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 线修好了，帧还是会丢会乱",
+          "text": "9.4 把拓扑和环路修好了，链路仍然只保证尽力：帧可能丢，也可能后发先至。到达不等于按顺序到达。可靠性不能等链路赠送，得自己在两端加一层。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "序号 · 给每帧一个固定位置",
+          "text": "发送端给每个数据帧编一个序号，接收端按号把它放回原位。缺号说明这一帧没到，重复号说明这是重发。序号把「到没到、第几个到」变成可查的编号，而不是靠感觉。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "重排缓冲 · 入口按号放，出口按序取",
+          "text": "重排缓冲要真的接在接收端入口与出口之间：入口按序号分格，出口只按顺序取走。乱序输入必须经它重排后再交给上层；只在界面写「已启用缓冲」而输出照原样透传，等于没接。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "30% 丢包 · 断档要报出哪一号",
+          "text": "注入 30% 丢包，同一配置跑两遍，丢的帧号应可复现。丢包会让序号断档，缓冲等不到就停在那里。此时必须报出缺的是哪一号，交给 10.2 的重传；「感觉少了几帧」不算检出。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 乱序能重排，缺号能检出",
+          "text": "验收：30% 丢包 + 乱序输入。四条同时——①乱序输入经缓冲后输出序号严格递增；②缺号被检出并报出具体序号；③重复号不重复交付；④知识卡写出序号治乱序、治丢失的两条机制。只接缓冲不判顺序，不给过。"
+        }
+      ],
+      "p1": "接出重排缓冲，注入 30% 丢包与乱序输入",
+      "p1_gates": [
+        "T10.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "把缓冲接在接收端入口与出口之间，喂乱序序列，再开 30% 丢包跑一遍",
+          "judge": "四条同时：①输出序号严格递增；②缺号报出具体序号；③重复号不重复交付；④知识卡两条机制写全",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T10.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "保留缓冲对象但让数据绕过它直接交给上层",
+          "judge": "乱序原样冒出，上层收到的顺序与输入完全一致；detail 写「缓冲未接出，输出未按序号重排」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T10.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "同一批 n 帧，期望缺号 = 0.3n，取整规则按数据侧",
+          "judge": "与机器计数一致；不算 P1；detail 写「期望缺号数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T10.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「同一序号让接收端放回原位；缺号说明丢，重复号说明重发」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T10.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T10.1-1",
+          "title": "乱序重排、缺号报出、重复不交付",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "in_seq",
+            "out_seq",
+            "status"
+          ],
+          "expect_rows": [
+            {
+              "in_seq": 1,
+              "out_seq": 1,
+              "status": "ok"
+            },
+            {
+              "in_seq": 3,
+              "out_seq": 2,
+              "status": "buffered"
+            },
+            {
+              "in_seq": 2,
+              "out_seq": 3,
+              "status": "reordered"
+            },
+            {
+              "in_seq": 4,
+              "out_seq": 4,
+              "status": "ok"
+            },
+            {
+              "in_seq": 5,
+              "out_seq": 5,
+              "status": "missing"
+            }
+          ],
+          "expect_meta": {
+            "monotonic": true,
+            "gap_seq": 5,
+            "duplicate_suppressed": true,
+            "loss_rate": 0.3,
+            "mechanisms": 2
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T10.1-2",
+          "title": "负例：缓冲只摆着，输出透传",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "reorder_buffer",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T10.1-3",
+          "title": "10 帧 30% 丢包的期望缺号数",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 3,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T10.1-4",
+          "title": "序号为什么同时治乱序与丢失",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "序号为什么能同时对付乱序和丢包？",
+            "options": [
+              "同一序号让接收端放回原位；缺号说明丢，重复号说明重发",
+              "序号让帧在链路上不会丢",
+              "序号能自动修复损坏的字节",
+              "序号把丢包率降到 0"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先看齐入口的放格规则，再确认出口只按顺序取；缺号要落到具体编号。",
+      "misconception": "把「接了缓冲」当成验收；不判输出顺序，缓冲等于没接。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "ack_retransmit": {
+      "id": "ack_retransmit",
+      "title": "ACK 与重传 · 同号补发",
+      "body": "ACK 必须带序号；超时无 ACK 就重发同一号，不许回空闲假送达。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 知道缺了，还得把它补上",
+          "text": "10.1 只能发现缺号，补不回来。补要靠确认：收到就回一个带序号的 ACK，告诉发端哪一帧到了；没等到 ACK，计时器到点就重发那一帧。确认与超时都沿用 8.2，不另造事件。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "ACK 认序号，不认「收到」",
+          "text": "回执必须带「我收到了第几号」，只写「收到」等于没说。发端收到对应号的 ACK 才清除等待；ACK 自己也会丢，丢了就当作没收到，靠超时重发兜底。重发是同一机制的兜底，不是第二条协议。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "计时器 · 到点重发同一号",
+          "text": "计时从发出那一帧起算，阈值按一帧往返时长定初值，最终以数据侧 timeout_ticks 为准。到点仍无 ACK 就重发同一序号，不许换号：换号会让接收端把它当新数据，重复交付。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "关确认 · 停在等待，不假装送达",
+          "text": "把 ACK 关掉再跑：发端应停在等待，计时器到点重发，轨迹里出现同一序号的两帧。重发后仍无 ACK，就必须继续等或继续重发，不许因为等太久就标记成功。P07 完整版在这里接上重传分支。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 关掉确认后看见重传",
+          "text": "验收：先跑正常 ACK，再关确认跑一遍。四条同时——①正常运行时 ACK 与帧号逐一对上；②关确认后观察到超时重发同一序号；③重发次数与轨迹可复现；④P07 完整版含窗口与重传分支。只在日志写「重传了」不算。"
+        }
+      ],
+      "p1": "跑正常 ACK，再关确认观察一次超时重传",
+      "p1_gates": [
+        "T10.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "接上 ACK 通道跑一遍，再关闭 ACK 让计时器到点，记录重发轨迹并落 P07 完整版",
+          "judge": "四条同时：①ACK 与帧号逐一对上；②关确认后超时重发同一序号；③重发次数与轨迹可复现；④P07 完整版含窗口与重传分支",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T10.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "计时器到点后不重发，状态直接回空闲",
+          "judge": "关确认下仍报「已送达」，轨迹里没有重发帧；detail 写「超时未重发却回空闲」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T10.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "丢 1 个 ACK 至少重发 1 次；若重发帧的 ACK 也丢，再 +1，按注入集逐条算",
+          "judge": "与机器计数的重发次数一致；不算 P1；detail 写「重发次数算错」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T10.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「同一序号让接收端认出这是重发，不会当成新数据重复交付」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T10.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T10.2-1",
+          "title": "ACK 对上、关确认后同号重发、轨迹可复现、P07 完整",
+          "kind": "handshake_fsm",
+          "required": true,
+          "events": [
+            "send",
+            "ack",
+            "timeout"
+          ],
+          "states": [
+            "idle",
+            "waiting",
+            "acked"
+          ],
+          "expect_state_after_drop": "waiting",
+          "expect_repeatable": true,
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T10.2-2",
+          "title": "负例：超时后回空闲并报成功",
+          "kind": "timeout_idle",
+          "required": true,
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T10.2-3",
+          "title": "丢 1 个 ACK 的最小重发次数",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 1,
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T10.2-4",
+          "title": "重发为什么必须同一序号",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "超时重发为什么必须带同一序号？",
+            "options": [
+              "同一序号让接收端认出这是重发，不会当成新数据重复交付",
+              "同一序号能让帧跑得更快",
+              "同一序号可以省掉 ACK",
+              "换号才算一次新的重传"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先看 ACK 里有没有序号，再关掉 ACK 看计时器到点后发的是不是同一号。",
+      "misconception": "把「等太久」当理由标记成功；没有 ACK 就是没送达，只能继续等或重发。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "sliding_window": {
+      "id": "sliding_window",
+      "title": "滑动窗口 · 用缓冲换吞吐",
+      "body": "窗口允许多帧在途，只有 ACK 才能右移；代价是缓冲与重传成本。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一次只等一帧，线在空转",
+          "text": "10.2 是停等：发一帧、等一个 ACK、再发下一帧，往返时间全花在等上。窗口允许多帧同时在路上：窗口 1 就是停等，窗口 4 是最多 4 帧未确认。窗口买的是吞吐。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "滑动 · 收到 ACK 才右移",
+          "text": "收到一个 ACK，窗口右移一格，才允许再发一帧。窗口里的帧分三种：已确认、在途、可发。右移必须由 ACK 触发，不许因为「发完了」自己往前滑；自己滑会让在途帧失去编号保护。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "代价 · 窗口越大，缓冲与重传越贵",
+          "text": "窗口不是越大越好：一帧丢了，后面在途的几帧都要等它；接收端缓冲不够，乱序帧只能丢，重传率就上去。窗口被往返时间与接收缓冲共同限住，调大之前先看这两项。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "实测 1→4 · 同配置两跑",
+          "text": "同一段数据、同一丢包配置，窗口 1 跑一遍、窗口 4 跑一遍，记吞吐与重传率。吞吐 ≥2× 是大纲给的初值【假设】，最终以数据侧阈值为准；窗口实现细节也以数据侧为准，本节不写死。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 吞吐达标，且重传率留痕",
+          "text": "验收：窗口 1 与 4 各跑一遍。四条同时——①两次配置一致；②窗口 4 吞吐 ≥2× 窗口 1（阈值以数据侧为准）；③重传率有记录，窗口变大后不隐藏重传；④性能卡写出窗口、吞吐、重传率三项。只跑窗口 4 不给过。"
+        }
+      ],
+      "p1": "窗口 1→4 同配置两跑，测吞吐与重传率",
+      "p1_gates": [
+        "T10.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "同一数据、同一丢包配置，窗口 1 与 4 各跑一遍，记录吞吐与重传率",
+          "judge": "四条同时：①两次配置一致；②窗口 4 吞吐 ≥2×；③重传率有记录且未被隐藏；④性能卡三项写全",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T10.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "只把窗口调大，接收端缓冲容量不动",
+          "judge": "乱序帧被缓冲拒收，重传率上升，吞吐不升反降；detail 写「窗口与接收缓冲不匹配」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T10.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "窗口 4 最多 4 帧未确认；发第 5 帧前必须等一个 ACK",
+          "judge": "与机器在途计数一致；不算 P1；detail 写「在途上限算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T10.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「用多帧在途换吞吐，代价是接收缓冲与重传成本上升」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T10.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T10.3-1",
+          "title": "同配置两跑、吞吐 ≥2×、重传率留痕、性能卡齐全",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "thresholds": {
+            "throughput_ratio": {
+              "status": "pending",
+              "initial": 2.0,
+              "reason": "课文标【假设】：吞吐 ≥2× 是大纲初值，最终以数据侧阈值为准；本批无校准数据。"
+            }
+          },
+          "pending_reason": "吞吐 ≥2× 是大纲初值【假设】，未校准；先挂 pending 不进分母，不以初值冒充定稿。",
+          "keys": [
+            "window",
+            "in_flight",
+            "throughput",
+            "retrans"
+          ],
+          "expect_rows": [
+            {
+              "window": 1,
+              "in_flight": 1,
+              "throughput": 1.0,
+              "retrans": 0.1
+            },
+            {
+              "window": 4,
+              "in_flight": 4,
+              "throughput": 2.4,
+              "retrans": 0.12
+            }
+          ],
+          "expect_meta": {
+            "same_config": true,
+            "retrans_recorded": true,
+            "perf_card": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T10.3-2",
+          "title": "负例：窗口 4、接收缓冲仍 1 帧",
+          "kind": "coverage",
+          "required": true,
+          "expect_cases": {
+            "buffer_overflow": true,
+            "retrans_up": true,
+            "throughput_down": true
+          },
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T10.3-3",
+          "title": "窗口 4 的在途上限",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 4,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T10.3-4",
+          "title": "窗口换来了什么、代价是什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "滑动窗口换来了什么，代价是什么？",
+            "options": [
+              "用多帧在途换吞吐，代价是接收缓冲与重传成本上升",
+              "用更少的内存换更高的可靠性",
+              "用更小的序号换更低的丢包率",
+              "用更慢的发送换更少的重传"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "两跑必须只有窗口不同；吞吐上去了，也要把重传率一起记下来。",
+      "misconception": "把窗口调大就完事；接收缓冲不跟着长，乱序帧会被拒收，重传率反而升高。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "reliable_channel": {
+      "id": "reliable_channel",
+      "title": "可靠通道 · 1 KB 全对",
+      "body": "序号、ACK、重传、窗口接成一条通道；30% 丢包下 1 KB 顺序全对。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 把三块拼成一条能用的通道",
+          "text": "序号、重传、窗口三块都各修过一遍，现在放到同一条 30% 丢包的链路上，传 1 KB，要求顺序全对。可靠通道不是链路变好了，是协议把坏链路用成了好链路。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "切帧 · 一帧一号，缺一帧都不算齐",
+          "text": "1 KB 数据按数据侧帧长切成若干帧，每帧带序号，段内字节按序。目标不是「发完了」，而是接收端按序号收齐全部帧、拼回 1 KB 且无缺号。发送计数和接收校验必须分开记。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "调参 · 阈值与窗口都在范围内试",
+          "text": "重传阈值、窗口大小都在数据侧允许范围内调，调一次记一次参数与结果。参数变了但吞吐掉下去、或重传率暴涨，都算没调好；能送到不等于调对了。每次调参都要能重放。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "结束条件 · 三条全满足才算送达",
+          "text": "结束看三条：接收端序号从首到尾连续、字节数正好 1 KB、内容与发送端逐字节一致。任一条不满足就不算送达，「大部分到了」不成立。丢包 30% 是注入值，不是允许的缺失量。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 30% 丢包下 1 KB 全对",
+          "text": "验收：30% 丢包，完整传 1 KB。四条同时——①1 KB 顺序全对、逐字节一致；②同一配置跑两遍结果一致；③参数、吞吐、重传率记在性能卡；④可靠通道蓝图写出序号、ACK、重传、窗口四处接线。蓝图随本节产出。"
+        }
+      ],
+      "p1": "30% 丢包下完整传 1 KB，调参并记录",
+      "p1_gates": [
+        "T10.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "切帧、带序号、开 30% 丢包跑满 1 KB，调重传阈值与窗口并记参数",
+          "judge": "四条同时：①顺序全对且逐字节一致；②同配置两跑一致；③参数/吞吐/重传率入性能卡；④蓝图四处接线写全",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T10.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "只看发送端发完计数，不做接收端校验",
+          "judge": "缺帧未被发现，拼回的字节数与内容都对不上；detail 写「只按发送端计数宣布完成」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T10.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "1 KB = 1024 字节 = 8192 比特（不含帧头）；切帧数按数据侧帧长",
+          "judge": "与机器值一致；不算 P1；detail 写「1 KB 字节/比特换算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T10.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「链路只尽力，可靠是序号、确认、重传、窗口一起买来的」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T10.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T10.4-1",
+          "title": "1 KB 逐字节一致、两跑一致、性能卡、蓝图四处接线",
+          "kind": "checksum",
+          "required": true,
+          "expect_bytes": 1024,
+          "expect_meta": {
+            "same_run": true,
+            "perf_card": true,
+            "blueprint_wired": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T10.4-2",
+          "title": "负例：发完就宣布成功",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "receiver_check",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T10.4-3",
+          "title": "1 KB 的字节与比特",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "bytes": 1024,
+            "bits": 8192
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T10.4-4",
+          "title": "可靠性到底从哪来",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "链路只保证尽力，可靠性到底从哪来？",
+            "options": [
+              "序号、确认、重传、窗口一起买来的",
+              "链路自己会变好",
+              "把发送速度调慢就自然可靠",
+              "接收端重发就够了"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "发送计数和接收校验分开记；结束看序号连续、字节数、逐字节校验三条。",
+      "misconception": "把「发完了」当成送达；接收端没收齐、没校验，就不能宣布成功。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
