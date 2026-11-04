@@ -643,7 +643,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 5199 checks, 0 failures（45 套件；含并行 CH09/CH10，见 §9）
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 5267 checks, 0 failures（46 套件；含并行 CH09–CH11，见 §9）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
@@ -692,13 +692,14 @@ artifacts/shots/lab_level.png  lab_binary.png  lab_boolean.png  lab_gate.png  la
 
 ## 9. CH07–CH08 数据落地与章节注册（2026-11-05）
 
-本轮新增 3 个套件、共 403 项检查；当次全量实测（工作区同时含并行会话的 CH09/CH10 提交）：
+本轮新增 3 个套件、共 403 项检查；当次全量实测（工作区同时含并行会话的 CH09–CH11 提交）：
 
 - `SUITE test_ch07 expected=208 actual=208`
 - `SUITE test_ch08 expected=157 actual=157`
 - `SUITE test_chapters_07_08 expected=38 actual=38`
-- `SUITE_TOTAL expected=5197 actual=5197`，`RESULT: 5199 checks, 0 failures`，45 套件。
-- 按 §8 基线 4645 + 本轮 403 = 5048；其余增量为并行 CH09（`test_ch09` 83 项）等，不计入本轮提交。
+- `SUITE_TOTAL expected=5265 actual=5265`，`RESULT: 5267 checks, 0 failures`，46 套件。
+- 按 §8 基线 4645 + 本轮 403 = 5048；其余增量为并行会话的 `test_ch09` 83 + `test_ch10` 68 +
+  `test_ch11` 68 = 219，不计入本轮提交。
 
 CH07（4 节 `serial_basics` / `frame4` / `uart` / `two_machine`，各 5 段、共 16 条 gate）：
 
