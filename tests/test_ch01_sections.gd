@@ -1,13 +1,12 @@
 extends RefCounted
 
-## CH01 六节 sections 数据落地校验（33 段 / 3099 字，去半角空格口径）。
+## CH01 六节 sections 数据落地校验（结构断言，不写死字数——文案会继续改）。
 ## 口径：order 为 lab 内从 1 起；after = 已完成 required gate 数；
 ## 每节最后一段必须落在 after = required gate 数 − 1；body 保留为兜底路径。
+## 字数口径：去半角空格后的字符数；单段 ≤260，同一 after 档同屏合计 ≤260。
 
 const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
-const EXPECT_COUNT := {"level": 5, "binary": 5, "boolean": 5, "gate": 6, "signal": 5, "half_adder": 7}
 const TOTAL_SECTIONS := 33
-const TOTAL_CHARS := 3099
 
 const Teach = preload("res://src/ui/teaching.gd")
 
@@ -19,15 +18,14 @@ func run(ctx: TestContext) -> void:
 	var req_by_lab := _required_by_lab(ctx, chapter_doc, labs_doc)
 
 	var total := 0
-	var chars := 0
 	for id in LABS:
 		var cfg: Dictionary = db.lab_data(str(id))
 		var secs: Array = cfg.get("sections", [])
 		var req: int = int(req_by_lab.get(id, -1))
 		ctx.check("%s 有 sections" % id, not secs.is_empty(), str(secs.size()))
-		ctx.eq("%s 段数" % id, secs.size(), int(EXPECT_COUNT[id]))
 		var max_after := -1
 		var prev_after := -1
+		var screen := {}
 		for i in secs.size():
 			var s: Dictionary = secs[i]
 			var order := int(s.get("order", -1))
@@ -44,17 +42,20 @@ func run(ctx: TestContext) -> void:
 				"after=%d required=%d" % [after, req])
 			ctx.check("%s[%d] text 非空" % [id, i + 1], not text.strip_edges().is_empty())
 			ctx.check("%s[%d] text ≤260 字" % [id, i + 1], text_len <= 260, str(text_len))
+			screen[after] = int(screen.get(after, 0)) + text_len
 			max_after = maxi(max_after, after)
 			prev_after = after
-			chars += text_len
 		total += secs.size()
 		var last_after := int((secs[secs.size() - 1] as Dictionary).get("after", -1))
 		ctx.check("%s 末段/最大 after = required−1" % id,
 			last_after == req - 1 and max_after == req - 1,
 			"last=%d max=%d required=%d" % [last_after, max_after, req])
+		# 同屏约束：同一 after 档一次显示的全部段落合计 ≤260。
+		for after in screen.keys():
+			ctx.check("%s after=%d 同屏合计 ≤260" % [id, int(after)],
+				int(screen[after]) <= 260, str(screen[after]))
 		_fallback_check(ctx, str(id), cfg)
 	ctx.eq("全文段数", total, TOTAL_SECTIONS)
-	ctx.eq("全文总字数（去空格）", chars, TOTAL_CHARS)
 
 ## required gate 数：章节 gate_ids 与 labs gate_cases 里 required=true 的条数必须一致。
 func _required_by_lab(ctx: TestContext, chapter_doc: Dictionary, labs_doc: Dictionary) -> Dictionary:
