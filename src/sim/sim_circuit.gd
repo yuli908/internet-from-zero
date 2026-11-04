@@ -90,6 +90,13 @@ func now() -> int:
 func pending() -> int:
 	return eng.pending() + _ev_t.size()
 
+func gate_count() -> int:
+	## 只读访问器：宏单元展开前的预算检查与测试用（不参与求值）。
+	return _g_op.size()
+
+func dff_count() -> int:
+	return dffs.size()
+
 func is_quiescent() -> bool:
 	return pending() == 0
 
@@ -198,6 +205,30 @@ func note_metastable(t: int, subject: String, reason: String) -> void:
 	metastable.append({"t": t, "subject": subject, "reason": reason})
 	if sink != null:
 		sink.record(t, "L3", "METASTABLE", subject, {"reason": reason})
+
+## M4：`docs/design/11` §3 的判定 kind（小写）→ trace kind（全大写）的唯一机械映射。
+## `build_area` 是语法糖（由 `AREA_MAX`/门数统计派生），不单独产生事件。
+const JUDGEMENT_KINDS := {
+	"mosfet_region": "MOSFET_REGION",
+	"x_propagation": "X_PROPAGATION",
+	"static_current": "STATIC_CURRENT",
+	"rail_margin": "RAIL_MARGIN",
+	"equiv": "EQUIV",
+	"area_max": "AREA_MAX",
+	"power_calc": "POWER_CALC",
+	"power_ratio": "POWER_RATIO",
+}
+
+func record_judgement(judgement_kind: String, subject: String, payload: Dictionary, at_tick: int = -1) -> bool:
+	## 只读观测：不改求值顺序、不增加仿真事件；layer 取当前电路的 `layer`。
+	## 未知 kind（含 `build_area`）或 trace 未开启 → 返回 false，不写入。
+	if sink == null:
+		return false
+	var kind := str(JUDGEMENT_KINDS.get(judgement_kind, ""))
+	if kind.is_empty():
+		return false
+	var t := eng.now if at_tick < 0 else at_tick
+	return sink.record(t, layer, kind, subject, payload)
 
 func enable_trace(capacity: int = 20000) -> TraceSink:
 	## 打开统一事件流（只读观测）。默认关闭，避免影响既有性能与行为。

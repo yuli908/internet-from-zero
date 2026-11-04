@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "format": "ifz-macros/1",
+  "source": "docs/simulation/03_components.md; docs/simulation/ref/simcore/components.py::ALU._build",
+  "note": "宏单元目录：对外 1 个节点，对内只在只读视图里看结构。alu4 无门级网表，只给 7 个只读页。",
+  "cells": {
+    "decoder3": {
+      "module_kind": "decoder3",
+      "width": 3,
+      "gate_count": 11,
+      "expandable": true
+    },
+    "comparator4": {
+      "module_kind": "comparator4",
+      "width": 4,
+      "gate_count": 33,
+      "expandable": true
+    },
+    "alu4": {
+      "module_kind": "",
+      "width": 4,
+      "gate_count": 166,
+      "expandable": false
+    }
+  },
+  "pages": {
+    "decoder3": [
+      {"id": "decoder3.all", "title": "3→8 译码器", "group": "comb", "gates": 11, "cells": []}
+    ],
+    "comparator4": [
+      {"id": "comparator4.all", "title": "4 位比较器", "group": "comb", "gates": 33, "cells": []}
+    ],
+    "alu4": [
+      {"id": "alu.ctrl", "title": "操作码译码", "group": "arith", "gates": 5,
+       "cells": ["nop0", "nop1", "nop2", "sub", "isadd"]},
+      {"id": "alu.adder", "title": "补码选择 + 行波加", "group": "arith", "gates": 40,
+       "cells": ["bneg0", "bneg1", "bneg2", "bneg3",
+                  "bsel.b0", "bsel.b1", "bsel.b2", "bsel.b3",
+                  "add.fa0", "add.fa1", "add.fa2", "add.fa3"]},
+      {"id": "alu.flags", "title": "标志位", "group": "arith", "gates": 9,
+       "cells": ["flagz", "v.na", "v.nb", "v.ns", "v.t1", "v.t2", "v.or", "flagv", "flagc"]},
+      {"id": "alu.logic", "title": "逻辑组", "group": "logic", "gates": 16,
+       "cells": ["and0", "and1", "and2", "and3", "or0", "or1", "or2", "or3",
+                  "xor0", "xor1", "xor2", "xor3", "not0", "not1", "not2", "not3"]},
+      {"id": "alu.sel1", "title": "选择级 1（op0）", "group": "select", "gates": 48,
+       "cells": ["gs.0", "gs.1", "gs.2", "gs.3", "gb0.0", "gb0.1", "gb0.2", "gb0.3",
+                  "gb1.0", "gb1.1", "gb1.2", "gb1.3"]},
+      {"id": "alu.sel2", "title": "选择级 2（op1）", "group": "select", "gates": 32,
+       "cells": ["ga.0", "ga.1", "ga.2", "ga.3", "gb.0", "gb.1", "gb.2", "gb.3"]},
+      {"id": "alu.sel3", "title": "选择级 3（op2）", "group": "select", "gates": 16,
+       "cells": ["y0", "y1", "y2", "y3"]}
+    ]
+  }
+}
