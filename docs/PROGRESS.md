@@ -174,13 +174,34 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 80 / 80 | 5.387（优化前首个超限） | **2.227** | **3.154** | **2.384** | OK 3/3 |
 | 100 / 100 | 7.594 | **3.063** | **3.076** | **2.913** | OK 3/3 |
 
-- 结论：100 门/100 DFF 三档 3 次全部 ≤5 ms（最差 3.154 ms，余量约 1.6×），`data/sim/delays.json` 的
-  `gdscript_gates/gdscript_dff/require_gdextension_above` 定为 **100**；`tests/test_data.gd` 同步断言。
-- 内容侧硬约束（M3-G15）：`CircuitEditor.max_gates` 默认取 `SimDelays.gdscript_gate_limit()`（关卡更严的值继续生效，
-  但不能超过 100）；超限不落门、状态栏显示"…该电路需要结构级表示"，`build_sim()` 返回
-  `{ok:false, error:"needs_structural_representation"}`，不做静默截断。`tests/test_circuit.gd` 新增 7 项断言锁住。
-- 全量回归：**1419 checks, 0 failures**（1410 基线 + 9 项：上限/提示/断言与数据字段）。
+- 结论：100 门/100 DFF 三档 3 次全部 ≤5 ms（最差 3.154 ms，余量约 1.6×）。**交互限值不据此抬高**：
+  按仿真组硬约束（2026-11-04 接口对齐）`gdscript_gates/gdscript_dff = 50/50`、`require_gdextension_above = 80`，
+  超过 80 构建期 `IFZ_E_SCALE`；`tests/test_data.gd` 同步断言。100 档实测只作性能余量记录。
+- 内容侧硬约束（M3-G15）：`CircuitEditor.max_gates` 默认取 `SimDelays.gdscript_gate_limit()`（50），
+  可显式放宽到 `gdscript_gate_hard_cap()`（80）；超关卡上限不落门、状态栏显示"…该电路需要结构级表示"，
+  `build_sim()` 返回 `needs_structural_representation`；超 80 返回 `IFZ_E_SCALE`，不做静默截断。
+- 全量回归：**1449 checks, 0 failures**（1410 基线 + OPT 9 项 + T1 DFF 30 项）。
 - 只读文档：`docs/simulation/` 的 200 门估算**未改**，偏差见 §3 第 15 行，由仿真组修正。
+
+### 2.8 T2 L3 时序器件 + L2 参考向量（2026-11-04）
+
+- 器件（`src/sim/sim_sequential.gd`，全部复用 `SimDff`）：
+  - `create_register`：W 个 DFF，初值 0，`p.d<i>` 为输入、`p.q<i>` 为输出；
+  - `create_counter`：寄存器 + 紧凑自增链（`q0' = !q0`、`qi' = qi ^ carry`、`ci = qi & carry`），
+    共 `2W-2` 个组合门（8 位 = 14 门）+ `W` 个 DFF，而非参考实现的 104 门展开，故 8 位计数器**不超限**；
+  - `create_shift_register`：`q<i>` 由 `q<i-1>`/`din` 在时钟沿串行移入。
+  - `drive_clock(sim, wire, period, cycles, high_ticks=-1, start_tick=-1)`：period 强制偶数，
+    采用**绝对 tick** 相位（`base + i*p`），避免读到滞后 `now()` 造成的 t=0 伪 setup 违例。
+- 计数器周期**实测裁决**（`SimSequential.measure_counter_period`，`tests/test_l3.gd::_test_counter_period`
+  断言 14/26）：扫描偶数周期，取满足"无 `METASTABLE` 记录 + 连续两个完整周期（4 位扫 34 个沿、8 位扫 514 个沿）
+  每个采样点都等于 `k mod 2^W`"的最小值。结果：**4 位 14 tick、8 位 26 tick**（见偏差 16）。
+- L2 参考向量（`tests/test_l2_vectors.gd`，只读读 `docs/simulation/ref/vectors/l2_vectors.json`）：
+  校验 `format == "ifz-l2-vectors/1"`、行数 9 / 27 / 37 / 27 / 5、`gate_delay` 与本工程 `SimDelays.delay` 一致，
+  再逐行比对 **105/105**：HA 9、FA 27、ripple8 37、mux2 27、mux4 5（`mux4` 行字段序为 `[d0..d3, s1, s0, y]`）。
+  `decoder3` 10 / `comparator4` 17 / `alu4` 8 **未比对**：对应 `SimModule` 未实现，且 ALU 166 门超 80 硬上限，
+  按接口对齐结论须走宏单元（偏差 17）。
+- 全量回归：**1493 checks, 0 failures**（比 T1 的 1452 项新增 41 项：器件/周期 + 向量 + 上限对齐断言）。
+  `tests/test_data.gd` 同步断言 `limits` 50/50/80 与 `delays.json` 的 `l3.counter4_min_period=14` / `counter8_min_period=26`。
 
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
@@ -200,7 +221,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 12 | 首位玩家初始资源 | 初始金币 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_gold/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
 | 13 | 货币单位 | 货币单位曾是 `scrap`（废铁），已按负责人裁决改为 **`gold`（金币，单位 g）**；`scrap` 降级为普通材料/回收物（`kind=material`）；旧档通过存档 v3 迁移（`scrap`→`gold`）兼容 | 与 `docs/design/03` §3「金币 g」口径统一；单字货币让材料与通货语义混淆 |
 | 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限取 **50 门/50 DFF**（p95 3.32–4.03 ms）。细化档 70 门 4.69 ms 仍达标、80 门 5.39 ms 超限；因复跑存在抖动（早先一轮 60 门曾 5.03 ms），限值保守定为 50。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
-| 15 | 仿真文档估算 **200 门**/200 DFF（`docs/simulation/06`） | 实测两档：**优化前 50**（100 门 p95 7.6 ms、200 门 17.6 ms）；**实现层优化后 100**（100 门 3 次 p95 2.91–3.08 ms、400 帧）。上限已写 `gdscript_gates/gdscript_dff/require_gdextension_above = 100`，内容侧编辑器同源卡死，超限提示"该电路需要结构级表示" | 200 是未验证的估算；GDScript 解释执行、无 JIT，热路径（每事件字典 + `Callable.callv` + 闭包订阅）是瓶颈；优化后余量仅约 1.6×，不做 200 的承诺。**`docs/simulation/` 不改**，由仿真组据本行修正 |
+| 15 | 仿真文档估算 **200 门**/200 DFF（`docs/simulation/06`） | 实测三档：优化前 100 门 p95 7.6 ms、200 门 17.6 ms；**实现层优化后 100 门 3 次 p95 2.91–3.08 ms**（400 帧）。交互限值按仿真组硬约束取 **50 默认 / 80 绝对**（超 80 → `IFZ_E_SCALE`），编辑器同源卡死并由 `test_data`/`test_circuit` 断言 | 200 是未验证的估算；GDScript 解释执行、无 JIT，优化后 100 档仍有约 1.6× 余量，但**交互上限不再按性能余量抬高**，以仿真组 50/80 硬约束为准。**`docs/simulation/` 不改**，由仿真组据本行修正 |
+| 16 | 计数器最小时钟周期：仿真组 L3 写 `period ≥ 6W+9`（4 位 33、8 位 57，8 位取 70）；本工程上一轮结构推导 `6W+20`（4 位 44） | **以真实 `SimCircuit` 实测裁决：4 位 14、8 位 26**（`SimSequential.measure_counter_period`；判据 = 偶数周期 + 无 `METASTABLE` + 连续两个完整周期逐沿值正确，4 位扫 34 沿、8 位扫 514 沿）。写回 `data/sim/delays.json` 的 `l3.counter4/8_min_period`，`test_l3`/`test_data` 断言 | 我们的计数器是紧凑自增链（`2W-2` 组合门 + `W` DFF，8 位仅 14 门），不是参考实现的 104 门展开；`6W+9`/`6W+20` 都是按展开结构估的。**`docs/simulation/` 不改**，由仿真组据本行修正 |
+| 17 | 仿真组 L2 参考向量 143 行（HA 9 / FA 27 / ripple8 37 / mux2 27 / mux4 5 / decoder3 10 / comparator4 17 / alu4 8） | 已比对 **105/105**（HA/FA/ripple8/mux2/mux4 逐行全等）；`decoder3` 10、`comparator4` 17、`alu4` 8 **未比对**（`SimModule` 未提供这三个器件，且 ALU 166 门超 80 硬上限，按接口对齐须走宏单元） | M3 只交付 L3 时序器件与已有 L2 件；补 decoder3/comparator4 需新增模块与门数预算，ALU 已判定必须宏单元。留待 M4 或单独立项 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

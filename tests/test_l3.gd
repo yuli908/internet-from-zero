@@ -9,6 +9,10 @@ func run(ctx: TestContext) -> void:
 	_test_setup(ctx)
 	_test_hold(ctx)
 	_test_reset(ctx)
+	_test_register(ctx)
+	_test_shift_register(ctx)
+	_test_counter(ctx)
+	_test_counter_period(ctx)
 
 func _mk(name: String) -> SimCircuit:
 	var c := SimCircuit.new(name)
@@ -129,3 +133,78 @@ func _test_reset(ctx: TestContext) -> void:
 	ctx.check("reset: RESET 期间无采样违例", c.metastable.is_empty(), str(c.metastable))
 	c.run_until(17)
 	ctx.eq("reset: 撤销后恢复采样 D=1", c.probe("q"), SimValue.ONE)
+
+func _test_register(ctx: TestContext) -> void:
+	var c := SimCircuit.new("l3_reg")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	var r := SimSequential.create_register(c, "r", 4, "clk", "rst")
+	ctx.check("register: 构建成功", bool(r.get("ok", false)), str(r.get("error", "")))
+	var ins: Array = r["inputs"]
+	var q: Array = r["q"]
+	# D = 1011（d3..d0）
+	c.set_input(ins[0], SimValue.ONE)
+	c.set_input(ins[1], SimValue.ONE)
+	c.set_input(ins[2], SimValue.ZERO)
+	c.set_input(ins[3], SimValue.ONE)
+	c.run_until(4)
+	SimSequential.drive_clock(c, "clk", 10, 3, -1, 4)
+	c.run_until(7)
+	ctx.eq("register: d0 采样", c.probe(q[0]), SimValue.ONE)
+	ctx.eq("register: d1 采样", c.probe(q[1]), SimValue.ONE)
+	ctx.eq("register: d2 采样", c.probe(q[2]), SimValue.ZERO)
+	ctx.eq("register: d3 采样", c.probe(q[3]), SimValue.ONE)
+	c.set_input("rst", SimValue.ONE, 15)
+	c.run_until(26)
+	ctx.eq("register: 复位后 q3=0", c.probe(q[3]), SimValue.ZERO)
+	ctx.eq("register: 复位后 q0=0", c.probe(q[0]), SimValue.ZERO)
+	ctx.check("register: 无亚稳态", c.metastable.is_empty(), str(c.metastable))
+
+func _test_shift_register(ctx: TestContext) -> void:
+	var c := SimCircuit.new("l3_shift")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("din", SimValue.ZERO)
+	var r := SimSequential.create_shift_register(c, "s", 3, "din", "clk")
+	ctx.check("shift: 构建成功", bool(r.get("ok", false)), str(r.get("error", "")))
+	var q: Array = r["q"]
+	c.set_input("din", SimValue.ONE)
+	c.set_input("din", SimValue.ZERO, 8)
+	c.run_until(4)
+	SimSequential.drive_clock(c, "clk", 10, 4, -1, 4)
+	c.run_until(7)
+	ctx.eq("shift: 第 1 沿后 q0=1", c.probe(q[0]), SimValue.ONE)
+	c.run_until(17)
+	ctx.eq("shift: q0 跟随新输入 0", c.probe(q[0]), SimValue.ZERO)
+	ctx.eq("shift: q1 收到旧值 1", c.probe(q[1]), SimValue.ONE)
+	c.run_until(27)
+	ctx.eq("shift: q2 依次传播 1", c.probe(q[2]), SimValue.ONE)
+	ctx.check("shift: 无亚稳态", c.metastable.is_empty(), str(c.metastable))
+
+func _test_counter(ctx: TestContext) -> void:
+	var c := SimCircuit.new("l3_counter")
+	c.add_wire("clk", SimValue.ZERO)
+	c.add_wire("rst", SimValue.ZERO)
+	var r := SimSequential.create_counter(c, "cnt", 4, "clk", "rst")
+	ctx.check("counter: 构建成功", bool(r.get("ok", false)), str(r.get("error", "")))
+	var q: Array = r["q"]
+	ctx.eq("counter: 4 位 Q", q.size(), 4)
+	c.set_input("rst", SimValue.ONE)
+	c.set_input("rst", SimValue.ZERO, 2)
+	c.run_until(4)
+	SimSequential.drive_clock(c, "clk", 20, 4, -1, 4)
+	c.run_until(19)
+	ctx.eq("counter: 第 1 沿后 = 1", SimSequential.read_value(c, q), 1)
+	c.run_until(39)
+	ctx.eq("counter: 第 2 沿后 = 2", SimSequential.read_value(c, q), 2)
+	c.run_until(59)
+	ctx.eq("counter: 第 3 沿后 = 3", SimSequential.read_value(c, q), 3)
+	ctx.check("counter: 无亚稳态", c.metastable.is_empty(), str(c.metastable))
+
+func _test_counter_period(ctx: TestContext) -> void:
+	## 周期实测：偶数 + 全周期扫描 + 无 METASTABLE + 逐沿正确。写回 data/sim/delays.json 的 `l3`。
+	var p4 := SimSequential.measure_counter_period(4)
+	ctx.check("counter4: 找到稳定周期", bool(p4.get("ok", false)), str(p4.get("error", "")))
+	ctx.eq("counter4: 最小偶数周期 = 14", int(p4.get("period", 0)), 14)
+	var p8 := SimSequential.measure_counter_period(8)
+	ctx.check("counter8: 找到稳定周期", bool(p8.get("ok", false)), str(p8.get("error", "")))
+	ctx.eq("counter8: 最小偶数周期 = 26", int(p8.get("period", 0)), 26)

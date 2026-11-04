@@ -24,11 +24,16 @@
   },
   "limits": {
     "max_events_per_tick": 20000,
-    "gdscript_gates": 100,
-    "gdscript_dff": 100,
-    "require_gdextension_above": 100
+    "gdscript_gates": 50,
+    "gdscript_dff": 50,
+    "require_gdextension_above": 80
   },
-  "bench_note": "2026-11-04 两轮实测（bench_sim.gd，每 tick 全门翻转 + 每帧一个时钟沿）：优化前 50 门 p95≈3.3ms、100 门≈7.6ms、200 门≈17.6ms；实现层优化（fanout 表 + 整数门/线网表 + 合并事件堆）后 400 帧三次复跑：50 门 1.34/1.34/1.52ms，80 门 2.23/3.15/2.38ms，100 门 3.06/3.08/2.91ms。上限按实测取 100（3/3 次 ≤5ms）；更大规模走 GDExtension（M4）。仿真文档估算 200 未实测，偏差记在 docs/PROGRESS.md。",
+  "l3": {
+    "counter4_min_period": 14,
+    "counter8_min_period": 26,
+    "counter_period_note": "SimSequential.measure_counter_period 实测：偶数周期、全周期扫描（4 位 34 沿 / 8 位 514 沿）、无 METASTABLE、逐沿值正确。4 位=14、8 位=26；与仿真组 6W+9（4→33/8→57）的差异见 docs/PROGRESS.md 偏差表。"
+  },
+  "bench_note": "2026-11-04 两轮实测（bench_sim.gd，每 tick 全门翻转 + 每帧一个时钟沿）：优化前 50 门 p95≈3.3ms、100 门≈7.6ms、200 门≈17.6ms；实现层优化（fanout 表 + 整数门/线网表 + 合并事件堆）后 400 帧三次复跑：50 门 1.34/1.34/1.52ms，80 门 2.23/3.15/2.38ms，100 门 3.06/3.08/2.91ms。交互限值按仿真组硬约束取 50（默认）/ 80（绝对上限，超过构建期 IFZ_E_SCALE）；实测 100 档性能余量记在 docs/PROGRESS.md 偏差表，仿真文档估算 200 未实测。",
   "relay": {
     "delay_per_stage_ticks": 3,
     "note": "第一章继电器实现的教学延迟；L1 归一化门模型仍使用 gate_delay。"

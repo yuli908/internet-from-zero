@@ -42,12 +42,16 @@
    线网与门表改用 `PackedInt32Array` 等紧凑数组、事件队列批量出队（减少每事件 Dictionary 分配）。
    禁止借优化改三值语义、延迟表、`(tick, seq)` 全序或 `max_events_per_tick` 行为。
    证据：**50 / 80 / 100 三档各 3 次**、400 帧、4 tick/帧，给 p95 对比表（3 次全列，不取最优）。
-2. **100 到不了就写 50**：若实测 100 门三档仍 >5 ms，则把上限写回 `data/sim/delays.json` 的
-   `limits.gdscript_gates`（同 `gdscript_dff` / `require_gdextension_above`），并在 `PROGRESS.md` 偏差表记
-   「仿真文档估算 200 门，实测 50/100」及原因（热路径/解释器开销/GDScript 无 JIT），**不虚报到 200**。
-3. **内容侧硬约束**：玩家可搭建的门级电路上限 = 实测上限（`SimDelays.gdscript_gate_limit()` 单一来源，
-   编辑器与判卷共用）；超限时 UI 明确提示"**该电路需要结构级表示**"，且拒绝构建/判卷，不做静默截断。
-   更大的系统一律走宏单元 / 结构级（L2 模块、后续 L4+），与仿真文档「CPU 不展开成门」的结论一致。
+   （已实测：100 档 3 次 p95 = 3.06 / 3.08 / 2.91 ms，见 `PROGRESS.md` §2.7。性能余量只作记录，
+   **不据此抬高交互上限**——交互上限按仿真组硬约束，见下条。）
+2. **交互上限按仿真组硬约束（2026-11-04 接口对齐，覆盖原"100 或 50"条款）**：
+   门级交互**默认 50 门 / 50 DFF，绝对上限 80**；超过 80 在构建期返回 **`IFZ_E_SCALE`**，
+   禁止静默降采样或只画一部分门。`data/sim/delays.json` 的 `limits.gdscript_gates=50`、
+   `gdscript_dff=50`、`require_gdextension_above=80`；`PROGRESS.md` 偏差表同时记实测 100 与文档估算 200 的差异。
+3. **内容侧硬约束**：玩家可搭建的门级电路上限 = `SimDelays.gdscript_gate_limit()`（默认 50，
+   编辑器与判卷共用单一来源）；超限时 UI 明确提示"**该电路需要结构级表示**"并拒绝构建；
+   超过绝对上限 80 返回 `IFZ_E_SCALE`，不做静默截断。更大的系统一律走宏单元 / 结构级
+   （L2 模块、后续 L4+），与仿真文档「CPU 不展开成门」的结论一致。
 4. **只读文档不改**：`docs/simulation/` 的 200 门估算**不改**（仿真组文件），只在 `PROGRESS.md` 偏差表记录实测；
    M3 验收命令中不得出现修改 `docs/simulation/` 的步骤。
 5. 该条进入验收：**M3-G14**（优化性能三档×3 次）与 **M3-G15**（内容侧上限与 UI 提示）必须机器可判定。
@@ -183,8 +187,8 @@
 | **M3-G11** 性能预算 | 新场景（N 级 DFF 链 + 4 位计数器）p95 ≤5 ms @ 4 tick/帧；实测上限写回 `delays.json` 并由 `test_data` 断言 | `bench.ps1 -Scenario l3` | 声明档位 p95 ≤5.00 ms；上限与 `delays.json` 一致 |
 | **M3-G12** 奖励入库 | 重复完成不二次发；未知 item 整单拒绝；存档往返保留；`data/ch01_levels.json` 无改动 | `run_tests.ps1` + `git diff data/` | 4 条断言 + diff 为空 |
 | **M3-G13** 回归 | 原有 1410 项 + 新增 ≥60 项，0 失败；导入无 ERROR；截图冒烟无回归 | `run_tests.ps1`、`selfcheck.ps1`、`--editor --quit` | `FAILED 0`、`RESULT PASS` |
-| **M3-G14** 优化后门数上限 | 实现层优化后 50/80/100 三档、各 3 次、400 帧的 p95 实测；100 档 3/3 ≤5 ms 才算达标，否则按 §1.2 条 2 回写 50 | `bench.ps1 -Sizes "50,80,100" -Frames 400` ×3 | 表格保留 3 次原值；声明上限与 3 次 p95 一致（达标=100，否则=50） |
-| **M3-G15** 内容侧门数卡死 | 编辑器 `max_gates` 默认取自 `SimDelays.gdscript_gate_limit()`；超限时不落门、状态栏显示"该电路需要结构级表示"；`build_sim()` 超限返回 `ok=false` 且 `error=="needs_structural_representation"` | `run_tests.ps1`（`test_l3`/`test_circuit`） | 3 条断言：上限同源、超限拒绝、提示文案精确匹配 |
+| **M3-G14** 优化后门数上限 | 实现层优化后 50/80/100 三档、各 3 次、400 帧的 p95 实测；交互上限按仿真组硬约束取 50（默认）/ 80（绝对），与实测 100 的差异记入偏差表 | `bench.ps1 -Sizes "50,80,100" -Frames 400` ×3 | 表格保留 3 次原值；`limits` 三键 = 50/50/80；PROGRESS 偏差行含「文档估算 200 / 实测 100 / 交互取 50/80」 |
+| **M3-G15** 内容侧门数卡死 | 编辑器 `max_gates` 默认取 `SimDelays.gdscript_gate_limit()`（50），可放宽到 `gdscript_gate_hard_cap()`（80）；超关卡上限提示"该电路需要结构级表示"且 `build_sim()` 返回 `needs_structural_representation`；超 80 返回 `IFZ_E_SCALE` | `run_tests.ps1`（`test_l3`/`test_circuit`/`test_data`） | 5 条断言：上限同源、绝对上限同源、超限提示精确、两种错误码各 1 条 |
 
 失败处理：任一 Gate 未过 → 标"未完成/需人工"，写入 `docs/PROGRESS.md`，**不得调低阈值**；
 若设计阈值与实测冲突（如 §8 R1），只记录偏差，不改只读文档。
@@ -198,12 +202,32 @@
 - OPT 只做实现层替换：**fanout 邻接表 + 整数线网/门表（PackedInt32Array）+ 合并事件队列（整数堆）**；
   公开 API（`add_wire/add_gate/add_dff/bind/set_input/probe/history/snapshot/restore`）与语义保持不变。
 - 验收档位：50 / 80 / 100（门=DFF=N），每档 3 次、400 帧，p95 全列。
-  - **3/3 次 100 档 p95 ≤5.00 ms** → `gdscript_gates=100`，`require_gdextension_above=100`；
-  - 否则 `gdscript_gates=50`，并把 100 档的实测值原样写进 PROGRESS 偏差表（原因：GDScript 解释执行 + 无 JIT）。
+  - 实测结果：50 档 1.34/1.34/1.52 ms、80 档 2.23/3.15/2.38 ms、100 档 3.06/3.08/2.91 ms（3/3 ≤5 ms）。
+  - **交互限值不跟实测抬到 100**：按仿真组硬约束 `gdscript_gates=50`、`gdscript_dff=50`、
+    `require_gdextension_above=80`；实测 100 只作为"余量"记录在 PROGRESS 偏差表。
+  - 超过 80 构建期 `IFZ_E_SCALE`，禁止静默降采样或只画一部分门。
 
 ### 5.2 L3 场景预算（OPT 之后再做）
 
 - 预算不变：**5 ms/帧、4 tick/帧**（`docs/simulation/06`）。
+- **计数器周期（本项实测裁决，2026-11-04）**：`SimSequential.measure_counter_period()` 在真实 `SimCircuit` 上
+  按偶数周期逐档扫描，判据 = 无 METASTABLE + 全周期扫描逐沿值正确（4 位 34 沿、8 位 514 沿）：
+  - **4 位最小稳定周期 = 14**（仿真组 `6W+20=44`、`6W+9=33` 均偏保守）；
+  - **8 位最小稳定周期 = 26**（仿真组 `6W+9=57`，取 70 更保守）；
+  - 差异原因：我们的计数器是紧凑结构（`W-2` 个 AND 进位 + `W` 个 NOT/XOR，组合门合计 `2W-2`
+    （8 位 = 14 门）+ `W` 个 DFF），不是参考实现的 104 门展开；clk→Q=2、setup=2 与参考一致。写回 `data/sim/delays.json` 的 `l3`，
+    `tests/test_data.gd` 断言 14/26。只读文档不改，偏差记 `PROGRESS.md` 第 16 行。
+- 器件实测事件数（仿真组提供，作为预算参照，非本仓库实测）：
+  | 器件 | 门/DFF | 事件 | 占 5 ms |
+  |---|---|---|---|
+  | 8 位行波加法器 | 40 门 | 63 | 1.7% |
+  | 3→8 译码器 | 11 门 | 13 | 4.1% |
+  | 4 位比较器 | 33 门 | 48 | 7.5% |
+  | 4 位 ALU | 166 门 | — | **超限，必须宏单元** |
+  | 8 位计数器 | 104 门 | — | **超限，必须宏单元** |
+  | 8 位寄存器 | 8 DFF | 10 | — |
+  | UART | — | 12 | — |
+  结论：玩家门级电路只能承载"几十门"规模；计数器/ALU 必须走 `SimSequential` 宏单元，与 §1.2 条 3 一致。
 - 新场景与档位（N = DFF 级数）：
   1. `dff_chain`：N=10 / 20 / 30 / 40 / 50，每帧 4 tick，时钟 period=4；
   2. `counter`：4 位计数器 + 4 位寄存器 + 8 位选择器，period=50；
@@ -246,6 +270,9 @@
 | R7 | 第二章 8 种新判定 kind 不在 M3 | M3 只保证 TraceSink 的 `kind` 白名单可扩展（新增不改 schema） | 白名单集中定义，CH02 另立项加 kind |
 | R8 | 仿真文档估算 200 门，GDScript 实测 100 档可能仍 >5 ms | 优化后先测；到不了就按实测写 50，**不回写 200** | `PROGRESS.md` 偏差表记「文档估算 200，实测 50/100」+ 原因；`docs/simulation/` 不改，由仿真组修正 |
 | R9 | OPT 改热路径可能引入顺序/计数偏差 | fanout 保持"按建门顺序订阅"；`seq` 与通用事件共享同一自增源；`max_events_per_tick` 对合并队列同样生效 | G13 全量回归 + G1/G8 时序向量 + `test_sim` 的 1v4 tick 一致；事件顺序断言不变 |
+| R10 | 计数器周期：仿真组 `6W+9`（8 位 57，取 70） vs 我们结构推导 44 vs 实测 | **以实测为准**：4 位 14、8 位 26（偶数、无 METASTABLE、全周期逐沿正确）。原因：紧凑自增链 `2W-2` 组合门 + `W` DFF（8 位 14 门），非 104 门展开 | `data/sim/delays.json` 的 `l3` 写 14/26 并被 `test_data`/`test_l3` 断言；`docs/simulation/` 不改，差异记 PROGRESS 第 16 行 |
+| R11 | L2 参考向量 JSON 的字段顺序与本地模块声明不同（mux4 为 `[d(4),s1,s0,y]`） | 测试按 JSON 顺序显式映射到 `SimModule.inputs`，不改模块声明 | `test_l2_vectors` 5 组各全量通过（105 行） |
+| R12 | 仿真组 L2 向量 143 行含 `decoder3` 10 / `comparator4` 17 / `alu4` 8，本工程无对应 `SimModule` | 只比对已实现 5 组共 **105/105**；其余 35 行记为未覆盖（ALU 166 门 > 80 硬上限，只能宏单元） | 不新增超预算模块；缺口记 `PROGRESS.md` 第 17 行，留待 M4 |
 
 ## 9. 验收命令（批准后照此执行，不得换命令）
 

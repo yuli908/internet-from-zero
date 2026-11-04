@@ -37,9 +37,10 @@ func setup(inputs: Array, outputs: Array, palette_in: Array, max_gates_in: int =
 	graph = CircuitGraph.new()
 	palette = palette_in.duplicate()
 	selected_gate = str(palette[0]) if not palette.is_empty() else ""
-	# 关卡可以更严（如 12 门），但不能超过 GDScript 实测量；更严的上限照旧生效。
 	var cap := SimDelays.gdscript_gate_limit()
-	max_gates = cap if max_gates_in <= 0 else mini(max_gates_in, cap)
+	var hard := SimDelays.gdscript_gate_hard_cap()
+	# 关卡可以更严（如 12 门），也可以显式放宽到绝对上限 80，但不能越过绝对上限。
+	max_gates = cap if max_gates_in <= 0 else clampi(max_gates_in, 1, hard)
 	delay_per_gate = delay_in
 	var i := 0
 	for raw in inputs:
@@ -65,7 +66,9 @@ func evaluate() -> Dictionary:
 	return graph.evaluate()
 
 func build_sim() -> Dictionary:
-	# 超限不构建：要求走结构级（宏单元/L2 模块），不做静默截断。
+	# 超过绝对上限：显式 IFZ_E_SCALE（禁止静默降采样/只画一部分）；超过关卡上限：要求结构级。
+	if gate_count() > SimDelays.gdscript_gate_hard_cap():
+		return {"ok": false, "sim": null, "inputs": [], "outputs": [], "error": "IFZ_E_SCALE"}
 	if gate_count() > max_gates:
 		return {"ok": false, "sim": null, "inputs": [], "outputs": [], "error": "needs_structural_representation"}
 	return SimCircuit.build_graph(graph, delay_per_gate)

@@ -60,15 +60,17 @@ func run(ctx: TestContext) -> void:
 	ctx.check("wrong gate rejected", not bool(bad["ok"]))
 	ctx.eq("wrong gate rows", bad["rows"].size(), 4)
 
-	# M3-G15：内容侧门数上限（与 SimDelays 同源；超限拒绝并要求结构级表示）
-	ctx.check("gdscript gate limit is 100", SimDelays.gdscript_gate_limit() == 100)
+	# M3-G15：门级交互上限（默认 50 / 绝对上限 80，与 SimDelays 同源）
+	ctx.check("gdscript gate limit is 50", SimDelays.gdscript_gate_limit() == 50)
+	ctx.check("gdscript hard cap is 80", SimDelays.gdscript_gate_hard_cap() == 80)
 	var ed := CircuitEditor.new()
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"])
 	ctx.eq("editor cap from delays", ed.max_gates, SimDelays.gdscript_gate_limit())
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 500)
-	ctx.eq("editor cap clamped to measured", ed.max_gates, SimDelays.gdscript_gate_limit())
+	ctx.eq("editor cap clamped to hard cap", ed.max_gates, SimDelays.gdscript_gate_hard_cap())
 	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 8)
 	ctx.eq("editor cap keeps stricter lab limit", ed.max_gates, 8)
+	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"])
 	for i in range(SimDelays.gdscript_gate_limit() + 1):
 		ed.graph.add_gate("g%d" % i, LogicGates.Type.AND)
 	ed._on_left(Vector2(5, 300))
@@ -76,4 +78,10 @@ func run(ctx: TestContext) -> void:
 	var over := ed.build_sim()
 	ctx.check("over cap build rejected", not bool(over.get("ok", true)))
 	ctx.eq("over cap error", str(over.get("error", "")), "needs_structural_representation")
+	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 500)
+	for i in range(SimDelays.gdscript_gate_hard_cap() + 1):
+		ed.graph.add_gate("h%d" % i, LogicGates.Type.AND)
+	var huge := ed.build_sim()
+	ctx.check("hard cap build rejected", not bool(huge.get("ok", true)))
+	ctx.eq("hard cap error code", str(huge.get("error", "")), "IFZ_E_SCALE")
 	ed.free()
