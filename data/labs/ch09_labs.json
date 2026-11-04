@@ -1,0 +1,938 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/20-ch09-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T9.x-n 按课文提案落库；备路 ≤3 跳为初值未校准，挂 pending 不进分母。",
+  "pending_kinds": {
+    "coverage": "9.4 备路恢复 ≤3 跳是章规格初值，最终以数据侧阈值为准；无校准数据，先挂 pending 不进分母。"
+  },
+  "labs": {
+    "addressing": {
+      "id": "addressing",
+      "title": "编址 · 名字不能重",
+      "body": "地址 = 网络号 + 主机号；同网直送，跨网交网关，重地址必须被拒。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 名字重了，包就不知道该给谁",
+          "text": "8.3 抓包时，寻址层已经留了两个位置：从哪来、到哪去。可位置里填什么还没定。地址就是节点在网里的名字；同一张网里两台机用同一个名字，包该给谁就成了运气。唯一性不是规矩，是转发能成立的前提。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "4+4 · 我在哪张网、网里第几号",
+          "text": "把地址拆两半：前 4 位是网络号，后 4 位是主机号。网络号相同就在同一张子网，可以直接送；网络号不同，主机号再像也不是邻居，得交给网关。地址等于「我在哪张网」加「我在网里第几号」。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "划子网 · 先定网络号占几位",
+          "text": "划子网先定网络号占几位，本节固定 4+4。4 个节点分 2 张子网，就写两个网络号，每张网里主机号不重复。地址表逐行要能说出这行属于哪张网；说不出来，那只是四串看着像的字符。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "重地址 · 分配器必须拒收",
+          "text": "故意把同一地址配给两台机，再让分配器收表：必须拒收，并指出和哪台冲突。若照单全收，唯一性只是文档上的一句话；真跑起来两台会同时应答，包要么送错，要么两边都以为自己被叫到。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 两子网全通，重地址被拒",
+          "text": "验收：4 个节点分 2 张子网。四条同时——①地址表两网各 2 节点、网内主机号不重复；②同网互送成功；③跨网经网关成功；④复制地址被拒并报出冲突对象。地址表随本节产出；只交一张全合法的表，不给过。"
+        }
+      ],
+      "p1": "给 4 个节点写 4+4 地址、划 2 张子网，并制造一次重地址交表",
+      "p1_gates": [
+        "T9.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "在地址分配器里给 4 个节点写网络号与主机号，再复制一个地址交表",
+          "judge": "四条同时：①两网各 2 节点且网内不重复；②同网互送成功；③跨网经网关成功；④重地址被拒并报冲突对象",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "复制地址后照常收下，不发冲突提示",
+          "judge": "两台同时应答，包送错或双份送达；detail 写「重复地址未被拒」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T9.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "前 4 位 16 种 × 后 4 位 16 种",
+          "judge": "与机器值一致；不算 P1；detail 写「地址容量算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T9.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「转发要能唯一确定收件人，重名会让送达变成运气」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T9.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T9.1-1",
+          "title": "4 节点 2 子网，同网/跨网都通，重地址被拒",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "node",
+            "net",
+            "host"
+          ],
+          "unique_key": "node",
+          "expect_rows": [
+            {
+              "node": "n1",
+              "net": 1,
+              "host": 1
+            },
+            {
+              "node": "n2",
+              "net": 1,
+              "host": 2
+            },
+            {
+              "node": "n3",
+              "net": 2,
+              "host": 3
+            },
+            {
+              "node": "n4",
+              "net": 2,
+              "host": 4
+            }
+          ],
+          "expect_meta": {
+            "same_net_ok": true,
+            "cross_net_ok": true,
+            "dup_rejected": true,
+            "conflict_with": "n2"
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.1-2",
+          "title": "负例：重地址照收，两台同时应答",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "dup_check",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T9.1-3",
+          "title": "4+4 能表示多少地址",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 256,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T9.1-4",
+          "title": "地址为什么必须唯一",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "同一张网里两台机用同一个地址，最直接的后果是什么？",
+            "options": [
+              "转发无法唯一确定收件人，送达变成运气",
+              "两台机会自动协商改号",
+              "网络会自动扩大地址位宽",
+              "交换机把两台合并成一台"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先把网络号写对，再写主机号；4 个节点两张网，每张网的主机号从 1 起不重复。",
+      "misconception": "把「地址看起来像」当成唯一；唯一性要靠分配器拒收重复地址来证明。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "arp": {
+      "id": "arp",
+      "title": "ARP · 问一次，用一段时间",
+      "body": "请求广播、应答单播；解析结果进缓存，再次直发不再广播。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 有地址，还得知道对面那块网卡",
+          "text": "9.1 的地址是逻辑名，网卡只认硬件地址。要把帧送到对面那块网卡，先得知道它的硬件地址。问的办法不是查全图，而是在本地喊一声：谁是这个地址，请把硬件地址告诉我。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "广播问 · 对号的人才应答",
+          "text": "请求帧发广播：所有节点都收到，只有地址对得上的那台应答。广播不是大声喊，是发给所有人、请对号的人回答；不对号的节点看完就丢，不占回程。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "单播答 · 只回给提问者",
+          "text": "应答帧单播回提问者，只发给刚才问的那台。若应答也广播，每次解析全网都被打扰一遍。两帧字段要逐项对上：谁问、问的是谁、答的硬件地址是什么。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "缓存 · 问一次，用一段时间",
+          "text": "解析结果写进缓存：逻辑地址对应哪个硬件地址。下次直接查缓存、不再广播；缓存要有效期，否则对方换了网卡，你还按旧地址发。有效期以数据侧 ttl 为准，本节不写数。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 两帧字段全对，缓存命中",
+          "text": "验收：发一次解析，再连发两次。四条同时——①请求帧广播且目标地址正确；②应答帧单播回提问者；③两帧字段与发送端抓包逐项一致；④后两次走缓存、广播次数不再增加。抓包报告随本节产出。"
+        }
+      ],
+      "p1": "发一次解析并连发两次，抓两帧并验证缓存命中",
+      "p1_gates": [
+        "T9.1a-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "发请求帧、收应答帧、写缓存；再对同一目标发两次",
+          "judge": "四条同时：①请求帧广播、目标地址正确；②应答帧单播回提问者；③两帧字段与发送端一致；④后两次命中缓存、广播次数不增",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.1a-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "把应答帧的目标写成广播地址",
+          "judge": "抓包可见多份应答，无关节点被重复打扰；detail 写「应答帧广播」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T9.1a-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "同一目标连发 3 次，缓存有效期内广播应为 1 次",
+          "judge": "与机器计数一致；不算 P1；detail 写「广播次数/缓存命中算错」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T9.1a-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「提问时不知道对方是谁，只能用广播；应答已知提问者，单播才不打扰别人」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T9.1a-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T9.1a-1",
+          "title": "请求广播、应答单播、两帧字段一致、缓存命中",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "frame",
+            "src",
+            "dst",
+            "broadcast",
+            "unicast",
+            "hw"
+          ],
+          "expect_rows": [
+            {
+              "frame": "req",
+              "src": "n1",
+              "dst": "broadcast",
+              "broadcast": true,
+              "unicast": false,
+              "hw": "aa-bb"
+            },
+            {
+              "frame": "resp",
+              "src": "n2",
+              "dst": "n1",
+              "broadcast": false,
+              "unicast": true,
+              "hw": "aa-bb"
+            }
+          ],
+          "expect_meta": {
+            "fields_match": true,
+            "broadcasts": 1,
+            "cache_hits": 2
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.1a-2",
+          "title": "负例：应答也广播，多份应答打扰全网",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "frame",
+            "dst",
+            "copies",
+            "bystanders"
+          ],
+          "expect_rows": [
+            {
+              "frame": "resp",
+              "dst": "broadcast",
+              "copies": 3,
+              "bystanders": 2
+            }
+          ],
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T9.1a-3",
+          "title": "同一目标连发 3 次，广播次数",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 1,
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T9.1a-4",
+          "title": "为什么请求广播、应答单播",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "ARP 请求为什么用广播，而应答用单播？",
+            "options": [
+              "提问时不知道对方硬件地址，只能问所有人；应答已知提问者，单播才不打扰别人",
+              "广播更快，单播更慢",
+              "广播只能发一次，单播可以重发",
+              "单播不需要硬件地址"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先看请求帧的目的地址是不是广播，再看应答帧是不是只回到 n1；最后数广播次数。",
+      "misconception": "把「应答也广播」当成更稳妥；多份应答会让无关节点被重复打扰。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "switch": {
+      "id": "switch",
+      "title": "交换机 · 表是学出来的",
+      "body": "看源地址学端口，查目的地址转发；命中单发、未命中泛洪，表要收敛。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一根线不够四台机用",
+          "text": "四台机要连成一张网，共用一根线会撞：两台同时开口，电平叠在一起谁也听不清。交换机给每个节点一个口，收到帧按硬件地址判断该从哪个口送出去，而不是让所有人一起听。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "学习 · 看源地址，记下它在哪个口",
+          "text": "学习靠看源地址：帧从哪个口进来，就记下这个源地址在那个口。转发表从空开始，发得越多越准。它是从流量里学出来的，不是手工填的；手工填的表，节点一换口就全错。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "转发 · 命中单发，未命中泛洪",
+          "text": "转发靠查目的地址：命中就只从对应口单发；没命中就从除入口外的口都发一遍，等应答回来再学。广播帧照泛洪走。命中与泛洪，是交换机仅有的两种送法。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "收敛 · 表错一行就送错一家",
+          "text": "表要收敛：同一拓扑跑两遍，表项必须一致；地址与端口逐行对上，端口接反就会把帧送给错的邻居。表里有旧行、有错行，比没有表更危险，它会让错送看起来像正常。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 表收敛，且不送错口",
+          "text": "验收：4 口各接一台节点，先发一帧让它泛洪，再等应答学到表项。四条同时——①首帧从其余口泛洪；②应答后表中有该地址与端口；③逐行地址与端口和拓扑一致；④同拓扑重跑两遍表项一致。H08 四口交换机落袋。"
+        }
+      ],
+      "p1": "4 口各接一节点，首帧泛洪，应答后学表，同拓扑跑两遍",
+      "p1_gates": [
+        "T9.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "4 节点各接一口，首帧泛洪，应答后学表；同拓扑再跑一遍对照",
+          "judge": "四条同时：①首帧从其余口泛洪；②应答后表含该地址与端口；③逐行地址/端口与拓扑一致；④两遍表项一致",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "直接写一张「想当然」的转发表",
+          "judge": "节点换口后帧送错，表不随流量更新；detail 写「转发表非学习所得/端口错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T9.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "4 口交换机，入口占 1 个，泛洪应发 3 个口",
+          "judge": "与机器计数一致；不算 P1；detail 写「泛洪口数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T9.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「查目的硬件地址对应的端口；查不到才泛洪」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T9.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T9.2-1",
+          "title": "首帧泛洪、应答学表、逐行一致、两遍收敛",
+          "kind": "port_map",
+          "required": true,
+          "expect_rows": [
+            {
+              "addr": "n1",
+              "port": "p1"
+            },
+            {
+              "addr": "n2",
+              "port": "p2"
+            },
+            {
+              "addr": "n3",
+              "port": "p3"
+            },
+            {
+              "addr": "n4",
+              "port": "p4"
+            }
+          ],
+          "expect_meta": {
+            "flood_ports": 3,
+            "converged": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.2-2",
+          "title": "负例：手工填表，节点换口就送错",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "addr",
+            "port",
+            "learned",
+            "moved",
+            "misdelivered"
+          ],
+          "expect_rows": [
+            {
+              "addr": "n1",
+              "port": "p2",
+              "learned": false,
+              "moved": true,
+              "misdelivered": true
+            }
+          ],
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T9.2-3",
+          "title": "4 口交换机泛洪口数",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 3,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T9.2-4",
+          "title": "交换机按什么决定出端口",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "交换机收到一帧后，按什么决定从哪个口发出去？",
+            "options": [
+              "查目的硬件地址对应的端口；查不到才泛洪",
+              "永远从除入口外的所有口发",
+              "按源地址决定出口，目的地址只做记录",
+              "按 IP 地址查路由表"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先让首帧泛洪，再用应答帧的源地址学表；最后把两遍表逐行对比。",
+      "misconception": "把转发表当成手工配置；它必须从流量里学出来，才会随节点换口更新。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "router": {
+      "id": "router",
+      "title": "路由 · 只知道下一步",
+      "body": "路由表只存目的网与下一跳；TTL 逐跳减一，写错一行就成圈。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 出了子网，得有人指下一步",
+          "text": "9.1 说跨子网交给网关，只交代了一句。网关凭什么知道下一步？靠路由表：目的网络号对应下一跳。它不需要知道整张互联网，只需要知道这一包该交给谁。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "路由表 · 只存目的网与下一跳",
+          "text": "路由表每行三样：目的网络号、下一跳、跳数。收到包查目的网络，选最具体的那行，交给它的下一跳。查不到就丢并报不可达，不许猜一个近似的网送出去。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "逐跳 · TTL 每过一跳减一",
+          "text": "TTL 每过一台路由减一，到 0 就丢弃并报超跳。它防的是路由表写错形成的圈：没有 TTL，包会在几台路由之间转到永远，还把线路占满。递减是逐跳看得见的证据。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "写错一行 · 全连通立刻断",
+          "text": "把某行的下一跳写成指回自己，两台节点之间立刻不通，要等 TTL 归零才报出来。改回正确下一跳再跑，通路必须恢复。写错一行与改回一行，两件事都要能复现。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 全连通，TTL 逐跳递减",
+          "text": "验收：4 节点跨 2 张子网。四条同时——①全连通；②每条路径逐跳 TTL 减一；③TTL 归零的包被丢并报超跳；④故意写错一行后不通、改回后恢复。H09 路由器与路由表随本节产出。"
+        }
+      ],
+      "p1": "手填路由表，走通两子网并逐跳看 TTL",
+      "p1_gates": [
+        "T9.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "在路由表编辑器里填目的网/下一跳，逐跳抓包对照 TTL",
+          "judge": "四条同时：①4 节点跨 2 网全通；②逐跳 TTL 减 1；③归零包被丢并报超跳；④写错一行不通、改回恢复",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "把某行下一跳写成当前路由自己",
+          "judge": "成圈，包转到 TTL 归零才报超跳；detail 写「下一跳回指成圈」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T9.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "一条 3 跳路径，起点 TTL 至少要是 3 才不中途被丢",
+          "judge": "与机器值一致；不算 P1；detail 写「TTL 起点/递减算错」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T9.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「只知道目的网络对应的下一跳，不知道全图」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T9.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T9.3-1",
+          "title": "两子网全通、TTL 逐跳减一、归零丢弃、改回恢复",
+          "kind": "port_map",
+          "required": true,
+          "expect_rows": [
+            {
+              "addr": "net1",
+              "port": "direct"
+            },
+            {
+              "addr": "net2",
+              "port": "r2"
+            }
+          ],
+          "expect_meta": {
+            "all_connected": true,
+            "ttl_step_ok": true,
+            "ttl_zero_dropped": true,
+            "wrong_then_fixed": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.3-2",
+          "title": "负例：下一跳指回自己，包转到 TTL 归零",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "row",
+            "next_hop",
+            "loop",
+            "ttl_zero_reported"
+          ],
+          "expect_rows": [
+            {
+              "row": "net2",
+              "next_hop": "r1",
+              "loop": true,
+              "ttl_zero_reported": true
+            }
+          ],
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T9.3-3",
+          "title": "3 跳路径的 TTL 起点下限",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 3,
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T9.3-4",
+          "title": "路由器到底知道什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "路由表里通常只需要知道什么？",
+            "options": [
+              "目的网络对应的下一跳，不需要知道整张互联网",
+              "每个主机的硬件地址",
+              "全网每一根线的位置",
+              "每个包的完整内容"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先把两张网的直连路由写对，再补一条经网关的下一跳；每走一跳记一次 TTL。",
+      "misconception": "把路由表当成全网地图；它只回答「这一包下一步交给谁」。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "loop_recovery": {
+      "id": "loop_recovery",
+      "title": "环路 · 风暴与备份",
+      "body": "多接一根线成圈会起广播风暴；阻断后帧数回落，断主路时备路要接上。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 多接一根线做备份",
+          "text": "为了让一条线断了还有备份，人会在两台交换机之间多接一根。这根线一旦接成圈，广播帧就会在两台之间来回复制：从每个口出去，绕一圈又回来，再发一遍。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "广播风暴 · 帧自己生自己",
+          "text": "这就是广播风暴：帧自己生自己，数量越滚越大，端口全被占满，正常帧挤不进去。它不是线坏了，是拓扑成了圈。只看单帧永远正常，必须看帧数随时间的变化。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "阻断 · 分区，或停用一个口",
+          "text": "阻断有两条路：物理拔掉一条线做分区，或让交换机协商出一棵生成树、主动停用一个口。停用的口不废，留着当备份；主路断了，再把它启用。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "恢复 · 按跳数算，不按秒算",
+          "text": "恢复按跳数算：拔线造环、风暴、阻断、恢复，四步都要能重放。恢复路径超过 3 跳算没学会；3 跳是章规格的初值，最终以数据侧阈值为准。秒数会骗人，跳数不会。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 风暴阻断，≤3 跳恢复",
+          "text": "验收：四条同时——①造环后广播帧数持续增长且可复现；②阻断后帧数回落、正常帧恢复送达；③断主路后备路在 ≤3 跳内接上；④网络报告写出环的位置与被停用的口。网络报告随本节产出。"
+        }
+      ],
+      "p1": "造环、复现风暴、阻断并恢复，写出环位置与停用口",
+      "p1_gates": [
+        "T9.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P1",
+          "produce": "多接一根线成环，看帧数增长；拔线或生成树阻断；再断主路，让备路接上",
+          "judge": "四条同时：①帧数增长可复现；②阻断后帧数回落且正常帧送达；③备路 ≤3 跳接上；④报告写出环位置与停用口",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "先拔线再谈「阻断成功」",
+          "judge": "没有风暴数据，无法证明阻断有效；detail 写「未复现风暴，仅做分区」",
+          "codes": [
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T9.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "3 节点环 3 条边、4 节点环 4 条边，边数 ≥ 节点数即成圈",
+          "judge": "与机器值一致；不算 P1；detail 写「环的边数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T9.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「帧在环里被反复复制，数量随轮次增长，拓扑成圈才是因」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T9.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T9.4-1",
+          "title": "风暴可复现、阻断回落、备路 ≤3 跳、报告齐全",
+          "kind": "coverage",
+          "required": true,
+          "status": "pending",
+          "thresholds": {
+            "max_hops": {
+              "status": "pending",
+              "initial": 3,
+              "reason": "课文标明「3 跳是章规格的初值，最终以数据侧阈值为准」；本批无校准数据，不拍死。"
+            }
+          },
+          "pending_reason": "备路恢复 ≤3 跳是章规格初值，未校准；先挂 pending 不进分母，不以初值冒充定稿。",
+          "expect_cases": {
+            "storm_growth": true,
+            "storm_reproducible": true,
+            "block_falls": true,
+            "normal_delivered": true,
+            "backup_path_ok": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.4-2",
+          "title": "负例：只拔线，没有风暴数据",
+          "kind": "coverage",
+          "required": true,
+          "expect_cases": {
+            "no_storm_data": true,
+            "partition_only": true
+          },
+          "codes": [
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T9.4-3",
+          "title": "3 节点环的边数",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 3,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T9.4-4",
+          "title": "风暴为什么不是线坏了",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "广播风暴的直接原因是什么？",
+            "options": [
+              "帧在拓扑环里被反复复制，数量随轮次增长",
+              "某根网线断了",
+              "交换机端口速率太低",
+              "节点的 IP 地址重复"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先造环看帧数曲线，再阻断看曲线回落；最后断主路，数备路经过几跳。",
+      "misconception": "把「拔掉一根线」当成阻断实验；没有风暴前的帧数增长，就没有阻断有效的证据。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
