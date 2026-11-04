@@ -1,0 +1,802 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/22-ch11-lecture-copy.md",
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。操作码取自 data/labs/ch05_labs.json 的 MUD-8 十六条（02 §7.5 已落库），未手编。返回地址基址 0xF0 为【假设】，挂 pending 不进分母。",
+  "pending_kinds": {
+    "table": "11.3 返回地址基址 MEM[0xF0..] 在课文标【假设】，未定稿；先挂 pending 不进分母。"
+  },
+  "labs": {
+    "assembler": {
+      "id": "assembler",
+      "title": "机器码 ↔ 助记符 · 一张表来回翻",
+      "body": "16 位一条：高 8 位操作码、低 8 位操作数；名字与码要能双向对上。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 人写名字，机器只认 16 位",
+          "text": "CH10 让数据可靠到达；到 CH11 换一层：人写给人看的助记符，机器只认 16 位编码。两者之间不是翻译腔，是一张固定对照表：助记符、操作码、操作数各占哪几位。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "编码 · 16 位一条，字段照表拆",
+          "text": "16 位一条：[OPCODE 8b][OPERAND 8b]；数据 8 位，地址空间 256 B，PC 按字节步进。这些都在 02 的 MUD-8 表里，不另立。助记符只是这张表的可读名字，名字换了码不变。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "手工汇编 5 行 · 正反都要对",
+          "text": "手工汇编 5 行：先写助记符，再逐行查表填操作码与操作数。每一行都要能反查回助记符，正反两个方向都对，才叫一一对应；只背名字、写不出码，是背单词。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "错一行 · 整段当另一条指令跑",
+          "text": "操作码填错或操作数溢出字段，机器不会提示「你写错了」，它会当另一条指令照跑。汇编器的错误定位要报到行号与字段，而不是笼统「语法错」；5 行里错哪行，必须指得出来。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 5 行编码全对，且能反查",
+          "text": "验收：手写 5 行，逐行机器码全对。四条同时——①5 行编码与 02 §7.5 表逐字段一致；②每行能反查回助记符；③故意写错一行能报到行号与字段；④P01 汇编器落袋。只对 4 行、或只交助记符不交码，不给过。"
+        }
+      ],
+      "p1": "手写 5 行汇编，逐行填 16 位码并反查，故意错一行定位",
+      "p1_gates": [
+        "T11.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "在汇编编辑器写 5 行助记符，逐行填 16 位编码，再反查回助记符；故意改错一行交判定",
+          "judge": "四条同时：①5 行编码逐字段一致；②每行反查回同一助记符；③错行报到行号与字段；④P01 汇编器落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T11.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "名字写对但把操作码填成相邻那一行",
+          "judge": "机器当另一条指令跑，终值随之改变；detail 写「操作码错，指令被误译」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T11.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "操作码取高 8 位、操作数取低 8 位；按 02 表查该助记符的码",
+          "judge": "与机器拆出的 16 位一致；不算 P1；detail 写「操作码/操作数字段拆分错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T11.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「机器只认编码，人靠固定表在名字与码之间来回翻译」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T11.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T11.1-1",
+          "title": "5 行编码逐字段一致、能反查、错行报行号与字段",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "line",
+            "mnemonic",
+            "opcode",
+            "operand",
+            "code16"
+          ],
+          "expect_rows": [
+            {
+              "line": 1,
+              "mnemonic": "LDI",
+              "opcode": 3,
+              "operand": 5,
+              "code16": "0x0305"
+            },
+            {
+              "line": 2,
+              "mnemonic": "STA",
+              "opcode": 2,
+              "operand": 32,
+              "code16": "0x0220"
+            },
+            {
+              "line": 3,
+              "mnemonic": "LDA",
+              "opcode": 1,
+              "operand": 32,
+              "code16": "0x0120"
+            },
+            {
+              "line": 4,
+              "mnemonic": "ADD",
+              "opcode": 4,
+              "operand": 33,
+              "code16": "0x0421"
+            },
+            {
+              "line": 5,
+              "mnemonic": "OUT",
+              "opcode": 12,
+              "operand": 0,
+              "code16": "0x0C00"
+            }
+          ],
+          "expect_meta": {
+            "roundtrip": true,
+            "wrong_line": 4,
+            "wrong_field": "opcode",
+            "assembler_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T11.1-2",
+          "title": "负例：助记符对、操作码抄成相邻行",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "line",
+            "mnemonic",
+            "opcode",
+            "decoded",
+            "result_changed"
+          ],
+          "expect_rows": [
+            {
+              "line": 4,
+              "mnemonic": "ADD",
+              "opcode": 5,
+              "decoded": "SUB",
+              "result_changed": true
+            }
+          ],
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T11.1-3",
+          "title": "拆 ADD 0x21 的操作码与操作数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "opcode": 4,
+            "operand": 33
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T11.1-4",
+          "title": "为什么需要助记符对照表",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "既然机器只认 16 位编码，为什么还要助记符？",
+            "options": [
+              "机器只认编码，人靠固定表在名字与码之间来回翻译",
+              "助记符能被机器直接执行",
+              "助记符让程序变短",
+              "助记符可以替代操作数"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先把高 8 位与低 8 位分开写，再按 02 的表逐行对；反查要从码回到同一个名字。",
+      "misconception": "把「名字写对」当成汇编对了；操作码错一位，机器会当另一条指令照跑。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "branch_loop": {
+      "id": "branch_loop",
+      "title": "跳转与循环 · 条件看标志",
+      "body": "计数会减、条件看 Z/C；把 JZ 写成 JMP 就永远退不出。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 直线跑不完一圈",
+          "text": "直线程序只会从上往下跑一遍。循环要有两个东西：一个能改的计数、一个能改变 PC 的条件跳转。跳转不是「回到上面」，是把 PC 换成一个新地址。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "条件 · 跳不跳看 Z/C",
+          "text": "条件来自标志：ADD/SUB 置 Z/C，JZ 看 Z、JC 看 C。跳不跳由标志决定，不由「跑到第几行」决定。标志是 ALU 的副产物，不是循环自己另设的计数器。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "0..9 累加 · 每轮都要能重放",
+          "text": "0..9 累加：计数放一个内存格或 B，每轮加一次、减一次，用 JZ 或 JC 退出。循环体要能被重放：同一初值跑两遍，每轮的 A、计数、Z/C 都要一样。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "死循环 · 先查计数与条件",
+          "text": "死循环先查两处：计数有没有真的减，跳转条件有没有真的看标志。把 JZ 写成不问条件的 JMP，程序就永远不会退出；单步到第二圈就能看出来。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 0..9 与 3 组 N 全对",
+          "text": "验收：写 0..9 累加，再跑 3 组 N 求和。四条同时——①0..9 结果正确且逐轮可重放；②3 组 N 全对（N 以数据侧题库为准）；③跳转确由 Z/C 触发；④程序蓝图落袋。只对一组 N，不给过。"
+        }
+      ],
+      "p1": "写 0..9 累加，再跑 3 组 N 求和并单步重放",
+      "p1_gates": [
+        "T11.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "用计数、加法、减法与 JZ/JC 写循环，单步核对每轮的 A、计数与标志",
+          "judge": "四条同时：①0..9 结果正确且逐轮可重放；②3 组 N 全对；③跳转由 Z/C 触发；④程序蓝图落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T11.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "循环回边写成不问条件的 JMP",
+          "judge": "计数减到 0 仍继续，程序不退出；detail 写「无条件跳转，循环不终止」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T11.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "0+1+…+9 = 45；N 求和按 N(N+1)/2 核对",
+          "judge": "与机器终值一致；不算 P1；detail 写「累加结果算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T11.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「看 ALU 置的 Z/C 标志，不看行号或循环次数」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T11.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T11.2-1",
+          "title": "0..9 正确可重放、3 组 N 全对、Z/C 触发、蓝图落袋",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "case",
+            "sum",
+            "replay_ok",
+            "zc_ok"
+          ],
+          "expect_rows": [
+            {
+              "case": "0..9",
+              "sum": 45,
+              "replay_ok": true,
+              "zc_ok": true
+            },
+            {
+              "case": "N=4",
+              "sum": 10,
+              "replay_ok": true,
+              "zc_ok": true
+            },
+            {
+              "case": "N=7",
+              "sum": 28,
+              "replay_ok": true,
+              "zc_ok": true
+            },
+            {
+              "case": "N=10",
+              "sum": 55,
+              "replay_ok": true,
+              "zc_ok": true
+            }
+          ],
+          "expect_meta": {
+            "jz_triggered": true,
+            "jc_triggered": true,
+            "blueprint": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T11.2-2",
+          "title": "负例：JMP 代替 JZ，循环不终止",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "conditional_jump",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T11.2-3",
+          "title": "0..9 的累加结果",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 45,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T11.2-4",
+          "title": "条件跳转到底看什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "条件跳转到底看什么？",
+            "options": [
+              "看 ALU 置的 Z/C 标志，不看行号或循环次数",
+              "看当前是第几行",
+              "看已经循环了几次",
+              "看内存里有没有同名变量"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "每轮单步记 A、计数、Z/C 三个值；退出条件必须真的读标志。",
+      "misconception": "把「回到上面」当成条件跳转；JMP 不看标志，计数到 0 也照跳。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "stack_call": {
+      "id": "stack_call",
+      "title": "栈与调用 · 压多少弹多少",
+      "body": "返回地址压栈、A/B 传参；返回后 PC、栈顶、A/B 三样都要回来。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 跳过去，还得回得来",
+          "text": "调用不是跳过去就算完：跳过去之前得留下「回来时从哪继续」。返回地址必须存在一个不会被被调函数覆盖的地方，这就是栈；调用压一层，返回弹一层。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "约定 · A/B 传参，返回地址压 0xF0",
+          "text": "02 的调用约定：A/B 传参，返回地址压进 MEM[0xF0..]【假设】，Z/C 不跨调用保存。约定不是建议：调用方与被调方都按它放、按它取，才能接上。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "对称 · 压多少，弹多少",
+          "text": "压栈与出栈要对称：调用前压了什么，返回后必须原样恢复；多压一个、少弹一个，栈顶就错位，下一次返回会跳到别的地址。栈可视化要能看见每一层的地址与值。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "单步一次 · 三个值都要对",
+          "text": "单步走一次调用：进函数前记下返回地址与栈顶，函数里改 A/B，返回后核对 PC 是否落在返回地址、栈顶是否回到原处、A/B 是否按约定保留。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 返回地址检查通过",
+          "text": "验收：完成一次带栈的调用并单步核对。四条同时——①返回地址落在 MEM[0xF0..] 且与调用前记录一致；②返回后 PC 正好是下一条；③栈顶回到调用前位置；④知识卡写出压栈/出栈与 A/B 传参三件事。返回地址对不上，不给过。"
+        }
+      ],
+      "p1": "按约定压返回地址，调用一次并单步核对",
+      "p1_gates": [
+        "T11.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "按调用约定压返回地址、A/B 传参，调用一次再返回，单步记录 PC 与栈顶",
+          "judge": "四条同时：①返回地址落在 MEM[0xF0..] 且与记录一致；②返回后 PC 是下一条；③栈顶复原；④知识卡三件事写全",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T11.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "直接跳进函数，不留回程地址",
+          "judge": "返回时 PC 落到未知地址，程序跑飞；detail 写「未压返回地址，返回落点错」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T11.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "一次调用压 1 层、返回弹 1 层，净变化 0；两层嵌套峰值 2 层",
+          "judge": "与机器栈顶计数一致；不算 P1；detail 写「栈顶层数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T11.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「被调函数会复用寄存器与临时格，只有栈能按层保存并原样恢复」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T11.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T11.3-1",
+          "title": "返回地址与记录一致、PC 下一条、栈顶复原、知识卡齐全",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "thresholds": {
+            "ret_base": {
+              "status": "pending",
+              "initial": "0xF0",
+              "reason": "课文标【假设】：返回地址压进 MEM[0xF0..]，基址未在数据侧定稿。"
+            }
+          },
+          "pending_reason": "返回地址基址 MEM[0xF0..] 在课文标【假设】，未定稿；先挂 pending 不进分母，不以假设地址冒充真值。",
+          "keys": [
+            "depth",
+            "ret_addr",
+            "pc_after",
+            "sp_after",
+            "a",
+            "b"
+          ],
+          "expect_rows": [
+            {
+              "depth": 1,
+              "ret_addr": "0xF0",
+              "pc_after": "0x0016",
+              "sp_after": "0xF1",
+              "a": 7,
+              "b": 3
+            }
+          ],
+          "expect_meta": {
+            "recorded": true,
+            "stack_restored": true,
+            "card": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T11.3-2",
+          "title": "负例：调用前不压返回地址，返回跑飞",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "ret_push",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T11.3-3",
+          "title": "栈顶净变化与嵌套峰值",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "net_change": 0,
+            "peak": 2
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T11.3-4",
+          "title": "返回地址为什么必须进栈",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "返回地址为什么必须进栈？",
+            "options": [
+              "被调函数会复用寄存器与临时格，只有栈能按层保存并原样恢复",
+              "栈比寄存器更快",
+              "栈能自动算出返回地址",
+              "不进栈也能靠 PC 记住"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "进函数前记返回地址与栈顶，返回后逐项核对 PC、栈顶、A/B。",
+      "misconception": "把「跳过去」当成调用；没有回程地址，返回只能落到未知地址。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "debug_locate": {
+      "id": "debug_locate",
+      "title": "调试定位 · 把「不对」缩到一行",
+      "body": "断点停在该行之前，先 PC 再寄存器最后内存；三个故障都要报到行与值。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 「结果不对」不是线索",
+          "text": "程序跑错时，最没用的信息是「结果不对」。有用的是「从哪一拍开始不对」：寄存器、内存、标志三块面板加断点，就是把「不对」缩小到一行、一个值。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "断点 · 停在那一行之前",
+          "text": "断点不是暂停键：它让程序停在某一行之前，此时寄存器/内存/标志是那一行的输入。先记下停点的值，再单步过这一行，比较前后差，才知道这行做了什么。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "顺序 · 先 PC，再寄存器，最后内存",
+          "text": "定位顺序：先看 PC 有没有跑偏（跳转错），再看关键寄存器终值（运算/传参错），最后看内存格（存错地址或覆盖）。三类错因对应三块面板，不要一上来就全屏乱看。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "三个故障 · 报到行与值才算定位",
+          "text": "三个故障逐个定位：每个都要报到行号、寄存器或内存地址、断点前的值、期望值。只写「这里有 bug」不算定位；改完要重跑，确认原故障消失且别的输出不变。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 3 个故障全定位并修复",
+          "text": "验收：3 个故障全定位并修复。四条同时——①每个故障报到行号与具体值；②三个故障各用断点/单步走到；③修复后重跑通过且无回归；④调试报告落袋。只改对结果、说不出位置，不给过。"
+        }
+      ],
+      "p1": "对 3 个错程序下断点、单步、写报告并修复",
+      "p1_gates": [
+        "T11.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "对数据侧给定的 3 个错程序逐个下断点、单步、读寄存器/内存/标志，写调试报告并修复",
+          "judge": "四条同时：①每个故障报到行号与具体值；②三个都经断点/单步走到；③修复后重跑通过且无回归；④调试报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T11.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "不定位错行，直接把最终输出改成期望值",
+          "judge": "原故障仍在，换一组输入即复现；detail 写「改结果未定位，换输入即复现」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T11.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按停点值与单步后的值相减，差值应与该行语义一致",
+          "judge": "与机器读数一致；不算 P1；detail 写「断点前后差值算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T11.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「停在该行执行之前，此时面板显示的是这一行的输入」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T11.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T11.4-1",
+          "title": "3 个故障都报到行与值、经断点走到、修复无回归",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "id",
+            "line",
+            "panel",
+            "value_before",
+            "value_expected",
+            "fixed"
+          ],
+          "expect_rows": [
+            {
+              "id": "F1",
+              "line": 3,
+              "panel": "PC",
+              "value_before": "0x0008",
+              "value_expected": "0x000C",
+              "fixed": true
+            },
+            {
+              "id": "F2",
+              "line": 6,
+              "panel": "A",
+              "value_before": 10,
+              "value_expected": 15,
+              "fixed": true
+            },
+            {
+              "id": "F3",
+              "line": 9,
+              "panel": "MEM",
+              "value_before": "0x20",
+              "value_expected": "0x21",
+              "fixed": true
+            }
+          ],
+          "expect_meta": {
+            "breakpoints": 3,
+            "rerun_ok": true,
+            "no_regression": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T11.4-2",
+          "title": "负例：只把输出常量改对，不定位",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "locate",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T11.4-3",
+          "title": "断点前后 A 的差值",
+          "kind": "derived_number",
+          "required": true,
+          "expect": 5,
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T11.4-4",
+          "title": "断点停在哪一刻",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "断点停在哪一刻？",
+            "options": [
+              "停在该行执行之前，此时面板显示的是这一行的输入",
+              "停在该行执行之后，面板显示输出",
+              "停在程序结束前最后一次写寄存器",
+              "停在任意一拍，与行无关"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先看 PC 有没有跑偏，再看关键寄存器，最后看内存格；每处都记停点值与期望值。",
+      "misconception": "把「改到结果对」当成修好；换一组输入就复现，说明故障还在原地。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
