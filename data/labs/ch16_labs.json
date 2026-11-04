@@ -1,0 +1,782 @@
+{
+  "version": 2,
+  "source": "D:\\ai lm\\internet_from_zero\\docs\\curriculum\\27-ch16-lecture-copy.md",
+  "source_note": "段落按课件 §1–§4 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：端口 8080、连接表字段、事件循环、时延上限 30 ms、超时 50 ms。",
+  "pending_kinds": {
+    "table": "16.4「10 分钟内存不增长」是 02 的【假设·未校准】，无阈值与采样接口；T16.4-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "server_listen": {
+      "id": "server_listen",
+      "title": "监听与连接 · 服务器不关机",
+      "body": "服务器开端口、等连接、处理、回到等；连接有生命周期，每次迁移都要留痕。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 服务器是不肯关机的程序",
+          "text": "服务器和普通程序的第一差别是不退出：开端口、等连接、处理、回到等。只要还在监听，程序就得一直在。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "生命周期 · listen 到 close",
+          "text": "连接有生命周期：listen → accept → 已连接 → 关闭。状态机沿用 8.2 的握手与超时语义；端口 8080、连接表字段 {conn_id,state,since} 由数据侧定稿。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 两个客户端连上再断开",
+          "text": "做一遍：开一个端口，两个客户端各连一次再断开，看连接表与日志。每次状态迁移都要有记录，断开后表里要能查到它从哪一步走的。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 日志喊 listening，端口没开",
+          "text": "负例：日志打出「listening」，端口实际没开；连接表摆着不随断开更新。客户端连不上、表还显示在线——「只摆着不接线」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 连接状态机全对",
+          "text": "验收：连接状态机全对。四条同时——①端口真监听，客户端能连上；②状态迁移与日志逐步对得上；③断开后状态变 closed；④H10 服务器机箱落袋。只打印一行 listening，不给过。"
+        }
+      ],
+      "p1": "开 8080 端口，两个客户端连上再断开，逐条核对连接表与日志",
+      "p1_gates": [
+        "T16.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "开 8080 端口，两个客户端各连一次再断开，核对表与日志",
+          "judge": "四条同时：①端口真监听；②迁移与日志逐步对；③断开变 closed；④H10 机箱落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T16.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "日志打 listening，端口没开，表不随断开更新",
+          "judge": "客户端连不上、表仍在线；detail 写「只摆着不接线」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T16.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按 listen→accept→closed 数每个连接的迁移次数",
+          "judge": "与机器日志一致；不算 P1；detail 写「迁移数或状态序错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T16.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「不退出，开端口等连接」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T16.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T16.1-1",
+          "title": "两个连接的迁移、日志、断开状态逐条对上",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "conn_id",
+            "state",
+            "events",
+            "log_ok"
+          ],
+          "expect_rows": [
+            {
+              "conn_id": 1,
+              "state": "closed",
+              "events": 3,
+              "log_ok": true
+            },
+            {
+              "conn_id": 2,
+              "state": "closed",
+              "events": 3,
+              "log_ok": true
+            }
+          ],
+          "expect_meta": {
+            "port_open": true,
+            "transitions_match": true,
+            "closed_after": true,
+            "h10_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T16.1-2",
+          "title": "负例：日志喊 listening，端口没开",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "listen_open",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T16.1-3",
+          "title": "按 listen→accept→closed 算每个连接的迁移数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "conn1_migrations": 3,
+            "conn2_migrations": 3
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T16.1-4",
+          "title": "服务器和普通程序的第一差别",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "服务器和普通程序的第一差别是什么？",
+            "options": [
+              "不退出：开端口、等连接、处理、回到等",
+              "代码更长，文件更多",
+              "必须多线程才能跑",
+              "只能处理一个客户端"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记端口与连接表字段，再按 listen→accept→closed 逐步对。",
+      "misconception": "把「日志写了 listening」当成「端口开了」；连不上就是没监听。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "concurrency": {
+      "id": "concurrency",
+      "title": "并发 · 两个连接不能互相踩",
+      "body": "事件循环单线程持多个连接，状态互不串；共享计数必须走临界区，否则丢更新。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一个连接忙，别的不能干等",
+          "text": "一个连接忙，别的连接不能干等。并发模型二选一：线程（可被抢占）或事件循环（轮询就绪）。选哪个都行，但不能把两种说法混着讲。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "共享状态 · 锁串起临界区",
+          "text": "共享状态要保护：两个执行流同时改同一个计数，会丢更新。锁把这段临界区串起来；锁的粒度与调度顺序以数据侧为准，本文件不拍实现。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 先造竞态，再加锁复跑",
+          "text": "做一遍：两个客户端同时发请求，先不加锁跑一次，看到丢更新；再加锁复跑，计数正确且第二个连接不必等第一个结束。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 文档写并发，实际串行",
+          "text": "负例：文档写「支持并发」，实际单线程顺序处理，第一个连接阻塞时第二个一直等；或计数不加锁，两个自增只涨 1。必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 两连接不阻塞，竞态被锁住",
+          "text": "验收：两连接互不阻塞，竞态被锁住。四条同时——①两个连接并行处理；②阻塞一个不影响另一个；③临界区结果无丢更新；④P08 服务端骨架落袋。只连一个客户端，不给过。"
+        }
+      ],
+      "p1": "两个客户端同时改同一计数，对照加锁与不加锁的结果",
+      "p1_gates": [
+        "T16.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "两个客户端同时改同一计数，对照加锁与不加锁",
+          "judge": "四条同时：①两连接执行重叠；②互不阻塞；③加锁计数=2；④P08 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T16.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "并发面板摆着，调度仍串行执行",
+          "judge": "第二连接等到第一连接结束才动；detail 写「并发未发生」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T16.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "算两连接同时 +1 在加锁/不加锁下的终值",
+          "judge": "与机器一致；不算 P1；detail 写「竞态终值算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T16.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「读旧值再写回，后写覆盖先写」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T16.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T16.2-1",
+          "title": "两连接重叠执行、互不阻塞、共享计数正确",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "conn_id",
+            "start",
+            "end",
+            "critical"
+          ],
+          "expect_rows": [
+            {
+              "conn_id": 1,
+              "start": 0,
+              "end": 5,
+              "critical": 1
+            },
+            {
+              "conn_id": 2,
+              "start": 0,
+              "end": 5,
+              "critical": 1
+            }
+          ],
+          "expect_meta": {
+            "overlap": true,
+            "non_blocking": true,
+            "no_lost_update": true,
+            "p08_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T16.2-2",
+          "title": "负例：并发调度没接，两连接实际串行",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "concurrent_dispatch",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T16.2-3",
+          "title": "按加锁/不加锁算两连接同时 +1 的终值",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "counter_locked": 2,
+            "counter_unlocked": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T16.2-4",
+          "title": "竞态丢更新是怎么发生的",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "竞态丢更新是怎么发生的？",
+            "options": [
+              "两个连接同时读旧值再写回，后写的覆盖先写的",
+              "连接数超过 2 就一定丢",
+              "不加锁会让程序直接崩溃",
+              "事件循环只能跑一个连接"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记两个连接的起止时刻，再看临界区进出与计数。",
+      "misconception": "把「同时连上」当成「并发对了」；计数少 1 就是竞态没锁住。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "load_test": {
+      "id": "load_test",
+      "title": "压测 · 8 个请求要真发",
+      "body": "压测器逐条发请求、记响应与时延；报告要能复算，不能拿预置图表冒充。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 压测要给出可复算的数",
+          "text": "压测不是「跑一下看看」，是给出可复算的数：并发数、总请求、成功数、丢请求、时延分布。8 个并发是本节的最小规模。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "口径 · 什么算一次成功",
+          "text": "统计口径先定：一个请求从发出到收到完整响应算一次；超时算丢，响应错算失败。时延上限与超时阈值以数据侧为准，本文件不拍毫秒数。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 8 并发，记时延与丢请求",
+          "text": "做一遍：8 个客户端同时请求，记录 8/8 是否都正确响应，导出每个请求的时延与结果，形成压测报告。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 预置的「8/8」图表",
+          "text": "负例：压测面板只显示预置的「8/8、时延 20 ms」图表，实际没发 8 个请求。数字好看、请求不存在——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 8/8 正确且报告可复算",
+          "text": "验收：8/8 正确响应且报告可复算。四条同时——①真发 8 个并发请求；②8 条响应都正确；③时延与丢请求逐条记录；④压测报告落袋。只看预置图表，不给过。"
+        }
+      ],
+      "p1": "发 8 个并发请求，逐条记时延，导出可复算报告",
+      "p1_gates": [
+        "T16.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "发 8 个并发请求，逐条记结果与时延，导出报告",
+          "judge": "四条同时：①真发 8 个；②8 条响应正确；③时延与丢请求逐条记录；④报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T16.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "面板显示 8/8 与固定时延，服务端无请求日志",
+          "judge": "服务端请求数为 0；detail 写「预置图表未发请求」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T16.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按 8 条时延与 0.5 s 窗口算平均时延与吞吐",
+          "judge": "与机器一致；不算 P1；detail 写「均值或吞吐算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T16.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「超时没收到算丢，收到但错算失败」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T16.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T16.3-1",
+          "title": "8 条请求逐条记录：结果、状态、时延",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "req_id",
+            "ok",
+            "status",
+            "latency"
+          ],
+          "expect_rows": [
+            {
+              "req_id": 1,
+              "ok": true,
+              "status": 200,
+              "latency": 12
+            },
+            {
+              "req_id": 2,
+              "ok": true,
+              "status": 200,
+              "latency": 15
+            },
+            {
+              "req_id": 3,
+              "ok": true,
+              "status": 200,
+              "latency": 11
+            },
+            {
+              "req_id": 4,
+              "ok": true,
+              "status": 200,
+              "latency": 14
+            },
+            {
+              "req_id": 5,
+              "ok": true,
+              "status": 200,
+              "latency": 13
+            },
+            {
+              "req_id": 6,
+              "ok": true,
+              "status": 200,
+              "latency": 12
+            },
+            {
+              "req_id": 7,
+              "ok": true,
+              "status": 200,
+              "latency": 16
+            },
+            {
+              "req_id": 8,
+              "ok": true,
+              "status": 200,
+              "latency": 11
+            }
+          ],
+          "expect_meta": {
+            "real_requests": true,
+            "all_ok": true,
+            "latency_logged": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T16.3-2",
+          "title": "负例：预置图表，未真发请求",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "send_requests",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T16.3-3",
+          "title": "按 8 条时延与 0.5 s 窗口算均值与吞吐",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "avg_latency": 13,
+            "throughput": 16
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T16.3-4",
+          "title": "丢请求与响应错怎么分",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "丢请求与响应错怎么分？",
+            "options": [
+              "超时没收到算丢；收到但内容或状态错算失败",
+              "两者都算丢请求",
+              "两者都算响应错",
+              "只看最终 8/8 的数字，过程不用分"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记 8 条时延，再算平均与吞吐；丢请求与响应错分两栏。",
+      "misconception": "把「面板显示 8/8」当成「真发了 8 个」；服务端请求数为 0 就是预置图表。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "resident_cleanup": {
+      "id": "resident_cleanup",
+      "title": "常驻与清理 · 断开后自己收",
+      "body": "客户端被杀不会打招呼，服务端靠超时发现；≤5 秒回收槽位，长期运行内存不涨。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 断开和残留都得自己收",
+          "text": "服务端要长期开着，断开和残留都得自己收。客户端被杀不会打招呼，服务端只能靠超时发现，再把连接与占用的资源放掉。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "口径 · 5 秒清理，10 分钟不涨",
+          "text": "清理口径：断开后 ≤5 秒内连接表变 closed 并释放槽位；连续运行 10 分钟内存不增长。10 分钟是 02 的【假设·未校准】，T16.4-1 挂 pending。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 杀掉客户端，盯回收",
+          "text": "做一遍：连上、杀掉客户端进程，盯连接表与内存基线；等到超时，确认槽位回收。再挂 10 分钟，比较起止内存。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 日志说已清理，表一直不减",
+          "text": "负例：日志写「已清理」，连接表条目却一直不减，内存随连接数上涨。表没回收、数字在涨——「只摆着」必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 5 秒清理，10 分钟无增长",
+          "text": "验收：≤5 秒清理，10 分钟无增长。四条同时——①断开后 5 秒内状态 closed；②槽位与句柄释放；③10 分钟内存不涨；④H12 电源落袋。只打日志不回收，不给过。"
+        }
+      ],
+      "p1": "杀掉客户端，盯连接表与内存采样，确认 5 秒内回收",
+      "p1_gates": [
+        "T16.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "杀掉客户端，记录断开时刻、连接表状态与内存起止采样",
+          "judge": "四条同时：①5 秒内 closed；②槽位/句柄释放；③10 分钟内存不涨；④H12 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T16.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "打印「已清理」，条目与内存都不回落",
+          "judge": "表条目数不变、内存上涨；detail 写「仅日志未释放」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T16.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按断开时刻与起止采样算 closed 时刻、内存与槽位增量",
+          "judge": "与机器采样一致；不算 P1；detail 写「基线或增量算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T16.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「客户端被杀不通知，只能靠超时发现」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T16.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T16.4-1",
+          "title": "断开后 5 秒内 closed、槽位释放、10 分钟内存不涨",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "「10 分钟内存不增长」是 02 的【假设·未校准】，数据侧无定稿阈值与长时采样接口；不以假设阈值冒充。",
+          "thresholds": {
+            "mem_baseline": {
+              "status": "pending",
+              "initial": "delta=0",
+              "reason": "10 分钟采样窗口与基线未给；仅判 5 秒回收。"
+            }
+          },
+          "keys": [
+            "conn_id",
+            "closed_at",
+            "slots_free",
+            "mem_delta"
+          ],
+          "expect_rows": [
+            {
+              "conn_id": 1,
+              "closed_at": 3,
+              "slots_free": 1,
+              "mem_delta": 0
+            }
+          ],
+          "expect_meta": {
+            "closed_within_5s": true,
+            "slots_released": true,
+            "mem_stable": true,
+            "h12_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T16.4-2",
+          "title": "负例：日志说已清理，连接表与内存都不降",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "slot_release",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T16.4-3",
+          "title": "按断开时刻与起止采样算 closed 时刻、内存与槽位增量",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "closed_at": 3,
+            "mem_delta": 0,
+            "slot_delta": -1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T16.4-4",
+          "title": "为什么必须靠超时清理",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么必须靠超时清理？",
+            "options": [
+              "客户端被杀不会通知服务端，只能由服务端超时发现并回收",
+              "超时清理比客户端主动断开更快",
+              "不超时清理连接会自动变成文件",
+              "超时只是日志标记，不影响资源"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记断开时刻与 closed 时刻，再比起止内存与连接数。",
+      "misconception": "把「日志说已清理」当成「表已回收」；条目不减就是没释放。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
