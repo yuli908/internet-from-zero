@@ -21,6 +21,34 @@ const BUILD_AREA_GATE_BUDGET := 8
 ## 面积按"展开后"统计：一个成品 XOR = NOT 1 + AND 1 + OR 1 + XOR 4。
 const GATE_EXPAND_WEIGHTS := {LogicGates.Type.XOR: 4}
 
+static func deferred_gates(cfg: Dictionary, lab_status: String = "ready") -> Dictionary:
+	## 只读分母接口（UI 用）：`content_status` 非 "ready" 的 gate 不进分母、不进进度条。
+	## gate 级字段缺省时回落到旧字段 `status`，再缺省视为 ready；`lab_status` 传整节状态，
+	## 整节 deferred 时全部 gate 不进分母（沿用既有裁决）。ready 后自动回到分母，无需迁移存档。
+	var ids := []
+	var all_ids := []
+	var total := 0
+	for raw in cfg.get("gate_cases", []):
+		if not (raw is Dictionary):
+			continue
+		total += 1
+		var cid := str(raw.get("id", ""))
+		all_ids.append(cid)
+		if _gate_content_status(raw) != "ready":
+			ids.append(cid)
+	if lab_status != "ready":
+		return {"total": total, "counted": 0, "deferred": total,
+			"ids": all_ids, "section_deferred": true}
+	return {"total": total, "counted": total - ids.size(), "deferred": ids.size(),
+		"ids": ids, "section_deferred": false}
+
+static func _gate_content_status(c: Dictionary) -> String:
+	if c.has("content_status"):
+		return str(c["content_status"])
+	if c.has("status"):
+		return "ready" if str(c["status"]) == "ready" else str(c["status"])
+	return "ready"
+
 static func run(_lab_id: String, cfg: Dictionary, inputs: Dictionary = {}, tracker: GateAttemptTracker = null) -> Dictionary:
 	var rep := GateReport.new()
 	var pending := []
@@ -90,7 +118,7 @@ static func id_ua_of(vgs: float, vds: float, dev: Dictionary) -> float:
 	if region == "linear":
 		var ron := float(dev.get("ron_ohm", 50.0))
 		return vds / ron * 1e6
-	return float(dev.get("id_sat_ua", 1000.0))
+	return float(dev.get("id_sat_ua", 5000.0))
 
 static func _judge_region(rep: GateReport, tracker: GateAttemptTracker, sim: SimCircuit,
 		cfg: Dictionary, c: Dictionary, cid: String, title: String, required: bool, answers: Dictionary) -> void:
@@ -353,12 +381,11 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 	var slots := int(c.get("slots", 4))
 	var budget := int(c.get("max_total_gates", BUILD_AREA_GATE_BUDGET))
 	var targets: Array = c.get("targets", [])
-	var ok := targets.size() <= slots
+	var ok := true
 	var lines := []
 	var code := GateResult.OK
-	if targets.size() > slots:
-		code = GateResult.E_AREA
 	var total_gates := 0
+	var occupied := 0
 	for raw in targets:
 		var t: Dictionary = {}
 		if raw is Dictionary:
@@ -368,6 +395,8 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 			t = {"id": name, "target": name, "input_ids": ["a"] if name == "not" else ["a", "b"]}
 		var tid := str(t.get("id", ""))
 		var g: CircuitGraph = graphs.get(tid, null)
+		# 槽位按“顶层器件”计：一个成品门占 1 槽，用 NAND 拼出来的 XOR 占 4 槽。
+		occupied += (g.gate_ids().size() if g != null else 0)
 		var res := BlackBox.check_target(g, str(t.get("target", "")), t.get("input_ids", ["a", "b"]), ["out"])
 		var used := expanded_gate_count(g)
 		total_gates += used
@@ -378,13 +407,17 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 			ok = false
 			if code == GateResult.OK:
 				code = int(res.get("code", GateResult.E_TARGET_UNREACHED))
+	if occupied > slots:
+		ok = false
+		code = GateResult.E_AREA
+		lines.append("槽位 %d>%d" % [occupied, slots])
 	if budget >= 0 and total_gates > budget:
 		ok = false
 		code = GateResult.E_AREA
 		lines.append("总门数 %d>%d" % [total_gates, budget])
 	LabChecks._emit(rep, tracker, code, cid, title, ok, {"slots": slots, "max_total_gates": budget},
-		"%d/%d 槽，总门数 ≤%d" % [targets.size(), slots, budget], lines,
-		"%s（%d 槽 / %d 目标 / %d 门）" % [", ".join(lines), slots, targets.size(), total_gates], required)
+		"占用 ≤%d 槽，总门数 ≤%d" % [slots, budget], lines,
+		"%s（%d 槽 / %d 占用 / %d 目标 / %d 门）" % [", ".join(lines), slots, occupied, targets.size(), total_gates], required)
 
 static func expanded_gate_count(graph: CircuitGraph) -> int:
 	## 面积/门数按"展开后"统计，而不是顶层件数：成品 XOR 记 4 个门。
