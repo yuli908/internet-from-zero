@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "format": "ifz-questions/1",
+  "chapter": "ch01",
+  "bank": "exercises",
+  "note": "M4 测试 fixture：只锁接口与校验行为，不是教学题目；正式题库等教学组 docs/curriculum/ 交付。",
+  "items": [
+    {
+      "id": "fx-choice",
+      "section": "1.1",
+      "task_ids": ["T-1.1"],
+      "type": "understanding",
+      "stem": "fixture：下列哪个门的输出在输入全 1 时为 0？",
+      "choices": ["AND", "OR", "NAND"],
+      "answer": 2,
+      "solutions": [
+        {"label": "解法 A", "approach": "按真值表逐项比对"},
+        {"label": "解法 B", "approach": "用德摩根律改写后判断"}
+      ],
+      "rubric": [{"dim": "结论", "weight": 100}],
+      "common_errors": ["把 NAND 与 AND 混同"],
+      "hints": []
+    },
+    {
+      "id": "fx-compute",
+      "section": "1.2",
+      "task_ids": ["T-1.2"],
+      "type": "compute",
+      "stem": "fixture：二进制 11₂ + 1₂ 的十进制结果是多少？",
+      "answer_value": 4,
+      "tol": 0.0,
+      "solutions": [
+        {"label": "解法 A", "approach": "先转十进制再相加"},
+        {"label": "解法 B", "approach": "列竖式逐位进位"}
+      ],
+      "rubric": [{"dim": "结果", "weight": 100}],
+      "common_errors": ["漏掉进位"],
+      "hints": ["写出每一位的位权"]
+    },
+    {
+      "id": "fx-build",
+      "section": "1.3",
+      "task_ids": ["T-1.3"],
+      "type": "build",
+      "stem": "fixture：搭建一个反相器并通过黑盒验收。",
+      "solutions": [
+        {"label": "解法 A", "approach": "单只 NOT 门"},
+        {"label": "解法 B", "approach": "NAND 两输入并联"}
+      ],
+      "rubric": [
+        {"dim": "验收正确性", "weight": 60},
+        {"dim": "结构说明", "weight": 40}
+      ],
+      "common_errors": ["输入悬空"],
+      "hints": []
+    }
+  ]
+}
