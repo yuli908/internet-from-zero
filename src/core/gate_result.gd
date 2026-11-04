@@ -3,8 +3,8 @@ extends RefCounted
 
 ## 结构化失败回传（M5 基础设施）。code 是稳定枚举（int），不是可变字符串。
 ## 每个失败结果统一形状：{code, gate_id, input, expected, actual, error_tags[], attempt}。
-## 映射来源：`docs/curriculum/05-failure-diagnostics.md`（教学组交付后按其重映射；
-## 该文件当前尚未入库，标签语义暂按六类首字母机器映射，见 `specs/m5/failure_contract.md`）。
+## 映射来源：`docs/curriculum/05-failure-diagnostics.md`（19 条 code 的教学组定稿；
+## 18–25 为 CH02 追加，不在该表内）。字段与精度见 `specs/m5/failure_contract.md`。
 
 const OK := 0
 const E_MISSING_GRAPH := 1
@@ -24,6 +24,15 @@ const E_QUIZ := 14
 const E_TARGET_UNREACHED := 15
 const E_GLITCH := 16
 const E_X_ROW := 17
+## CH02 新判定 kind 的 code（只增不改：18–24 为 M5 追加，25 为"暂不支持"标记）。
+const E_REGION := 18
+const E_STATIC_CURRENT := 19
+const E_RAIL_MARGIN := 20
+const E_EQUIV := 21
+const E_AREA := 22
+const E_POWER_CALC := 23
+const E_POWER_RATIO := 24
+const E_PENDING := 25
 const E_GENERIC := 99
 
 ## 六类错因标签（教学组口径）。
@@ -31,8 +40,8 @@ const TAG_K := "K"  # 概念/知识
 const TAG_S := "S"  # 结构/连线
 const TAG_C := "C"  # 计算/取值
 const TAG_P := "P"  # 步骤/流程
-const TAG_M := "M"  # 时序/亚稳
-const TAG_R := "R"  # 兜底（其余失败；待 05 文档确认语义）
+const TAG_M := "M"  # 建模层（含时序/亚稳/三值这类模型错误）
+const TAG_R := "R"  # 推理 + 技术兜底（4/5/10/99 只进日志，不进玩家提示阶梯）
 const TAGS := [TAG_K, TAG_S, TAG_C, TAG_P, TAG_M, TAG_R]
 
 const NAMES := {
@@ -54,6 +63,14 @@ const NAMES := {
 	E_TARGET_UNREACHED: "E_TARGET_UNREACHED",
 	E_GLITCH: "E_GLITCH",
 	E_X_ROW: "E_X_ROW",
+	E_REGION: "E_REGION",
+	E_STATIC_CURRENT: "E_STATIC_CURRENT",
+	E_RAIL_MARGIN: "E_RAIL_MARGIN",
+	E_EQUIV: "E_EQUIV",
+	E_AREA: "E_AREA",
+	E_POWER_CALC: "E_POWER_CALC",
+	E_POWER_RATIO: "E_POWER_RATIO",
+	E_PENDING: "E_PENDING",
 	E_GENERIC: "E_GENERIC",
 }
 
@@ -62,20 +79,28 @@ const TAG_MAP := {
 	E_MISSING_GRAPH: [TAG_S],
 	E_BUILD: [TAG_S],
 	E_UNCONNECTED: [TAG_S],
-	E_UNKNOWN_KIND: [TAG_P],
-	E_UNKNOWN_TARGET: [TAG_P],
-	E_TRUTH_ROW: [TAG_K, TAG_C],
-	E_TABLE_CELL: [TAG_K, TAG_C],
-	E_DELAY_EXCEED: [TAG_M],
-	E_DELAY_MISMATCH: [TAG_M],
-	E_OUTPUT_MISMATCH: [TAG_C],
-	E_STRUCTURE_SAME: [TAG_S],
+	E_UNKNOWN_KIND: [TAG_R],
+	E_UNKNOWN_TARGET: [TAG_R],
+	E_TRUTH_ROW: [TAG_K, TAG_S],
+	E_TABLE_CELL: [TAG_K],
+	E_DELAY_EXCEED: [TAG_M, TAG_S],
+	E_DELAY_MISMATCH: [TAG_M, TAG_R],
+	E_OUTPUT_MISMATCH: [TAG_R],
+	E_STRUCTURE_SAME: [TAG_S, TAG_P],
 	E_ENCAPSULATION: [TAG_P],
 	E_COVERAGE: [TAG_P],
 	E_QUIZ: [TAG_K],
-	E_TARGET_UNREACHED: [TAG_C],
-	E_GLITCH: [TAG_M],
+	E_TARGET_UNREACHED: [TAG_C, TAG_P],
+	E_GLITCH: [TAG_M, TAG_S],
 	E_X_ROW: [TAG_K, TAG_M],
+	E_REGION: [TAG_K, TAG_C],
+	E_STATIC_CURRENT: [TAG_C],
+	E_RAIL_MARGIN: [TAG_C],
+	E_EQUIV: [TAG_K, TAG_C],
+	E_AREA: [TAG_S, TAG_C],
+	E_POWER_CALC: [TAG_C, TAG_K],
+	E_POWER_RATIO: [TAG_C, TAG_K],
+	E_PENDING: [TAG_R],
 	E_GENERIC: [TAG_R],
 }
 
@@ -98,6 +123,14 @@ const DESCRIBE := {
 	E_TARGET_UNREACHED: "目标值尚未达成",
 	E_GLITCH: "毛刺仍存在或未达宽度",
 	E_X_ROW: "含 X 的用例失败",
+	E_REGION: "MOS 工作区判错",
+	E_STATIC_CURRENT: "静态电流超出上限",
+	E_RAIL_MARGIN: "输出电平未达轨到轨",
+	E_EQUIV: "与参考函数不等价",
+	E_AREA: "门数超出上限",
+	E_POWER_CALC: "功耗计算不符",
+	E_POWER_RATIO: "功耗比不符",
+	E_PENDING: "仿真层暂不支持（待接入）",
 	E_GENERIC: "未分类失败（已按兜底处理）",
 }
 

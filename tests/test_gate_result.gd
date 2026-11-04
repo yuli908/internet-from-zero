@@ -5,6 +5,8 @@ extends RefCounted
 func run(ctx: TestContext) -> void:
 	_result_contract(ctx)
 	_tag_mapping(ctx)
+	_tag_table_matches_doc(ctx)
+	_log_only_codes(ctx)
 	_unknown_code(ctx)
 	_attempts(ctx)
 	_report_shape(ctx)
@@ -46,10 +48,10 @@ func _tag_mapping(ctx: TestContext) -> void:
 	ctx.eq("ok no tags", GateResult.tags_for(GateResult.OK), [])
 	ctx.eq("unconnected -> S", GateResult.tags_for(GateResult.E_UNCONNECTED), ["S"])
 	ctx.eq("missing graph -> S", GateResult.tags_for(GateResult.E_MISSING_GRAPH), ["S"])
-	ctx.eq("truth row -> K,C", GateResult.tags_for(GateResult.E_TRUTH_ROW), ["K", "C"])
-	ctx.eq("table cell -> K,C", GateResult.tags_for(GateResult.E_TABLE_CELL), ["K", "C"])
-	ctx.eq("delay exceed -> M", GateResult.tags_for(GateResult.E_DELAY_EXCEED), ["M"])
-	ctx.eq("output mismatch -> C", GateResult.tags_for(GateResult.E_OUTPUT_MISMATCH), ["C"])
+	ctx.eq("truth row -> K,S", GateResult.tags_for(GateResult.E_TRUTH_ROW), ["K", "S"])
+	ctx.eq("table cell -> K", GateResult.tags_for(GateResult.E_TABLE_CELL), ["K"])
+	ctx.eq("delay exceed -> M,S", GateResult.tags_for(GateResult.E_DELAY_EXCEED), ["M", "S"])
+	ctx.eq("output mismatch -> R", GateResult.tags_for(GateResult.E_OUTPUT_MISMATCH), ["R"])
 	ctx.eq("coverage -> P", GateResult.tags_for(GateResult.E_COVERAGE), ["P"])
 	ctx.eq("quiz -> K", GateResult.tags_for(GateResult.E_QUIZ), ["K"])
 	ctx.eq("x row -> K,M", GateResult.tags_for(GateResult.E_X_ROW), ["K", "M"])
@@ -58,6 +60,33 @@ func _tag_mapping(ctx: TestContext) -> void:
 	for k in GateResult.TAG_MAP.keys():
 		for tag in GateResult.TAG_MAP[k]:
 			ctx.check("tag %s in six classes" % str(tag), (GateResult.TAGS as Array).has(str(tag)))
+
+func _tag_table_matches_doc(ctx: TestContext) -> void:
+	## 19 条 code 与 docs/curriculum/05-failure-diagnostics.md §1 硬编码对账。
+	var expected := {
+		0: [], 1: ["S"], 2: ["S"], 3: ["S"], 4: ["R"], 5: ["R"],
+		6: ["K", "S"], 7: ["K"], 8: ["M", "S"], 9: ["M", "R"],
+		10: ["R"], 11: ["S", "P"], 12: ["P"], 13: ["P"], 14: ["K"],
+		15: ["C", "P"], 16: ["M", "S"], 17: ["K", "M"], 99: ["R"],
+	}
+	ctx.eq("doc table size", expected.size(), 19)
+	for code in expected.keys():
+		ctx.eq("doc tags %d" % int(code), GateResult.tags_for(int(code)), expected[code])
+
+func _log_only_codes(ctx: TestContext) -> void:
+	## 4/5/10/99 属技术侧配置缺陷：挂 R 只为让六类闭合，只进日志、不进玩家阶梯。
+	## 不新增结构：可进阶梯的 code 由“至少有一个非 R 标签”判定。
+	var log_only := [4, 5, 10, 99]
+	var ladder := []
+	for k in GateResult.NAMES.keys():
+		if GateResult.tags_for(int(k)) != ["R"]:
+			ladder.append(int(k))
+	for c in log_only:
+		ctx.eq("log-only %d is pure R" % c, GateResult.tags_for(c), ["R"])
+		ctx.check("log-only %d not in ladder set" % c, not ladder.has(c))
+	for k in GateResult.NAMES.keys():
+		if GateResult.tags_for(int(k)) == ["R"]:
+			ctx.check("pure R only log-only (%d)" % int(k), log_only.has(int(k)) or int(k) == GateResult.E_PENDING)
 
 func _unknown_code(ctx: TestContext) -> void:
 	ctx.eq("normalize unknown", GateResult.normalize(12345), GateResult.E_GENERIC)
@@ -103,7 +132,7 @@ func _report_shape(ctx: TestContext) -> void:
 	rep.add_case(GateResult.E_TABLE_CELL, "T1.3-1", "AND 表", {"gate": "and", "row": 2}, 0, "1", [], "", true, 4)
 	var c2: Dictionary = rep.cases[1]
 	ctx.eq("add_case code", int(c2["code"]), GateResult.E_TABLE_CELL)
-	ctx.eq("add_case tags", c2["error_tags"], ["K", "C"])
+	ctx.eq("add_case tags", c2["error_tags"], ["K"])
 	ctx.eq("add_case attempt", int(c2["attempt"]), 4)
 	ctx.eq("failure codes", rep.failure_codes(), [GateResult.E_GENERIC, GateResult.E_TABLE_CELL])
 	var ok_rep := GateReport.new()
@@ -128,7 +157,7 @@ func _voltage(ctx: TestContext, cfg: Dictionary) -> void:
 	var r2 := LabChecks.voltage(bad)
 	var f := _case_of(r2, "T1.1-4")
 	ctx.eq("voltage fail code", int(f.get("code", -1)), GateResult.E_OUTPUT_MISMATCH)
-	ctx.eq("voltage fail tags", f.get("error_tags", []), ["C"])
+	ctx.eq("voltage fail tags", f.get("error_tags", []), ["R"])
 	ctx.close("voltage fail input v", float(f.get("input", {}).get("v", -1)), 0.85)
 	ctx.eq("voltage fail expected", str(f.get("expected", "")), "0")
 	ctx.eq("voltage fail actual", str(f.get("actual", "")), "X")
