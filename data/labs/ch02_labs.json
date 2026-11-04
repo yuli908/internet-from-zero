@@ -8,7 +8,7 @@
     "transistor": {
       "id": "transistor",
       "title": "2.1 三端开关",
-      "body": "一个继电器要靠线圈拉触点，慢、响、费电。换成一颗 MOSFET：栅极加电压，源漏之间就通。把四个测点按 Vds 从小到大排成一条看「先升后平」：① Vgs=3.3 V、Vds=0.2 V（线性，电流随 Vds 上升）；② Vgs=0 V、Vds=3.0 V（截止，基本无电流）；③ Vgs=3.3 V、Vds=3.0 V（饱和，封顶）；④ Vgs=3.3 V、Vds=6.0 V（仍是同一个封顶值，不再上涨）。",
+      "body": "一个继电器要靠线圈拉触点，慢、响、费电。换成一颗 MOSFET：栅压过阈值 0.9 V 才形成沟道，低于阈值截止。四个测点各测一组 (Vgs, Vds)，按截止/线性/饱和归三个区，不按 Vds 排序：① Vgs=3.3 V、Vds=0.2 V（线性，电流随 Vds 上升）；② Vgs=0 V、Vds=3.0 V（截止，基本无电流）；③ Vgs=3.3 V、Vds=3.0 V（饱和，封顶）；④ Vgs=3.3 V、Vds=6.0 V（仍是同一个封顶值，不再上涨）。",
       "measure_conditions": [
         {"gate": "T2.1-2", "vgs": 3.3, "vds": 0.2, "label": "线性"},
         {"gate": "T2.1-1", "vgs": 0.0, "vds": 3.0, "label": "截止"},
@@ -53,7 +53,7 @@
     "inverter": {
       "id": "inverter",
       "title": "2.2 两个管子造一个门",
-      "body": "上面一个 PMOS（栅极低时导通），下面一个 NMOS（栅极高时导通）。输入 0 时上面通、输出接电源；输入 1 时下面通、输出接地。两种稳态都只有一条通路有电流。",
+      "body": "上面一个 PMOS（栅极低时导通），下面一个 NMOS（栅极高时导通）。输入 0 时上面通、输出接电源；输入 1 时下面通、输出接地。两种稳态都只有一条通路，且电源到地那条被截止管切断，稳态电流 ≤1 µA。",
       "topology": {"pull_up": "pmos", "pull_down": "nmos", "inputs": ["a"], "outputs": ["y"]},
       "rail": {"v_high_min": 3.2, "v_low_max": 0.1, "vdd": 3.3, "ron_ohm": 50, "load_ohm": 2000},
       "static_current_max_ua": 1.0,
@@ -95,7 +95,7 @@
     "replace": {
       "id": "replace",
       "title": "2.4 把旧门换掉",
-      "body": "第一章你用 2 个非门 + 2 个门拼出 XOR。现在用 4 个 NAND 重做一遍：行为必须完全一致，但更快、更小、稳态不耗电。验收只看行为；结构由你决定。",
+      "body": "第一章你用 2 个非门 + 2 个门拼出 XOR。现在用 4 个 NAND 重做一遍：延迟 ≤8、门数 ≤5 是待验目标；静态电流暂无模型，标 pending，不当已知。行为等价是第一条，延迟、门数、静态电流同时看；结构自由，代价不自由。",
       "reference": "CH01 MY-XOR",
       "topology": {"inputs": ["a", "b"], "outputs": ["out"]},
       "max_gates": 5,

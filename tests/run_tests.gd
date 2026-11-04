@@ -37,9 +37,13 @@ const SUITES := [
 	"res://tests/test_teaching.gd",
 	"res://tests/test_ch01_sections.gd",
 	"res://tests/test_ch01_sections_ui.gd",
+	"res://tests/test_ch02_body.gd",
 ]
 
-# 声明的 check 数（2026-11-04 实测，总数 2962）。少一项即该 suite 判红。
+# TODO(下一轮，待 UI/数据两会话空闲后再做)：把各套件期望数从本文件挪到各自测试文件的
+# `const EXPECT := N`，总数改为运行时对已注册套件求和。这样每个会话只碰自己的文件，
+# 不再出现“提交前临时把别人的数字置回 HEAD、提交后再恢复”的风险。
+# 声明的 check 数（2026-11-04 实测，总数 2993）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
 	"test_bit_math": 27,
 	"test_logic_gates": 24,
@@ -66,10 +70,11 @@ const SUITE_EXPECT := {
 	"test_gate_result": 305,
 	"test_ch01_grants": 43,
 	"test_ch02": 100,
-	"test_denominator": 38,
+	"test_denominator": 46,
 	"test_teaching": 46,
 	"test_ch01_sections": 260,
 	"test_ch01_sections_ui": 250,
+	"test_ch02_body": 23,
 }
 
 const ABORT_PROBE := "res://tests/_abort_probe.gd"
