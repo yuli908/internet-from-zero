@@ -3,10 +3,10 @@ extends RefCounted
 ## M5 结构化失败回传：code 枚举、error_tags 映射、attempt 计数、每类 gate 的精度。
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 310
+const EXPECT := 315
 const EXPECT_GROUPS := {
-	"code_registry": 1, "per_code_contract": 87, "make_record": 15, "tag_mapping": 11,
-	"tag_map_six_classes": 40, "doc_tag_table": 20, "log_only": 13, "unknown_code": 6,
+	"code_registry": 1, "per_code_contract": 90, "make_record": 15, "tag_mapping": 11,
+	"tag_map_six_classes": 42, "doc_tag_table": 20, "log_only": 13, "unknown_code": 6,
 	"attempts": 13, "report_shape": 13, "voltage": 10, "binary": 12, "boolean": 22,
 	"gate": 18, "signal": 14, "half_adder": 15,
 }

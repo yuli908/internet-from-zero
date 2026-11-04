@@ -1,0 +1,147 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/15-ch03-lecture-copy.md",
+  "source_note": "课文为唯一事实源；21 段原样搬运，未改写。gate 号与 lab 名按课文提案写死（提案即落库）。",
+  "pending_kinds": {},
+  "labs": {
+    "full_adder": {
+      "id": "full_adder",
+      "title": "3.1 全加器",
+      "body": "半加器只有 A、B 两个输入，装不下低位送来的进位。全加器 = 2 只半加器 + 1 个或门：先算 A+B 得 s1、c1，再算 s1+Cin，两个进位互斥，用一只或门合并成 Cout。验收看 8 行，不是 4 行。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 半加器只差一个输入", "text": "1.6 的半加器只有两个输入：A 和 B。可加法是一列一位往上加的，低位算完会往高位送一个进位；到第二位，要被加的是三个数——A、B，加上低位送来的进位。半加器没有第三个口，装不下它。所以全加器不是新电路，是半加器多开一个口。"},
+        {"order": 2, "after": 0, "title": "缺口的代价 · 1+1+1 装不下", "text": "拿 1+1+1 试：半加器先算 A=1、B=1，得和 0、进位 1；第三个 1 没有地方进，结果就少一个。三个 1 相加的正确值是 11₂——本位 1、向高位再进 1。所以进位输入不是「多一个可选项」，是这一列本来就有第三个数；缺了它，8 位加法器根本叠不起来。"},
+        {"order": 3, "after": 1, "title": "拼法 · 两只半加器加一个或", "text": "第一只半加器算 A+B，得 s1、c1；第二只算 s1+Cin，得和 s2、c2；两个进位用一只或门合并成 Cout。所以全加器 = 2 只半加器 + 1 个或门，不用新器件。等价写法：和 = A⊕B⊕Cin，进位 = A·B + Cin·(A⊕B)，可以拿前一句逐行核对。"},
+        {"order": 4, "after": 2, "title": "一个或门够 · 两个进位不会同时来", "text": "为什么一个或门就够：若 c1 为 1，说明 A、B 都是 1，此时 s1 必为 0，第二只半加器的进位不可能为 1；反过来，c1 为 0 时进位只可能来自 c2。两路永远不同时为 1，所以不必「再把两个进位加一遍」。这也是它只用 1 个或门、不再串一只半加器的原因。"},
+        {"order": 5, "after": 3, "title": "验收 · 8 行，不是 4 行", "text": "验收看 8 行：Cin=0 的四行就是 1.6 那张表，Cin=1 的四行才是新增。8 行全对、延迟按最长路径（A/B/Cin 到 Cout）报出来、封装后端口是 A、B、Cin、SUM、Cout。下一节把这 8 只叠成一列，进位就是那条竖线——链一长，速度就开始要账。"}
+      ],
+      "p1": "两只半加器 + 一只或门拼全加器，Cin 单独引一个输入，跑 8 行",
+      "p1_gates": ["T3.1-1", "T3.1-2", "T3.1-3"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "从零件库拖 2 个已封装的半加器实例，补 1 个或门；Cin 单独引一个输入；跑 8 行", "judge": "三条同时成立：①8/8 真值全过；②结构是 2 个半加器实例 + 1 个或门；③延迟报告有值", "codes": ["E_UNCONNECTED(3)", "E_TRUTH_ROW(6)", "E_DELAY_EXCEED(8)", "E_ENCAPSULATION(12)"], "gates": ["T3.1-1", "T3.1-2", "T3.1-3"]},
+        {"id": "B", "level": "P0", "produce": "填三输入真值表 8 行（含 Cin=1 的四行）", "judge": "8/8；首个错行给 expected/actual", "codes": ["E_TRUTH_ROW(6)"], "gates": ["T3.1-1"]},
+        {"id": "C", "level": "负例", "produce": "Cin 接死 0", "judge": "Cin=1 的四行必错：期望和 1 或进位 1，实得 0", "codes": ["E_TRUTH_ROW(6)"], "gates": ["T3.1-1"]},
+        {"id": "D", "level": "quiz", "produce": "为什么必须有进位输入", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T3.1-4"]},
+        {"id": "E", "level": "P0", "produce": "封装成 A、B、Cin、SUM、Cout 五个端口", "judge": "封装前后 8 行一致", "codes": ["E_ENCAPSULATION(12)"], "gates": []}
+      ],
+      "hint": "先算 A+B 得 s1、c1，再算 s1+Cin；两个进位永远不会同时为 1，所以一只或门就够。",
+      "misconception": "「全加器是新电路」：它只是半加器多开一个进位输入口，仍是 2 只半加器 + 1 个或门。",
+      "gate_cases": [
+        {"id": "T3.1-1", "title": "全加器真值表 8/8（含 Cin=1 四行）", "kind": "fa_truth", "required": true,
+         "codes": ["E_UNCONNECTED(3)", "E_TRUTH_ROW(6)"]},
+        {"id": "T3.1-2", "title": "结构 = 2 个半加器实例 + 1 个或门", "kind": "part_count", "required": true,
+         "expect": {"half_adder": 2, "or": 1}, "codes": ["E_ENCAPSULATION(12)", "E_UNCONNECTED(3)"]},
+        {"id": "T3.1-3", "title": "延迟报告有值（上限待技术侧定，只报级数）", "kind": "delay_positive", "required": true,
+         "codes": ["E_DELAY_EXCEED(8)"]},
+        {"id": "T3.1-4", "title": "选择题：为什么全加器必须有进位输入", "kind": "quiz", "required": true,
+         "quiz": {"question": "全加器为什么必须有第三个输入 Cin？", "options": ["为了更快", "A、B 是本列两个加数，进位是本列的第三个加数", "为了省门", "为了兼容半加器"], "answer": 1,
+          "explain": "一列加法本来就有三个数：两个加数加低位进位；缺了它，1+1+1 会少一个。"},
+         "codes": ["E_QUIZ(14)"]}
+      ],
+      "grants": {"items": {"G13": 1}, "blueprint": ["KN-FA-01"]}
+    },
+    "adder8": {
+      "id": "adder8",
+      "title": "3.2 八位加法器",
+      "body": "8 位加法就是竖式：8 只全加器按位序排成一列，A、B 走数据总线，进位单独串成链，第 7 位送出的 C8 就是第 9 位。验收 16 组随机 + 4 组边界，255+1 必须 C8=1、S=0。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 八列竖式", "text": "8 位加法就是竖式：从最低位往上，每一位三个数（A_i、B_i、上一位的进位），出本位的和 S_i 与向下一位的进位。第 0 位没有低位进位，Cin 接 0；第 7 位送出 C8，那就是第 9 位。八只全加器排成一列，进位像一条竖线往上穿。"},
+        {"order": 2, "after": 0, "title": "不是复制八次 · 同一只零件排八遍", "text": "先把 3.1 的全加器封装成零件，阵列里放 8 个实例，端口按位序接。改一只就要改八只的写法，这一节不许出现——阵列只认零件，不认手画。所以 8 位不是 8 份劳动，是 1 份劳动 × 8 个实例；线也只有三类：两条数据总线、一条进位链、一个 C8。"},
+        {"order": 3, "after": 1, "title": "两种线要分清 · 总线与进位链", "text": "A、B 走并行的数据总线，按位序分到 8 个实例；进位不进总线——它是一位一位串过去的，必须单独连成链。分不清就会把进位也接到总线上，出现「每一位都拿 Cin=0」的假加法：低 8 位看着对，一进位就错。所以进位链单独画、单独查。"},
+        {"order": 4, "after": 2, "title": "验收 · 随机加边界，含第 9 位", "text": "验收三类：16 组随机（0–255 内）、4 组边界（0+0、255+0、128+127、255+1）、进位链延迟报告。255+1 必须出 C8=1、S=0——只测 8 位和，会把 256 判成 0 而假通过。C8 就是第 9 位，本节要求你把它接出来看，但只当一根线，不解释补码、不讲符号。"},
+        {"order": 5, "after": 3, "title": "代价 · 进位是一条串行的路", "text": "行波进位的延迟不是「8 个门加起来」，是最低位那只的进位一路穿到最高位——第 7 位的和要等前 7 位的进位全到。所以速度由这条链决定，门数由 8 只零件决定。想快就得让进位提前算（超前进位），那是后面的账；现在只要把这条链有几级读出来。"}
+      ],
+      "p1": "从零件库放 8 个全加器实例，A0..A7、B0..B7 走总线，C0 接 0、C1..C8 串链，S0..S7 接出",
+      "p1_gates": ["T3.2-1", "T3.2-2", "T3.2-3", "T3.2-4"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "8 只全加器排成行波进位阵列", "judge": "四条同时成立：①整列是同一封装件的 8 个实例；②16 随机 + 4 边界全过；③255+1 出 C8=1、S=0；④延迟报告给出进位链级数", "codes": ["E_UNCONNECTED(3)", "E_TRUTH_ROW(6)", "E_DELAY_EXCEED(8)", "E_ENCAPSULATION(12)"], "gates": ["T3.2-1", "T3.2-2", "T3.2-3", "T3.2-4"]},
+        {"id": "B", "level": "负例", "produce": "把 C 也当数据线，每位 Cin 都成 0", "judge": "低 8 位仍对，但 255+1 出 C8=0、S=255 → 6，detail 写「S7/C8」", "codes": ["E_TRUTH_ROW(6)"], "gates": ["T3.2-3"]},
+        {"id": "C", "level": "负例", "produce": "手画 8 份、只改一只", "judge": "实例校验不过（不是同一零件）", "codes": ["E_ENCAPSULATION(12)"], "gates": ["T3.2-1"]},
+        {"id": "D", "level": "P0", "produce": "读最长进位链级数并填表", "judge": "级数 = 7 级进位 + 1 级本位和；上限待技术侧定，未定前只报告不判红", "codes": ["E_DELAY_EXCEED(8)"], "gates": ["T3.2-4"]},
+        {"id": "E", "level": "只记录", "produce": "一句话写出「C8=1 表示超过 255」", "judge": "不判、不计失败；不得写成「已会处理溢出」", "codes": [], "gates": []}
+      ],
+      "hint": "进位不进总线：C0 接 0，C1..C8 单独串成链；255+1 必须看 C8。",
+      "misconception": "「8 位加法器要画 8 份」：只需把 3.1 的全加器实例化 8 次，改零件即改全部。",
+      "gate_cases": [
+        {"id": "T3.2-1", "title": "同一封装全加器的 8 个实例", "kind": "same_part_array", "required": true,
+         "part": "full_adder", "instances": 8, "codes": ["E_ENCAPSULATION(12)"]},
+        {"id": "T3.2-2", "title": "16 组随机 + 4 组边界全过", "kind": "adder_sweep", "required": true,
+         "random_count": 16, "boundary": [[0, 0], [255, 0], [128, 127], [255, 1]], "codes": ["E_TRUTH_ROW(6)"]},
+        {"id": "T3.2-3", "title": "255+1 出 C8=1、S=0", "kind": "carry_out", "required": true,
+         "a": 255, "b": 1, "sum": 0, "c8": 1, "codes": ["E_TRUTH_ROW(6)"]},
+        {"id": "T3.2-4", "title": "进位链级数报告 = 8（7 级进位 + 1 级本位和）", "kind": "stage_report", "required": true,
+         "stages": 8, "codes": ["E_DELAY_EXCEED(8)"]}
+      ],
+      "grants": {"items": {"M12": 1}, "blueprint": ["KN-ADDR-01"]}
+    },
+    "clock_edge": {
+      "id": "clock_edge",
+      "title": "3.3 时钟与边沿",
+      "body": "一拍是两次上升沿之间的时间 T，f=1/T。组合逻辑随时输出，没有「什么时候看结果」；时钟给出节拍，只在沿上采样。把 3.2 的 8 级进位加 1 级采样接进来，T ≥ 9 级 × 单级延迟。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 组合逻辑没有「什么时候」", "text": "3.2 的加法器，只要输入不变就一直在算，输出随时可能变——它没有「什么时候看结果」这回事。真实电路要许多块同时推进，没有统一节拍，各块快慢不一，就拼不成一台机器。这个节拍就是时钟。"},
+        {"order": 2, "after": 0, "title": "一拍是什么 · 周期与频率", "text": "一拍 = 两次上升沿之间的时间，记作 T；频率 f = 1/T，一秒里有多少拍。时钟是一根反复高低的线，本身不携带数据，只负责「到点了」。3.2 报的那条 8 级进位，就是这一拍之内必须走完的路。多数系统统一看上沿；下沿也行，但全系统只能挑一种。"},
+        {"order": 3, "after": 1, "title": "认沿不认电平 · 沿是「现在」", "text": "为什么认沿不认电平：电平为高的整段时间里，门一直在动，中途值会晃；上升沿只是一个时刻，只在那一刻采样，晃过去的中间值不算数。沿还顺带解决另一件事：同一条沿上所有块一起动手，谁也不会读到别人改了一半的值。"},
+        {"order": 4, "after": 2, "title": "把 3.2 的级数接进来 · 级数换周期", "text": "把 3.2 的级数报告接进来：进位链 8 级，加上沿上采样 1 级，一拍至少要能走完 9 级。周期 T ≥ 级数 × 单级延迟；级数越多，T 越大，f 越低。这就是那条进位链的账——它不再是抽象的「慢」，而是能换算成频率的数。"},
+        {"order": 5, "after": 3, "title": "交接 · 沿到了，谁记住", "text": "沿到了，谁记住这一拍的值？组合逻辑不会记，输入一撤输出就没了。要跨拍保存，就得有能「停住」的电路——下一节的双稳态。到这里回收链走完两段：3.2 报级数，3.3 定一拍；再往上到 5.4，才合成时钟上限那张表。"}
+      ],
+      "p1": "放可调周期的时钟源，用同一组 A/B 分别以长 T、短 T 各采一次加法器输出",
+      "p1_gates": ["T3.3-1"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "时钟源 + 沿上采样：长 T、短 T 各采一次", "judge": "三条同时成立：①T 可设两档；②长 T 采样 = 期望和；③短 T 采样 ≠ 期望和（必须能红）", "codes": ["E_TRUTH_ROW(6)", "E_DELAY_EXCEED(8)", "E_UNCONNECTED(3)"], "gates": ["T3.3-1"]},
+        {"id": "B", "level": "quiz", "produce": "一拍 / 周期 / 频率定义", "judge": "answer 对照；非唯一 gate", "codes": ["E_QUIZ(14)"], "gates": ["T3.3-2"]},
+        {"id": "C", "level": "负例", "produce": "把探针接成「高电平期间一直采」", "judge": "高电平期间采到的值会随输入晃动而变，判定不稳定 → 6，detail 写「沿采样」", "codes": ["E_TRUTH_ROW(6)"], "gates": ["T3.3-4"]},
+        {"id": "D", "level": "P0", "produce": "用 3.2 报的级数填 T ≥ 级数×单级", "judge": "填入的级数与 3.2 报告一致，且 T 不小于该值", "codes": ["E_TIMING_MARGIN(27)"], "gates": ["T3.3-3"]}
+      ],
+      "hint": "沿只采样一个时刻；T 要覆盖 8 级进位 + 1 级采样，短 T 必然采到未稳定的值。",
+      "misconception": "「电平高时一直采样更稳」：高电平期间门一直在动，采到的是晃动中的中间值。",
+      "gate_cases": [
+        {"id": "T3.3-1", "title": "长 T 采样正确、短 T 采样必错（两档）", "kind": "clock_sample", "required": true,
+         "expect_sum": 8, "codes": ["E_TRUTH_ROW(6)", "E_DELAY_EXCEED(8)", "E_UNCONNECTED(3)"]},
+        {"id": "T3.3-2", "title": "选择题：一拍与频率的定义", "kind": "quiz", "required": true,
+         "quiz": {"question": "「一拍」与频率 f 的关系是？", "options": ["T 是高电平宽度，f=2/T", "T 是两次上升沿之间的时间，f=1/T", "T 是延迟总和，f=T", "T 和 f 无关"], "answer": 1,
+          "explain": "周期 T 是两次上升沿之间；频率是每秒拍数，f=1/T。"},
+         "codes": ["E_QUIZ(14)"]},
+        {"id": "T3.3-3", "title": "级数 → 周期：T ≥ (8+1) × 单级延迟", "kind": "timing_derived", "required": true,
+         "extra_stages": 1, "codes": ["E_TIMING_MARGIN(27)", "E_DELAY_MISMATCH(9)"]},
+        {"id": "T3.3-4", "title": "采样模式必须是沿采样", "kind": "sample_mode", "required": true,
+         "expect_mode": "edge", "codes": ["E_TRUTH_ROW(6)", "E_UNCONNECTED(3)"]}
+      ],
+      "grants": {"items": {"M11": 1}, "blueprint": ["KN-CLK-02"]}
+    },
+    "bistable_reg": {
+      "id": "bistable_reg",
+      "title": "3.4 双稳态与寄存器",
+      "body": "两只反相器首尾相接成环，绕一圈两次取反，两个稳定态都自洽，这就是双稳态。不给新输入时它能保持 10 tick 不变；在环入口加受控门与 WE，就变成 1 位寄存器，8 只并排就是 8 位寄存器。",
+      "sections": [
+        {"order": 1, "after": 0, "title": "开场 · 组合逻辑只算不记", "text": "组合逻辑只算不记：加法器的输入一撤，输出立刻跟着没了。要跨拍保存，就得有电路在不被驱动时也能自己撑住一个值。这一节先造出这个「撑住」，再把它变成寄存器，最后装上状态机。"},
+        {"order": 2, "after": 0, "title": "正反馈 · 两只反相器对着接", "text": "两只反相器对着接：第一只的输出接第二只的输入，第二只的输出接回第一只。绕一圈是两次取反，等于没取反，所以「上=1、下=0」和「上=0、下=1」都自洽。中间那点不自洽：偏一点，一圈回来偏得更远，正反馈把它推到两头之一。"},
+        {"order": 3, "after": 1, "title": "保持 10 tick · 能停住才叫记忆", "text": "能停住才叫记忆。上电、不给任何新输入，每 tick 读一次：10 tick 里读回的值必须一直是同一个。中途翻一次，就说明它只是「碰巧对」，不是记住。这一条是红线：记忆必须从双稳态讲起，不从寄存器菜单讲起。"},
+        {"order": 4, "after": 2, "title": "从双稳态到寄存器 · 加一个「听谁」的门", "text": "双稳态只会保持，不会改写。在环的入口加两只受控门，由一个写使能 WE 管：WE=1 时外部值才准进环，WE=0 时环自己转、外部进不来。这样的小单元存 1 位；8 只并排、共用一个 WE，就是 8 位寄存器。"},
+        {"order": 5, "after": 3, "title": "建立/保持 · 沿前后不许动", "text": "沿不是保险丝：数据必须在沿前 t_setup 就稳定，沿后还要保持 t_hold 不动。晚了或早了都可能采到半路值，输出卡在中间——这就是亚稳态。这两个数接到 5.4：一拍 T ≥ 组合级数×单级 + t_setup，装不下就得降频。"},
+        {"order": 6, "after": 3, "title": "末段 · 状态机与次态表", "text": "状态机 = 一组寄存器存「现在是哪个状态」，加一张次态表说「这个状态配这个输入，下一拍去哪」，输出由状态决定。交通灯最小：红→绿→黄→红，表三行，每拍按表换行。完整交通灯进 CH03 挑战，不进必修。"}
+      ],
+      "p1": "两只反相器首尾相接成环，上电后不给任何输入，逐拍观察 10 tick",
+      "p1_gates": ["T3.4-2"],
+      "practice": [
+        {"id": "A", "level": "P1", "produce": "交叉反相器保持 10 tick，两个稳定态各测一次", "judge": "10 个 tick 逐拍读回同一值；中途任一拍翻转即失败", "codes": ["E_HOLD_TICKS(26)", "E_UNCONNECTED(3)"], "gates": ["T3.4-1", "T3.4-2"]},
+        {"id": "B", "level": "P1", "produce": "8 个小单元并排、共用一个 WE；写一组值 → 关 WE → 隔几拍读回", "judge": "WE=1 写入后 WE=0 的若干拍里读回值不变；写入前读回上一次的值", "codes": ["E_HOLD_TICKS(26)", "E_TRUTH_ROW(6)"], "gates": ["T3.4-3"]},
+        {"id": "C", "level": "负例", "produce": "在上升沿前一格改输入", "judge": "采到半路值 → 输出非 0 非 1 或与期望不符", "codes": ["E_TIMING_MARGIN(27)"], "gates": ["T3.4-4"]},
+        {"id": "D", "level": "挑战", "produce": "交通灯次态表（红→绿→黄→红，三行）", "judge": "连续 12 拍状态序列正确；不进必修", "codes": ["E_TRUTH_ROW(6)"], "gates": []}
+      ],
+      "hint": "两只反相器对着接成环，两个稳定态都自洽；加 WE 只决定「让不让外部值进环」。",
+      "misconception": "「寄存器是菜单里选出来的」：先有交叉耦合的正反馈能停住，再加写使能才成为寄存器。",
+      "gate_cases": [
+        {"id": "T3.4-1", "title": "两只反相器交叉耦合（正反馈成环）", "kind": "feedback_structure", "required": true,
+         "inverters": 2, "codes": ["E_HOLD_TICKS(26)", "E_UNCONNECTED(3)"]},
+        {"id": "T3.4-2", "title": "交叉反相器保持 10 tick，两个稳定态各一次", "kind": "hold_ticks", "required": true,
+         "ticks": 10, "states": [0, 1], "codes": ["E_HOLD_TICKS(26)"]},
+        {"id": "T3.4-3", "title": "8 位寄存器：WE=1 写入、WE=0 读回不变", "kind": "register_hold", "required": true,
+         "width": 8, "codes": ["E_HOLD_TICKS(26)", "E_TRUTH_ROW(6)"]},
+        {"id": "T3.4-4", "title": "建立/保持余量：沿前 t_setup、沿后 t_hold 都要够", "kind": "setup_hold", "required": true,
+         "setup_required": 1, "hold_required": 1, "codes": ["E_TIMING_MARGIN(27)"]}
+      ],
+      "grants": {"items": {"G15": 1}, "blueprint": ["KN-MEM-02"]}
+    }
+  }
+}
