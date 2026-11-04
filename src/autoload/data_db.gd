@@ -99,6 +99,18 @@ func runtime_for(chapter_id_in: String) -> ChapterRuntime:
 		_runtimes[chapter_id_in] = ChapterRuntime.from_doc(ChapterRegistry.levels_doc(chapter_id_in))
 	return _runtimes[chapter_id_in]
 
+func use_chapter(chapter_id_in: String) -> bool:
+	## 切到指定章节：只替换"当前章节"缓存（运行时 / 实验数据段 / 数据版本）。
+	## 玩家进度是全局的，切章不改存档字段；未知章节返回 false 且不改现状。
+	if not chapters.has(chapter_id_in):
+		return false
+	chapter = runtime_for(chapter_id_in)
+	labs_doc = ChapterRegistry.labs_doc(chapter_id_in)
+	labs = labs_for(chapter_id_in)
+	data_version = int(ChapterRegistry.levels_doc(chapter_id_in).get("version", 0))
+	EventBus.fire("chapter_switched:%s" % chapter_id_in)
+	return true
+
 func _json(path: String) -> Dictionary:
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():

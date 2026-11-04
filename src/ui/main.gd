@@ -33,11 +33,25 @@ func _ready() -> void:
 	_build()
 	_connect_events()
 	GameState.boot()
+	_restore_chapter()
 	print("IFZ_BOOT data_ok=%s files=%d chapter=%s" % [str(DataDB.ready_ok), DataDB.loaded_files, DataDB.chapter_id()])
 	if not DataDB.ready_ok:
 		EventBus.toast("数据校验有 %d 个问题，见诊断页" % DataDB.errors.size(), "error")
 	_show_start()
 	_handle_cli()
+
+func _restore_chapter() -> void:
+	## 当前章节跟着存档走；`--chapter=<id>` 可覆盖（截图/验收用）。未知章节回退默认章。
+	var want := str(GameState.player.chapter_id)
+	var cli := CliArgs.value("chapter", "")
+	if not cli.is_empty():
+		want = cli
+	if want.is_empty() or not DataDB.use_chapter(want):
+		DataDB.use_chapter(DataDB.default_chapter_id())
+	if _hub != null:
+		_hub.rebuild_for_chapter()
+	if _start != null:
+		_start.refresh_chapter()
 
 func _connect_events() -> void:
 	EventBus.notify.connect(_on_notify)
@@ -467,14 +481,26 @@ func _inv_signature(inv: Dictionary) -> String:
 	return ",".join(PackedStringArray(parts))
 
 func _chapter_completion_reward() -> Dictionary:
-	## 章节完成时的两笔结算：complete_reward + 章节里程碑节点（ChapterFlow._finish_chapter 解锁 CH01）。
+	## 章节完成时的两笔结算：complete_reward + 本章里程碑节点（节点 ID 由章节数据推导，不写死）。
 	var fin: Dictionary = DataDB.chapter.data.get("complete_reward", {})
 	var gold := int(fin.get("gold", 0))
 	var xp := int(fin.get("xp", 0))
-	var n: Dictionary = DataDB.skill_graph.node("CH01")
+	var n := _chapter_milestone_node(fin)
 	gold += int(n.get("gold_award", 0))
 	xp += int(n.get("xp_award", 0))
+	if n.is_empty():
+		# 与 ChapterFlow._finish_chapter 同一口径：里程碑节点缺失时按章末预算发金币。
+		gold += int(DataDB.chapter.data.get("economy", {}).get("chapter_end_gold", 0))
 	return {"gold": gold, "xp": xp}
+
+func _chapter_milestone_node(fin: Dictionary) -> Dictionary:
+	## 优先用 complete_reward.badge 当节点 ID（如 CH02-CMOS），再退回章节 ID 大写（CH01）。
+	var badge := str(fin.get("badge", ""))
+	if not badge.is_empty():
+		var hit: Dictionary = DataDB.skill_graph.node(badge)
+		if not hit.is_empty():
+			return hit
+	return DataDB.skill_graph.node(DataDB.chapter.id().to_upper())
 
 func _final_snapshot() -> Dictionary:
 	var p := GameState.player

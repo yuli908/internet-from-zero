@@ -21,6 +21,21 @@ var _shards: Array = []
 var _hint: Label
 var _selected := 0
 var _settings: SettingsPanel
+var _sub_label: Label
+
+func refresh_chapter() -> void:
+	## 切章后刷新副标题：开始界面的章节名必须跟着当前章节走。
+	if _sub_label != null:
+		_sub_label.text = _chapter_subtitle()
+
+func _chapter_subtitle() -> String:
+	## 没有章节数据时退回中性文案（只显示游戏名），不写死任何章节标题。
+	var base := "互联网 · 从零重建"
+	var c: ChapterRuntime = DataDB.chapter
+	if c == null:
+		return base
+	var t := c.title()
+	return base if t.is_empty() else base + "　" + t
 
 func setup(main_ref: Control) -> void:
 	super.setup(main_ref)
@@ -81,7 +96,8 @@ func _build() -> void:
 	rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sub_row.add_child(rule)
-	sub_row.add_child(Ui.label("互联网 · 从零重建　第一章「电与逻辑」", 19, Color("#AAB6AF")))
+	_sub_label = Ui.label(_chapter_subtitle(), 19, Color("#AAB6AF"))
+	sub_row.add_child(_sub_label)
 	left_v.add_child(sub_row)
 	left_v.add_child(_spacer_v())
 

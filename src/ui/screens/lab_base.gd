@@ -164,9 +164,10 @@ func _build() -> void:
 	pass
 
 func _code_text(meta: Dictionary) -> String:
+	## 编号跟着当前章节走：T2.1 / T3.4 …，不再固定 T1。
 	var order := int(meta.get("order", 0))
 	var gates: Array = meta.get("gate_ids", [])
-	return "T1.%d · %d 项验收 · %s" % [order, gates.size(), str(meta.get("subtitle", ""))]
+	return "T%d.%d · %d 项验收 · %s" % [int(DataDB.chapter.data.get("number", 1)), order, gates.size(), str(meta.get("subtitle", ""))]
 
 func _finish_shell() -> void:
 	## 子类 `_build()` 结束后调用：没用的检查器列直接隐藏，把宽度让给编辑区。

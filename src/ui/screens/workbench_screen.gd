@@ -13,52 +13,24 @@ const LAB_PATHS := {
 	"gate": preload("res://src/ui/screens/lab_gate.gd"),
 	"signal": preload("res://src/ui/screens/lab_signal.gd"),
 	"half_adder": preload("res://src/ui/screens/lab_half_adder.gd"),
+	"transistor": preload("res://src/ui/screens/lab_ch02.gd"),
+	"inverter": preload("res://src/ui/screens/lab_ch02.gd"),
+	"nand": preload("res://src/ui/screens/lab_ch02.gd"),
+	"power": preload("res://src/ui/screens/lab_ch02.gd"),
 }
 
-const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
 const TREE_W := 922
 const TREE_H := 468
 const RAIL_W := 236
 
-# 36 节点：7 里程碑 + 13 知识 + 9 技能 + 7 挑战。
-const NODES := [
-	["CH01-1", "第一束电", 1, 0, "milestone"],
-	["CH01-2", "两种状态", 2, 0, "milestone"],
-	["CH01-3", "真值表", 3, 0, "milestone"],
-	["CH01-4", "门级", 4, 0, "milestone"],
-	["CH01-5", "会记忆的电路", 5, 0, "milestone"],
-	["CH01-6", "加法器", 6, 0, "milestone"],
-	["CH01", "第一章完成", 7, 0, "milestone"],
-	["KN-ELEC-01", "两种状态装下世界", 2, 1, "knowledge"],
-	["KN-BIN-01", "机械开关写数字", 3, 1, "knowledge"],
-	["KN-BIN-02", "二进制数与 DIP", 4, 1, "knowledge"],
-	["KN-BIN-03", "最简积之和", 5, 1, "knowledge"],
-	["KN-BIN-04", "半加器真值", 6, 1, "knowledge"],
-	["KN-BOOL-01", "布尔代数", 7, 1, "knowledge"],
-	["KN-BOOL-02", "德摩根定律", 1, 2, "knowledge"],
-	["KN-BOOL-03", "卡诺图化简", 2, 2, "knowledge"],
-	["KN-GATE-01", "门延迟与扇出", 3, 2, "knowledge"],
-	["KN-SIG-01", "时钟边沿", 4, 2, "knowledge"],
-	["KN-SIG-02", "JK 与 D 触发器", 5, 2, "knowledge"],
-	["KN-SIG-03", "计数器分频", 6, 2, "knowledge"],
-	["KN-ADD-01", "半加器进位", 7, 2, "knowledge"],
-	["SK-LEVEL", "电平判读", 1, 5, "skill"],
-	["SK-BIN", "进制转换", 2, 5, "skill"],
-	["SK-BOOL", "布尔化简", 3, 5, "skill"],
-	["SK-GATE", "门级搭建", 4, 5, "skill"],
-	["SK-SIGNAL", "时序分析", 5, 5, "skill"],
-	["SK-ADD", "加法器设计", 6, 5, "skill"],
-	["SK-ENCAP", "封装与复用", 7, 5, "skill"],
-	["SK-MEASURE", "测量与排错", 1, 6, "skill"],
-	["SK-DEMORGAN", "德摩根改写", 3, 6, "skill"],
-	["CH01-CH-1", "1.1 电平判读", 1, 7, "challenge"],
-	["CH01-CH-2", "1.2 二进制", 2, 7, "challenge"],
-	["CH01-CH-3", "1.3 布尔", 3, 7, "challenge"],
-	["CH01-CH-4", "1.4 门级", 4, 7, "challenge"],
-	["CH01-CH-5", "1.5 时序", 5, 7, "challenge"],
-	["CH01-CH-6", "1.6 半加器", 6, 7, "challenge"],
-	["CH01-CH-7", "章末验收", 7, 7, "challenge"],
-]
+## 布局槽位（坐标固定，内容按当前章节数据填）：知识 13 格、技能 9 格。
+## 改章节不重排坐标，只换填充内容。
+const KNOW_SLOTS := [[2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2]]
+const SKILL_SLOTS := [[1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [1, 6], [3, 6]]
+
+## 当前章节派生出来的节点与实验列表（不写死章节 ID）。
+var _nodes: Array = []
+var _labs: Array = []
 
 var _board: Control
 var _rail_card: PanelContainer
@@ -82,6 +54,7 @@ var _footer_zoom: Label
 
 var _lab_layer: Control
 var _pages: Dictionary = {}
+var _kicker_label: Label
 var _lab_open := false
 var _current_lab := ""
 var _current_obj := ""
@@ -159,8 +132,8 @@ func _build() -> void:
 	_rail = Ui.vbox(0)
 	rail_margin.add_child(_rail)
 
-	var kicker := Ui.mono("CHAPTER 01 · 第一章", UiTheme.F_META, UiTheme.MUTED)
-	_rail.add_child(kicker)
+	_kicker_label = Ui.mono(_chapter_kicker(), UiTheme.F_META, UiTheme.MUTED)
+	_rail.add_child(_kicker_label)
 	_chapter_label = Ui.label(_chapter_name(), 22, UiTheme.CHALK)
 	_rail.add_child(_chapter_label)
 	_rail.add_child(Ui.gap(12))
@@ -174,7 +147,7 @@ func _build() -> void:
 
 	_progress_bar = ProgressBar.new()
 	_progress_bar.custom_minimum_size = Vector2(0, 7)
-	_progress_bar.max_value = float(NODES.size())
+	_progress_bar.max_value = float(maxi(_nodes.size(), 1))
 	_progress_bar.show_percentage = false
 	_progress_bar.add_theme_stylebox_override("background", UiTheme.flat_tight(UiTheme.alpha(UiTheme.CHALK, 0.10), UiTheme.alpha(UiTheme.CHALK, 0.22)))
 	_progress_bar.add_theme_stylebox_override("fill", UiTheme.flat_tight(UiTheme.CHALK, UiTheme.CHALK))
@@ -348,13 +321,14 @@ func _set_rail_active(key: String, active: bool) -> void:
 		cap.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if active else (UiTheme.MUTED_DIM if b.disabled else UiTheme.CHALK))
 
 func _build_nodes() -> void:
+	_build_chapter_nodes()
 	_halo = Control.new()
 	_halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_halo.visible = false
 	_halo.draw.connect(_draw_halo)
 	_nodes_layer.add_child(_halo)
 
-	for raw in NODES:
+	for raw in _nodes:
 		var rec := _node_record(raw)
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
@@ -403,27 +377,13 @@ func _build_node_labels(b: Button, rec: Dictionary) -> void:
 		texts["title"] = title
 	_node_texts[str(rec["id"])] = texts
 
-func _node_record(raw: Array) -> Dictionary:
-	var id := str(raw[0])
-	var kind := str(raw[4])
-	var lab := ""
-	var code := ""
-	if kind == "milestone" or kind == "challenge":
-		if id == "CH01" or id == "CH01-CH-7":
-			lab = ""
-			code = "CH01" if id == "CH01" else "FINAL"
-		else:
-			var idx := 0
-			if kind == "milestone":
-				idx = int(str(raw[0]).split("-")[1]) - 1
-			else:
-				idx = int(str(raw[0]).split("-")[2]) - 1
-			lab = LABS[clampi(idx, 0, LABS.size() - 1)]
-			code = "1.%d" % (idx + 1)
-	else:
-		code = id
-	var row := int(raw[3])
-	var col := int(raw[2])
+func _node_record(raw: Dictionary) -> Dictionary:
+	var id := str(raw.get("id", ""))
+	var kind := str(raw.get("kind", ""))
+	var lab := str(raw.get("lab", ""))
+	var code := str(raw.get("code", id))
+	var row := int(raw.get("row", 0))
+	var col := int(raw.get("col", 1))
 	var w := 110.0 if kind == "challenge" else 118.0
 	var h := 38.0 if kind == "challenge" else (52.0 if kind == "milestone" else 46.0)
 	var y := 0.0
@@ -437,21 +397,109 @@ func _node_record(raw: Array) -> Dictionary:
 		y = 420.0
 	var pos := Vector2((col - 1) * 134.0 + (4.0 if kind == "challenge" else 0.0), y)
 	return {
-		"id": id, "title": str(raw[1]), "col": col, "row": row, "kind": kind,
+		"id": id, "title": str(raw.get("title", "")), "col": col, "row": row, "kind": kind,
 		"lab": lab, "code": code, "pos": pos, "size": Vector2(w, h),
 	}
 
+func _build_chapter_nodes() -> void:
+	## 节点清单全部从当前章节运行时派生：里程碑、章末、知识、技能、挑战都在数据里。
+	## 槽位坐标固定，章节内容不同只换填充，不重排布局。
+	_nodes.clear()
+	_labs.clear()
+	var c: ChapterRuntime = DataDB.chapter
+	if c == null:
+		return
+	var num := int(c.data.get("number", 0))
+	var up := c.id().to_upper()
+	for raw in c.lab_order:
+		_labs.append(str(raw))
+	var n := _labs.size()
+	for i in n:
+		var lab := c.lab(_labs[i])
+		_nodes.append({
+			"id": str(lab.get("milestone", "")), "title": _short_title(str(lab.get("title", ""))),
+			"col": mini(i + 1, 7), "row": 0, "kind": "milestone", "lab": str(lab.get("id", "")),
+			"code": "%d.%d" % [num, i + 1],
+		})
+	_nodes.append({
+		"id": up, "title": "%s完成" % _chapter_name(), "col": mini(n + 1, 7), "row": 0,
+		"kind": "chapter", "lab": "", "code": "CH%02d" % num,
+	})
+	var seen := {}
+	var ki := 0
+	for lid in _labs:
+		var lab := c.lab(lid)
+		for raw_card in lab.get("knowledge_cards", []):
+			var kid := str(raw_card)
+			if ki >= KNOW_SLOTS.size() or DataDB.skill_graph.node(kid).is_empty():
+				continue
+			var ks: Array = KNOW_SLOTS[ki]
+			_nodes.append({"id": kid, "title": _node_title(kid), "col": int(ks[0]), "row": int(ks[1]), "kind": "knowledge", "lab": "", "code": kid})
+			ki += 1
+	var si := 0
+	for lid in _labs:
+		var lab := c.lab(lid)
+		var sk_names: Array = []
+		sk_names.append_array(lab.get("skill_nodes", []))
+		if lab.has("skill_node"):
+			sk_names.append(str(lab.get("skill_node")))
+		for raw_sk in sk_names:
+			var sid := str(raw_sk)
+			if sid.is_empty() or seen.has(sid) or si >= SKILL_SLOTS.size():
+				continue
+			if DataDB.skill_graph.node(sid).is_empty():
+				continue
+			seen[sid] = true
+			var ss: Array = SKILL_SLOTS[si]
+			_nodes.append({"id": sid, "title": _node_title(sid), "col": int(ss[0]), "row": int(ss[1]), "kind": "skill", "lab": "", "code": sid})
+			si += 1
+	for i in n:
+		var lab := c.lab(_labs[i])
+		_nodes.append({
+			"id": "%s-CH-%d" % [up, i + 1], "title": str(lab.get("title", "")),
+			"col": mini(i + 1, 7), "row": 7, "kind": "challenge", "lab": str(lab.get("id", "")),
+			"code": "%d.%d" % [num, i + 1],
+		})
+	_nodes.append({
+		"id": "%s-CH-FINAL" % up, "title": "章末验收", "col": mini(n + 1, 7), "row": 7,
+		"kind": "final", "lab": "", "code": "FINAL",
+	})
+
+func _short_title(title: String) -> String:
+	## "2.1 三端开关" → "三端开关"：里程碑格子只放短名，编号单独一行。
+	var parts := title.split(" ", false, 1)
+	return parts[1].strip_edges() if parts.size() > 1 else title
+
+func _node_title(node_id: String) -> String:
+	var n: Dictionary = DataDB.skill_graph.node(node_id)
+	var t := str(n.get("title", ""))
+	return t if not t.is_empty() else node_id
+
+func _chapter_number() -> int:
+	return int(DataDB.chapter.data.get("number", 0))
+
+func _chapter_kicker() -> String:
+	## 抬头章节号：CHAPTER 02 · 第二章（章号与章名都来自章节数据）。
+	var num := _chapter_number()
+	var t := DataDB.chapter.title()
+	var parts := t.split("·")
+	var name := parts[0].strip_edges() if parts.size() > 1 else "第%d章" % num
+	return "CHAPTER %02d · %s" % [num, name]
+
 func _node_state(rec: Dictionary) -> String:
 	var id := str(rec["id"])
+	var kind := str(rec["kind"])
 	if id == _current_milestone:
 		return "current"
-	if rec["kind"] == "knowledge" or rec["kind"] == "skill":
+	if kind == "knowledge" or kind == "skill":
 		return "done" if Knowledge.is_unlocked(id) else "locked"
-	if id == "CH01" or id == "CH01-CH-7":
+	if kind == "chapter" or kind == "final":
 		return "done" if ChapterFlow.chapter_complete() else "locked"
 	var lab := str(rec["lab"])
 	if lab.is_empty():
 		return "locked"
+	if DataDB.chapter.content_status(lab) != "ready":
+		return "deferred"
 	if ChapterFlow.is_objective_done(DataDB.chapter.objective_for_lab(lab)):
 		return "done"
 	if ChapterFlow.is_lab_unlocked(lab):
@@ -471,6 +519,9 @@ func _node_style(state: String) -> StyleBoxFlat:
 			sb.bg_color = UiTheme.alpha(UiTheme.CHALK, 0.12)
 			sb.border_color = UiTheme.CHALK_BRIGHT
 			sb.set_border_width_all(2)
+		"deferred":
+			sb.bg_color = UiTheme.alpha(UiTheme.RUST, 0.06)
+			sb.border_color = UiTheme.alpha(UiTheme.RUST, 0.55)
 	sb.content_margin_left = 0
 	sb.content_margin_right = 0
 	sb.content_margin_top = 0
@@ -479,7 +530,7 @@ func _node_style(state: String) -> StyleBoxFlat:
 
 func _update_node_states() -> void:
 	_halo.visible = false
-	for raw in NODES:
+	for raw in _nodes:
 		var rec := _node_record(raw)
 		var id := str(rec["id"])
 		var b: Button = _node_buttons.get(id, null)
@@ -499,8 +550,12 @@ func _update_node_states() -> void:
 			ink = Color("#14251F")
 		elif st == "current":
 			ink = Color("#FFFDF5")
+		elif st == "deferred":
+			ink = UiTheme.RUST
 		b.modulate.a = 0.56 if st == "locked" else 1.0
 		if title_l != null:
+			## 未开放的节不写失败态：标题直接换成"暂未开放"，原因走点击提示。
+			title_l.text = "暂未开放" if st == "deferred" else str(rec["title"])
 			title_l.add_theme_color_override("font_color", ink)
 		if code_l != null:
 			code_l.add_theme_color_override("font_color", UiTheme.alpha(ink, 0.72))
@@ -534,16 +589,16 @@ func _pulse_halo() -> void:
 
 func _draw_lines() -> void:
 	# 里程碑横向主干：走过实线 2.4 px α.62，未走虚线 1.4 px α.20。
-	for i in 6:
+	for i in maxi(_labs.size(), 1):
 		var a := Vector2(i * 134.0 + 118.0, 26.0)
 		var b := Vector2((i + 1) * 134.0, 26.0)
-		var done := _lab_index_done(i) and _lab_index_done(i + 1)
+		var done := _lab_index_done(i) and (i + 1 >= _labs.size() or _lab_index_done(i + 1))
 		if done:
 			_lines.draw_line(a, b, UiTheme.alpha(UiTheme.CHALK, 0.62), 2.4)
 		else:
 			_lines.draw_dashed_line(a, b, UiTheme.alpha(UiTheme.CHALK, 0.20), 1.4, 7.0)
 	# 列内竖茎：从里程碑底部贯到技能行，卡片覆盖处自然被遮住。
-	for i in LABS.size():
+	for i in _labs.size():
 		var x := i * 134.0 + 59.0
 		var done := _lab_index_done(i)
 		if done:
@@ -552,28 +607,71 @@ func _draw_lines() -> void:
 			_lines.draw_dashed_line(Vector2(x, 52.0), Vector2(x, 302.0), UiTheme.alpha(UiTheme.CHALK, 0.20), 1.4, 7.0)
 
 func _lab_index_done(i: int) -> bool:
-	if i < 0 or i >= LABS.size():
-		return false
-	return ChapterFlow.is_objective_done(DataDB.chapter.objective_for_lab(LABS[i]))
+	if i < 0 or i >= _labs.size():
+		return ChapterFlow.chapter_complete()
+	return ChapterFlow.is_objective_done(DataDB.chapter.objective_for_lab(_labs[i]))
 
 func _on_node(rec: Dictionary) -> void:
 	var st := _node_state(rec)
+	var kind := str(rec["kind"])
+	var lab := str(rec["lab"])
 	if st == "locked":
 		EventBus.toast("还没解锁：先完成前置节点", "warn")
 		return
-	var id := str(rec["id"])
-	if rec["kind"] == "knowledge" or rec["kind"] == "skill":
+	if st == "deferred":
+		## 未开放的原因直接取数据里的 deferred_reason，不在 UI 里另写一套。
+		EventBus.toast(DataDB.chapter.lab_lock_reason(GameState.player, lab), "warn")
+		return
+	if kind == "knowledge" or kind == "skill":
 		_go("skills")
 		return
-	if id == "CH01" or id == "CH01-CH-7":
-		if ChapterFlow.chapter_complete():
-			EventBus.toast("第一章已完成；可重跑任一实验或查看档案", "ok")
-		else:
-			EventBus.toast("完成 6 节实验后自动结算第一章", "warn")
+	if kind == "chapter":
+		_advance_chapter()
 		return
-	var lab := str(rec["lab"])
+	if kind == "final":
+		if ChapterFlow.chapter_complete():
+			EventBus.toast("%s已完成；可重跑任一实验或查看档案" % _chapter_name(), "ok")
+		else:
+			EventBus.toast("完成 %d 节实验后自动结算%s" % [_labs.size(), _chapter_name()], "warn")
+		return
 	if not lab.is_empty():
 		select_lab(lab, true)
+
+func _advance_chapter() -> void:
+	## 进度推进式切章：章末节点（或抬头按钮）完成本章后进入下一章，不弹窗。
+	if not ChapterFlow.chapter_complete():
+		EventBus.toast("完成 %d 节实验后自动结算%s" % [_labs.size(), _chapter_name()], "warn")
+		return
+	var nxt := str(DataDB.chapter.next_chapter())
+	if nxt.is_empty() or nxt == DataDB.chapter.id():
+		EventBus.toast("%s已完成；已是最后一章" % _chapter_name(), "ok")
+		return
+	switch_chapter(nxt)
+
+func switch_chapter(cid: String) -> bool:
+	## 切章就地把树、实验页、抬头换成目标章节；存档里的 chapter_id 同步，下次进入自动恢复。
+	if not DataDB.use_chapter(cid):
+		EventBus.toast("没有这一章：%s" % cid, "warn")
+		return false
+	GameState.player.chapter_id = cid
+	SaveManager.save_game(1, true)
+	rebuild_for_chapter()
+	EventBus.toast("已进入%s" % _chapter_name(), "ok")
+	return true
+
+func rebuild_for_chapter() -> void:
+	## 章节数据换了，整屏按新章节重搭（节点坐标模板不变，只换内容）。
+	close_lab()
+	_pages.clear()
+	_node_buttons.clear()
+	_node_texts.clear()
+	_current_obj = ""
+	_current_lab = ""
+	_current_milestone = ""
+	for c in get_children():
+		remove_child(c)
+		c.queue_free()
+	_build()
 
 func _on_viewport_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -618,25 +716,24 @@ func _resolve_current() -> void:
 	_current_lab = str(nxt.get("lab", "")) if not nxt.is_empty() else ""
 	_current_milestone = ""
 	if not _current_lab.is_empty():
-		var idx := LABS.find(_current_lab)
-		if idx >= 0:
-			_current_milestone = "CH01-%d" % (idx + 1)
+		_current_milestone = str(DataDB.chapter.lab(_current_lab).get("milestone", ""))
 
 func _refresh() -> void:
 	_resolve_current()
 	var done := 0
-	for lab in LABS:
-		if ChapterFlow.is_objective_done(DataDB.chapter.objective_for_lab(lab)):
+	var active: Array = DataDB.chapter.active_objective_ids()
+	for raw_o in active:
+		if ChapterFlow.is_objective_done(str(raw_o)):
 			done += 1
 	var p := GameState.player
 	var node_done := 0
-	for raw in NODES:
+	for raw in _nodes:
 		if _node_state(_node_record(raw)) == "done":
 			node_done += 1
-	_rail_progress.text = "%d / %d" % [node_done, NODES.size()]
-	_progress_bar.max_value = float(NODES.size())
+	_rail_progress.text = "%d / %d" % [node_done, _nodes.size()]
+	_progress_bar.max_value = float(maxi(_nodes.size(), 1))
 	_progress_bar.value = float(node_done)
-	_progress_label.text = "进度 %d/%d" % [done, LABS.size()]
+	_progress_label.text = "进度 %d/%d" % [done, active.size()]
 	_gold_label.text = "金币 %d" % int(p.gold)
 	if not _current_lab.is_empty():
 		var nxt := ChapterFlow.next_objective()
@@ -645,7 +742,7 @@ func _refresh() -> void:
 		_header_sub.text = "%s · %s" % [str(meta.get("title", "")), str(meta.get("subtitle", ""))]
 		_header_kicker.text = "当前任务"
 	elif ChapterFlow.chapter_complete():
-		_header_task.text = "第一章已完成"
+		_header_task.text = "%s已完成" % _chapter_name()
 		_header_sub.text = "可重跑任一实验；档案与诊断已解锁"
 		_header_kicker.text = "章节状态"
 	else:
@@ -655,10 +752,12 @@ func _refresh() -> void:
 	_set_rail_active("labs", true)
 	var archive_on := done >= 3
 	_rail_buttons["archive"].disabled = not archive_on
-	var diag_on := p.has_flag("gate:T1.1-1")
+	var diag_on := p.has_flag("gate:T%d.1-1" % _chapter_number())
 	_rail_buttons["diagnostics"].disabled = not diag_on
 	_update_rail_lock("archive", not archive_on, "完成 3 节后解锁")
 	_update_rail_lock("diagnostics", not diag_on, "首次通过门实验")
+	_kicker_label.text = _chapter_kicker()
+	_chapter_label.text = _chapter_name()
 	_update_node_states()
 	refresh_status_for_pages()
 
