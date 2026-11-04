@@ -35,16 +35,18 @@ const SUITES := [
 	"res://tests/test_ch02.gd",
 	"res://tests/test_denominator.gd",
 	"res://tests/test_ch02_denominator_ui.gd",
+	"res://tests/test_lab_bench_ui.gd",
 	"res://tests/test_teaching.gd",
 	"res://tests/test_ch01_sections.gd",
 	"res://tests/test_ch01_sections_ui.gd",
 	"res://tests/test_ch02_body.gd",
+	"res://tests/test_ch02_sections.gd",
 ]
 
 # TODO(下一轮，待 UI/数据两会话空闲后再做)：把各套件期望数从本文件挪到各自测试文件的
 # `const EXPECT := N`，总数改为运行时对已注册套件求和。这样每个会话只碰自己的文件，
 # 不再出现“提交前临时把别人的数字置回 HEAD、提交后再恢复”的风险。
-# 声明的 check 数（2026-11-04 实测，总数 2993）。少一项即该 suite 判红。
+# 声明的 check 数（2026-11-04 实测，总数 3223）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
 	"test_bit_math": 27,
 	"test_logic_gates": 24,
@@ -73,10 +75,12 @@ const SUITE_EXPECT := {
 	"test_ch02": 100,
 	"test_denominator": 46,
 	"test_ch02_denominator_ui": 37,
+	"test_lab_bench_ui": 35,
 	"test_teaching": 46,
-	"test_ch01_sections": 260,
+	"test_ch01_sections": 261,
 	"test_ch01_sections_ui": 256,
-	"test_ch02_body": 23,
+	"test_ch02_body": 29,
+	"test_ch02_sections": 180,
 }
 
 const ABORT_PROBE := "res://tests/_abort_probe.gd"

@@ -1,6 +1,7 @@
 extends RefCounted
 
 ## CH02 兜底 `body` 的 5 条真矛盾修正 + 2.5 `build_area` 面积判据实测（7 门过 / 10 门拒）。
+## 另含预算分支探针：4×成品 XOR（16>8、槽位 4）与槽位放宽副本（10 门仅预算被拒）。
 ## 口径来源：docs/curriculum/14-ch02-sections-sync-map.md §4.1 / §1。
 
 const Ch02ChecksScript := preload("res://src/core/ch02_checks.gd")
@@ -56,6 +57,30 @@ func _check_build_area(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("10 门：拒绝同时报槽位 10>4 与总门数 10>8",
 		str(c10.get("detail", "")).contains("槽位 10>4") and str(c10.get("detail", "")).contains("总门数 10>8"),
 		str(c10.get("detail", "")))
+
+	# 探针 A：4 个成品 XOR（顶层 4 槽、展开 16>8）。行为对 not/and/or 不成立，但预算行应报 16>8、槽位行不出现。
+	var four_xor := {"not": _g2("xor"), "and": _g2("xor"), "or": _g2("xor"), "xor": _g2("xor")}
+	ctx.eq("4×XOR 构型展开门数", _expanded(four_xor), 16)
+	var r16: Dictionary = Ch02ChecksScript.run("power", cfg, {"answers": answers, "graphs": four_xor})
+	var c16 := _case(r16["report"], "T2.5-3")
+	ctx.check("4×XOR：槽位 4 不超，detail 无槽位行", not str(c16.get("detail", "")).contains("槽位"),
+		str(c16.get("detail", "")))
+	ctx.check("4×XOR：预算行报总门数 16>8", str(c16.get("detail", "")).contains("总门数 16>8"),
+		str(c16.get("detail", "")))
+	ctx.check("4×XOR：not/and/or 行为未过（✗）", str(c16.get("detail", "")).contains("✗"),
+		str(c16.get("detail", "")))
+
+	# 探针 B：仅放宽本用例槽位到 10（测试副本，不改数据），10 门手搓行为全过 → 只剩预算一条理由。
+	var wide: Dictionary = JSON.parse_string(JSON.stringify(cfg))
+	for raw_case in (wide as Dictionary).get("gate_cases", []):
+		if str((raw_case as Dictionary).get("id", "")) == "T2.5-3":
+			(raw_case as Dictionary)["slots"] = 10
+	var rw: Dictionary = Ch02ChecksScript.run("power", wide, {"answers": answers, "graphs": ten})
+	var cw := _case(rw["report"], "T2.5-3")
+	ctx.check("槽位放宽后：10 门仅因预算被拒（无槽位行）",
+		not bool(cw.get("ok", false)) and str(cw.get("detail", "")).contains("总门数 10>8")
+		and not str(cw.get("detail", "")).contains("槽位"), str(cw.get("detail", "")))
+	ctx.check("槽位放宽后：code=E_AREA", GateResult.E_AREA in (rw["report"] as GateReport).failure_codes())
 
 func _case(rep: GateReport, cid: String) -> Dictionary:
 	for raw in rep.cases:

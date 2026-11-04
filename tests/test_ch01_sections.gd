@@ -3,11 +3,12 @@ extends RefCounted
 ## CH01 六节 sections 数据落地校验（结构断言，不写死字数——文案会继续改）。
 ## 口径：order 为 lab 内从 1 起；after = 已完成 required gate 数；
 ## 每节最后一段必须落在 after = required gate 数 − 1；body 保留为兜底路径。
-## 字数口径：去半角空格后的字符数；单段 ≤260（宽容上限）与 ≤150（现行口径），
-## 同一 after 档同屏合计 ≤260。1.4 两段（原 order 17/21）超 150 属已知存量，待另轮拆分。
+## 字数口径：去半角空格后的字符数，按位置分档——左栏五页 150，gate（1.4 中栏讲解带）170；
+## 同一 after 档同屏合计 ≤260。分档表是唯一来源，禁止再统一回 150。
 
 const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
 const TOTAL_SECTIONS := 34
+const CHAR_LIMITS := {"level": 150, "binary": 150, "boolean": 150, "gate": 170, "signal": 150, "half_adder": 150}
 
 const Teach = preload("res://src/ui/teaching.gd")
 
@@ -17,12 +18,15 @@ func run(ctx: TestContext) -> void:
 	var labs_doc := TestUtil.labs_doc()
 	var chapter_doc := TestUtil.chapter_doc()
 	var req_by_lab := _required_by_lab(ctx, chapter_doc, labs_doc)
+	ctx.check("gate 单段上限为 170（中栏），不是 150", int(CHAR_LIMITS["gate"]) == 170,
+		str(CHAR_LIMITS["gate"]))
 
 	var total := 0
 	for id in LABS:
 		var cfg: Dictionary = db.lab_data(str(id))
 		var secs: Array = cfg.get("sections", [])
 		var req: int = int(req_by_lab.get(id, -1))
+		var limit := int(CHAR_LIMITS[id])
 		ctx.check("%s 有 sections" % id, not secs.is_empty(), str(secs.size()))
 		var max_after := -1
 		var prev_after := -1
@@ -43,7 +47,7 @@ func run(ctx: TestContext) -> void:
 				"after=%d required=%d" % [after, req])
 			ctx.check("%s[%d] text 非空" % [id, i + 1], not text.strip_edges().is_empty())
 			ctx.check("%s[%d] text ≤260 字" % [id, i + 1], text_len <= 260, str(text_len))
-			ctx.check("%s[%d] text ≤150 字" % [id, i + 1], text_len <= 150, str(text_len))
+			ctx.check("%s[%d] text ≤%d 字（位置分档）" % [id, i + 1, limit], text_len <= limit, str(text_len))
 			screen[after] = int(screen.get(after, 0)) + text_len
 			max_after = maxi(max_after, after)
 			prev_after = after
