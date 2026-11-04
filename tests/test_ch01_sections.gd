@@ -3,10 +3,11 @@ extends RefCounted
 ## CH01 六节 sections 数据落地校验（结构断言，不写死字数——文案会继续改）。
 ## 口径：order 为 lab 内从 1 起；after = 已完成 required gate 数；
 ## 每节最后一段必须落在 after = required gate 数 − 1；body 保留为兜底路径。
-## 字数口径：去半角空格后的字符数；单段 ≤260，同一 after 档同屏合计 ≤260。
+## 字数口径：去半角空格后的字符数；单段 ≤260（宽容上限）与 ≤150（现行口径），
+## 同一 after 档同屏合计 ≤260。1.4 两段（原 order 17/21）超 150 属已知存量，待另轮拆分。
 
 const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
-const TOTAL_SECTIONS := 33
+const TOTAL_SECTIONS := 34
 
 const Teach = preload("res://src/ui/teaching.gd")
 
@@ -42,6 +43,7 @@ func run(ctx: TestContext) -> void:
 				"after=%d required=%d" % [after, req])
 			ctx.check("%s[%d] text 非空" % [id, i + 1], not text.strip_edges().is_empty())
 			ctx.check("%s[%d] text ≤260 字" % [id, i + 1], text_len <= 260, str(text_len))
+			ctx.check("%s[%d] text ≤150 字" % [id, i + 1], text_len <= 150, str(text_len))
 			screen[after] = int(screen.get(after, 0)) + text_len
 			max_after = maxi(max_after, after)
 			prev_after = after
