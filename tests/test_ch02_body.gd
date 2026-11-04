@@ -69,6 +69,9 @@ func _check_build_area(ctx: TestContext, cfg: Dictionary) -> void:
 		str(c16.get("detail", "")))
 	ctx.check("4×XOR：not/and/or 行为未过（✗）", str(c16.get("detail", "")).contains("✗"),
 		str(c16.get("detail", "")))
+	ctx.check("4×XOR：code=E_AREA（预算分支覆盖行为码）",
+		GateResult.E_AREA in (r16["report"] as GateReport).failure_codes(),
+		str((r16["report"] as GateReport).failure_codes()))
 
 	# 探针 B：仅放宽本用例槽位到 10（测试副本，不改数据），10 门手搓行为全过 → 只剩预算一条理由。
 	var wide: Dictionary = JSON.parse_string(JSON.stringify(cfg))

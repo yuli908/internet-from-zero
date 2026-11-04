@@ -46,7 +46,7 @@ const SUITES := [
 # TODO(下一轮，待 UI/数据两会话空闲后再做)：把各套件期望数从本文件挪到各自测试文件的
 # `const EXPECT := N`，总数改为运行时对已注册套件求和。这样每个会话只碰自己的文件，
 # 不再出现“提交前临时把别人的数字置回 HEAD、提交后再恢复”的风险。
-# 声明的 check 数（2026-11-04 实测，总数 3223）。少一项即该 suite 判红。
+# 声明的 check 数（2026-11-04 实测，总数 3260）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
 	"test_bit_math": 27,
 	"test_logic_gates": 24,
@@ -79,7 +79,7 @@ const SUITE_EXPECT := {
 	"test_teaching": 46,
 	"test_ch01_sections": 261,
 	"test_ch01_sections_ui": 256,
-	"test_ch02_body": 29,
+	"test_ch02_body": 30,
 	"test_ch02_sections": 180,
 }
 
