@@ -217,9 +217,95 @@ func _build() -> void:
 
 func _code_text(meta: Dictionary) -> String:
 	## 编号跟着当前章节走：T2.1 / T3.4 …，不再固定 T1。
+	return header_code_text(lab_data, meta, int(DataDB.chapter.data.get("number", 1)))
+
+## 抬头编号行：验收项数取「进分母」的 counted，而不是 gate_ids 的原始条数。
+## 整节延后（counted=0）时不报数，避免「0 项验收」这种永远补不上的假进度。
+static func header_code_text(cfg: Dictionary, meta: Dictionary, chapter_no: int) -> String:
 	var order := int(meta.get("order", 0))
-	var gates: Array = meta.get("gate_ids", [])
-	return "T%d.%d · %d 项验收 · %s" % [int(DataDB.chapter.data.get("number", 1)), order, gates.size(), str(meta.get("subtitle", ""))]
+	var parts := PackedStringArray(["T%d.%d" % [chapter_no, order]])
+	var count_text := gate_count_text(cfg, meta.get("gate_ids", []))
+	if not count_text.is_empty():
+		parts.append(count_text)
+	parts.append(str(meta.get("subtitle", "")))
+	return " · ".join(parts)
+
+## 第二章分母口径的唯一入口（UI 与断言共用）：未就绪的判据不进分母、不进进度条。
+## 其它章节的 cfg 没有延后项，counted == total，行为不变。
+static func gate_denominator(cfg: Dictionary) -> Dictionary:
+	return Ch02Checks.deferred_gates(cfg)
+
+## 抬头/进度报数：只统计进分母的判据；整节延后时返回空串（不显示计数）。
+static func gate_count_text(cfg: Dictionary, fallback_gate_ids: Array) -> String:
+	if not cfg.has("gate_cases"):
+		return "%d 项验收" % fallback_gate_ids.size()
+	var counted := int(gate_denominator(cfg)["counted"])
+	return "" if counted <= 0 else "%d 项验收" % counted
+
+## 结算计数（纯函数）：延后项既不计入分子也不计入分母。
+static func settlement_counts(cfg: Dictionary, passed_ids: Array) -> Dictionary:
+	var d := gate_denominator(cfg)
+	var deferred := {}
+	for raw in (d.get("ids", []) as Array):
+		deferred[str(raw)] = true
+	var ok := 0
+	for raw in passed_ids:
+		var gid := str(raw)
+		if not deferred.has(gid):
+			ok += 1
+	var total := int(d.get("counted", 0))
+	return {
+		"ok": mini(ok, total),
+		"total": total,
+		"deferred": int(d.get("deferred", 0)),
+		"section_deferred": bool(d.get("section_deferred", false)),
+	}
+
+## 结算页文案（纯函数）：延后只留一行「本节 N 项延后」，不逐条列 id、不弹提示阶梯。
+static func settlement_view(cfg: Dictionary, report: GateReport, done: bool, reward: Dictionary) -> Dictionary:
+	var deferred := {}
+	for raw in (gate_denominator(cfg).get("ids", []) as Array):
+		deferred[str(raw)] = true
+	var passed_ids: Array = []
+	var fail_details: Array = []
+	if report != null:
+		for raw in report.cases:
+			var c: Dictionary = raw
+			var cid := str(c.get("id", ""))
+			if deferred.has(cid):
+				continue
+			if bool(c.get("ok", false)):
+				passed_ids.append(cid)
+			else:
+				fail_details.append("%s %s" % [cid, str(c.get("detail", ""))])
+	var sc := settlement_counts(cfg, passed_ids)
+	var ok_count := int(sc["ok"])
+	var denom := int(sc["total"])
+	var n_defer := int(sc["deferred"])
+	var ok_all := denom > 0 and ok_count == denom
+	var detail := ""
+	var tone := "muted"
+	if not fail_details.is_empty():
+		detail = "未通过：" + " / ".join(PackedStringArray(fail_details))
+		tone = "bad"
+	elif denom > 0:
+		var parts := PackedStringArray()
+		if done:
+			parts.append("已记账 · 金币 +%d · XP +%d" % [int(reward.get("gold", 0)), int(reward.get("xp", 0))])
+		if n_defer > 0:
+			parts.append("本节 %d 项延后" % n_defer)
+		detail = " · ".join(parts)
+		tone = "ok" if ok_all else "bad"
+	elif n_defer > 0:
+		detail = "本节 %d 项延后" % n_defer
+	return {
+		"ok": ok_all,
+		"title": ("验收 · 通过 %d/%d" % [ok_count, denom]) if denom > 0 else "验收",
+		"detail": detail,
+		"tone": tone,
+		"deferred": n_defer,
+		"failures": fail_details,
+	}
 
 func _finish_shell() -> void:
 	## 子类 `_build()` 结束后调用：没用的检查器列直接隐藏，把宽度让给编辑区。
@@ -307,6 +393,10 @@ func pass_report(report: GateReport) -> bool:
 	## gate 结果逐条写存档；全部 required 通过才允许完成。
 	if report == null or not report.all_required_passed():
 		return false
+	# 整节延后：没有可验收的判据，不允许凭空完成（延后项不计分母也不记账）。
+	var sc := settlement_counts(lab_data, [])
+	if bool(sc["section_deferred"]) and int(sc["total"]) <= 0:
+		return false
 	for raw in report.cases:
 		var c: Dictionary = raw
 		if bool(c.get("ok", false)):
@@ -319,29 +409,22 @@ func pass_report(report: GateReport) -> bool:
 func show_report(report: GateReport) -> void:
 	if report == null:
 		return
-	var ok_count := 0
-	var fail_details: Array = []
-	for raw in report.cases:
-		var c: Dictionary = raw
-		if bool(c.get("ok", false)):
-			ok_count += 1
-		else:
-			fail_details.append("%s %s" % [str(c.get("id", "")), str(c.get("detail", ""))])
-	_result_ok = ok_count == report.cases.size()
-	var color := UiTheme.CHALK_BRIGHT if _result_ok else UiTheme.DANGER
+	# 分子/分母都走 deferred_gates 的 counted：延后项既不进分母，也不进失败明细。
+	var reward: Dictionary = DataDB.chapter.lab(lab_id).get("reward", {})
+	var view := settlement_view(lab_data, report, is_done(), reward)
+	_result_ok = bool(view["ok"])
+	var tone := str(view["tone"])
+	var color := UiTheme.MUTED
+	if tone == "ok":
+		color = UiTheme.CHALK_BRIGHT
+	elif tone == "bad":
+		color = UiTheme.DANGER
 	_result_bar.color = color
 	_result_strip.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.BOARD_SUNK, UiTheme.alpha(color, 0.7)))
-	_result_title.text = "验收 · 通过 %d/%d" % [ok_count, report.cases.size()]
+	_result_title.text = str(view["title"])
 	_result_title.add_theme_color_override("font_color", color)
-	if fail_details.is_empty():
-		_result_detail.text = ""
-		_result_detail.add_theme_color_override("font_color", UiTheme.CHALK)
-		if is_done():
-			var reward: Dictionary = DataDB.chapter.lab(lab_id).get("reward", {})
-			_result_detail.text = "已记账 · 金币 +%d · XP +%d" % [int(reward.get("gold", 0)), int(reward.get("xp", 0))]
-	else:
-		_result_detail.text = "未通过：" + " / ".join(PackedStringArray(fail_details))
-		_result_detail.add_theme_color_override("font_color", UiTheme.RUST)
+	_result_detail.text = str(view["detail"])
+	_result_detail.add_theme_color_override("font_color", UiTheme.RUST if tone == "bad" else UiTheme.CHALK)
 	# 提示阶梯读到本次最大 attempt；误区只在 required 失败时出（成功即清空）。
 	_attempt = 0
 	for raw in report.cases:
