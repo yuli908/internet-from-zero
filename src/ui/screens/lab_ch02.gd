@@ -53,16 +53,16 @@ func _build_probe() -> void:
 		var c: Dictionary = raw
 		if str(c.get("kind", "")) == "mosfet_region":
 			center.add_child(_probe_card(c))
+	for raw in lab_data.get("gate_cases", []):
+		var q: Dictionary = raw
+		if str(q.get("kind", "")) == "quiz":
+			center.add_child(_quiz_card(q, 2))
 	center.add_child(Ui.spacer())
 
 	inspector.add_child(_section("本节判据"))
 	for raw in lab_data.get("gate_cases", []):
 		var c: Dictionary = raw
 		inspector.add_child(Ui.wrap(str(c.get("title", "")), UiTheme.F_BODY, UiTheme.MUTED))
-	for raw in lab_data.get("gate_cases", []):
-		var q: Dictionary = raw
-		if str(q.get("kind", "")) == "quiz":
-			inspector.add_child(_quiz_card(q))
 	_editor = null
 	inspector.add_child(Ui.spacer())
 	inspector.add_child(Ui.button("运行验收", func(): _run(str(lab_data.get("title", lab_id))), true))
@@ -466,7 +466,7 @@ func _style_choice(b: Button, on: bool) -> void:
 	b.add_theme_stylebox_override("normal", UiTheme.flat(UiTheme.CHALK if on else UiTheme.BOARD_HIGH, UiTheme.CHALK if on else UiTheme.LINE))
 	b.add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.CHALK)
 
-func _quiz_card(c: Dictionary) -> Control:
+func _quiz_card(c: Dictionary, cols: int = 1) -> Control:
 	var quiz: Dictionary = c.get("quiz", {})
 	var card := Ui.card(UiTheme.BOARD_HIGH, UiTheme.LINE)
 	var m := Ui.margin4(12, 8, 12, 8)
@@ -474,8 +474,18 @@ func _quiz_card(c: Dictionary) -> Control:
 	var v := Ui.vbox(6)
 	m.add_child(v)
 	v.add_child(Ui.wrap(str(quiz.get("question", "")), UiTheme.F_BODY, UiTheme.CHALK))
-	for ob in _quiz_options(c):
-		v.add_child(ob)
+	if cols > 1:
+		var grid := GridContainer.new()
+		grid.columns = cols
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 4)
+		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		v.add_child(grid)
+		for ob in _quiz_options(c):
+			grid.add_child(ob)
+	else:
+		for ob in _quiz_options(c):
+			v.add_child(ob)
 	return card
 
 func _quiz_options(c: Dictionary) -> Array:
