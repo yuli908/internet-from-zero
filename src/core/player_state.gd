@@ -114,6 +114,31 @@ func grant_items(lab_id: String, grants: Dictionary, catalog: Catalog, dry_run: 
 		granted[str(raw_id)] = int(items[raw_id])
 	return {"ok": true, "error": "", "granted": granted, "already": false}
 
+func backfill_lab_grants(chapter: ChapterRuntime, labs_doc: Dictionary, catalog: Catalog) -> Dictionary:
+	## M5：旧档补发。已通关但从未领过教学奖励的存档，读档后补发一次。
+	## 走 `grant_items` 的 `once`/`bound_first` 路径：成功后写 `granted:<lab_id>`，
+	## 因此连续多次补发只会发一次，不会无限刷。
+	if chapter == null or catalog == null:
+		return {"ok": false, "error": "数据未就绪", "granted": {}, "labs": []}
+	var added := {}
+	var labs_done := []
+	for raw_id in chapter.lab_order:
+		var lab_id := str(raw_id)
+		if not is_lab_completed(lab_id):
+			continue
+		if has_flag("granted:%s" % lab_id):
+			continue
+		var grants: Dictionary = chapter.grants(lab_id, labs_doc)
+		if grants.is_empty():
+			continue
+		var r := grant_items(lab_id, grants, catalog)
+		if not bool(r.get("ok", false)) or bool(r.get("already", false)):
+			continue
+		for raw_item in r.get("granted", {}).keys():
+			added[str(raw_item)] = item_count(str(raw_item))
+		labs_done.append(lab_id)
+	return {"ok": true, "error": "", "granted": added, "labs": labs_done}
+
 func grant_knowledge(id: String) -> bool:
 	if knowledge.has(id):
 		return false

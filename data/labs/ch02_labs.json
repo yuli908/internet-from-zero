@@ -1,0 +1,138 @@
+{
+  "version": 2,
+  "source": "docs/design/11-ch02-content-spec.md",
+  "pending_kinds": {
+    "static_current": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd",
+    "rail_margin": "L1 仿真层只输出 0/1/X，无输出电平模型，规格要求 V_high/V_low 落在轨内"
+  },
+  "labs": {
+    "transistor": {
+      "id": "transistor",
+      "title": "2.1 三端开关",
+      "body": "一个继电器要靠线圈拉触点，慢、响、费电。换成一颗 MOSFET：栅极加电压，源漏之间就通。先把栅压从 0 加到 3.3 V，看它怎么从「断开」变成「导通」。测量条件：① Vgs=0.0 V、Vds=3.0 V；② Vgs=3.3 V、Vds=0.2 V；③ Vgs=3.3 V、Vds=3.0 V。",
+      "measure_conditions": [
+        {"gate": "T2.1-1", "vgs": 0.0, "vds": 3.0},
+        {"gate": "T2.1-2", "vgs": 3.3, "vds": 0.2},
+        {"gate": "T2.1-3", "vgs": 3.3, "vds": 3.0}
+      ],
+      "device": {
+        "type": "nmos",
+        "vdd": 3.3,
+        "vth": 0.9,
+        "ron_ohm": 50,
+        "id_off_ua": 0.001,
+        "id_sat_ua": 5000
+      },
+      "region_model": "vgs < vth → cutoff；vgs ≥ vth 且 vds < (vgs - vth) → linear；否则 saturation",
+      "presets": [
+        {"vgs": 0.0, "vds": 3.0, "label": "栅极 0 V"},
+        {"vgs": 1.65, "vds": 3.0, "label": "栅极 1.65 V（禁区）"},
+        {"vgs": 3.3, "vds": 0.2, "label": "栅极 3.3 V，漏极 0.2 V"},
+        {"vgs": 3.3, "vds": 3.0, "label": "栅极 3.3 V，漏极 3.0 V"}
+      ],
+      "hint": "Vgs 低于阈值就是断路；高于阈值后，看 Vds 与 (Vgs−Vth) 的大小关系区分线性区与饱和区。",
+      "misconception": "「MOSFET 是放大器，不适合做开关」：做数字逻辑时它只在截止与线性两端来回，不工作在放大区。",
+      "gate_cases": [
+        {"id": "T2.1-1", "title": "Vgs=0：截止，Id ≤ 1 µA", "kind": "mosfet_region",
+         "vgs": 0.0, "vds": 3.0, "expect_region": "cutoff", "max_id_ua": 1, "required": true},
+        {"id": "T2.1-2", "title": "Vgs=3.3, Vds=0.2：线性区，Ron ≤ 50 Ω", "kind": "mosfet_region",
+         "vgs": 3.3, "vds": 0.2, "expect_region": "linear", "max_ron_ohm": 50, "required": true},
+        {"id": "T2.1-3", "title": "Vgs=3.3, Vds=3.0：饱和区，Id 不随 Vds 变（±10%）", "kind": "mosfet_region",
+         "vgs": 3.3, "vds": 3.0, "expect_region": "saturation", "cadence_tol": 0.10, "required": true},
+        {"id": "T2.1-4", "title": "选择题：为什么数字逻辑用 MOS 而不是 BJT", "kind": "quiz",
+         "quiz": {
+           "question": "数字电路几乎都用 MOSFET 而不是 BJT，最关键的原因是？",
+           "options": ["BJT 不能做开关", "MOS 的栅极几乎不取电流，级联时不需持续驱动功耗", "BJT 只能承受低压", "MOS 速度永远更快"],
+           "answer": 1,
+           "explain": "栅极是电容性负载：只在翻转时充放电，稳态几乎不耗电；BJT 需要持续的基极电流。"
+         }, "required": true}
+      ],
+      "grants": {"items": {"M06": 1, "M07": 2}, "blueprint": ["KN-TR-04"]}
+    },
+    "inverter": {
+      "id": "inverter",
+      "title": "2.2 两个管子造一个门",
+      "body": "上面一个 PMOS（栅极低时导通），下面一个 NMOS（栅极高时导通）。输入 0 时上面通、输出接电源；输入 1 时下面通、输出接地。两种稳态都只有一条通路有电流。",
+      "topology": {"pull_up": "pmos", "pull_down": "nmos", "inputs": ["a"], "outputs": ["y"]},
+      "rail": {"v_high_min": 3.2, "v_low_max": 0.1},
+      "static_current_max_ua": 1.0,
+      "max_gates": 4,
+      "hint": "先只接 0 和 1 两种输入；注意两种稳态下电源到地的通路都被一只管子切断。",
+      "misconception": "「CMOS 不耗电」不准确：稳态几乎不耗电，翻转时仍要充放电（2.5 节会算这笔账）。",
+      "gate_cases": [
+        {"id": "T2.2-1", "title": "反相真值表 2/2（0→1，1→0）", "kind": "truth", "rows": [[0], [1]], "expected": [1, 0], "required": true},
+        {"id": "T2.2-2", "title": "输入 X 时输出 X（三值传播）", "kind": "x_propagation", "expect": "X", "required": true},
+        {"id": "T2.2-3", "title": "两种稳态下静态电流 ≤ 1 µA", "kind": "static_current", "max_ua": 1.0, "states": [[0], [1]], "required": true,
+         "status": "pending", "pending_reason": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd"},
+        {"id": "T2.2-4", "title": "输出轨到轨：高 ≥ 3.2 V，低 ≤ 0.1 V", "kind": "rail_margin", "v_high_min": 3.2, "v_low_max": 0.1, "required": true,
+         "status": "pending", "pending_reason": "L1 仿真层只输出 0/1/X，无输出电平模型，规格要求 V_high/V_low 落在轨内"}
+      ],
+      "grants": {"items": {"G01": 1}, "blueprint": ["KN-CMOS-01"]}
+    },
+    "nand": {
+      "id": "nand",
+      "title": "2.3 万能门",
+      "body": "只用与非门（NAND），造出非、与、或。提示：把两个输入接在一起就是非；与 = 与非再取非；或 = 用德摩根把输入先取非。",
+      "palette": ["nand"],
+      "max_gates": 6,
+      "tasks": [
+        {"id": "t_nand", "title": "任务 A：观察 NAND 真值表", "target": "nand", "palette": ["nand"], "input_ids": ["a", "b"]},
+        {"id": "t_not", "title": "任务 B：1 个 NAND 造 NOT", "target": "not", "palette": ["nand"], "input_ids": ["a"]},
+        {"id": "t_and", "title": "任务 C：2 个 NAND 造 AND", "target": "and", "palette": ["nand"], "input_ids": ["a", "b"]},
+        {"id": "t_or", "title": "任务 D：3 个 NAND 造 OR", "target": "or", "palette": ["nand"], "input_ids": ["a", "b"]}
+      ],
+      "hint": "A NAND A = ¬A；(A NAND B) NAND (A NAND B) = A∧B；(¬A NAND ¬B) = A∨B。",
+      "misconception": "「NAND 只是与门加非门，肯定更慢更贵」：物理上 NAND 是最小 CMOS 单元，AND 反而要多一级。",
+      "gate_cases": [
+        {"id": "T2.3-1", "title": "NAND 真值表 4/4", "kind": "truth", "rows": [[0,0],[0,1],[1,0],[1,1]], "expected": [1,1,1,0], "required": true},
+        {"id": "T2.3-2", "title": "只用 NAND 造出 NOT（≤1 门）", "kind": "target", "target": "not", "max_gates": 1, "required": true},
+        {"id": "T2.3-3", "title": "只用 NAND 造出 AND（≤2 门）", "kind": "target", "target": "and", "max_gates": 2, "required": true},
+        {"id": "T2.3-4", "title": "只用 NAND 造出 OR（≤3 门）", "kind": "target", "target": "or", "max_gates": 3, "required": true}
+      ],
+      "grants": {"items": {"G06": 2}, "blueprint": ["KN-NAND-01"]}
+    },
+    "replace": {
+      "id": "replace",
+      "title": "2.4 把旧门换掉",
+      "body": "第一章你用 2 个非门 + 2 个门拼出 XOR。现在用 4 个 NAND 重做一遍：行为必须完全一致，但更快、更小、稳态不耗电。验收只看行为；结构由你决定。",
+      "reference": "CH01 MY-XOR",
+      "topology": {"inputs": ["a", "b"], "outputs": ["out"]},
+      "max_gates": 5,
+      "max_delay": 8,
+      "static_current_max_ua": 1.0,
+      "hint": "4 个 NAND 的标准接法：n1=NAND(A,B)；n2=NAND(A,n1)；n3=NAND(B,n1)；Y=NAND(n2,n3)。",
+      "misconception": "「行为等价就等于可以替换」：还要看延迟、面积与静态电流，否则换上去的系统可能跑不动。",
+      "gate_cases": [
+        {"id": "T2.4-1", "title": "与 CH01 的 XOR 行为等价（4/4 真值 + 含 X）", "kind": "equiv", "ref": "xor", "required": true},
+        {"id": "T2.4-2", "title": "稳定时间 ≤ 8 tick（NAND 2 t × 3 级）", "kind": "delay", "max": 8, "required": true},
+        {"id": "T2.4-3", "title": "门数 ≤ 5（含封装）", "kind": "area_max", "max_gates": 5, "required": true},
+        {"id": "T2.4-4", "title": "全部稳态静态电流 ≤ 1 µA", "kind": "static_current", "max_ua": 1.0, "states": [[0,0],[0,1],[1,0],[1,1]], "required": true,
+         "status": "pending", "pending_reason": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd"}
+      ],
+      "grants": {"items": {"G04": 1}, "blueprint": ["KN-EQUIV-01"]}
+    },
+    "power": {
+      "id": "power",
+      "title": "2.5 代价：电、热、面积",
+      "body": "CMOS 稳态几乎不耗电，但每次翻转都要给栅极电容充放电。P = α·C·V²·f。把频率降一半，功耗会怎样？最后在 1 块 PCB 上塞进 4 个门。",
+      "power_model": {"alpha": 0.5, "c_f": 1e-11, "vdd": 3.3, "f_hz": 1000000},
+      "board": {"pcb_slots": 4, "must_pass": ["not", "and", "or", "xor"]},
+      "hint": "P 与 f 成正比；V 是平方项，所以降压比降频更狠（但降压会碰到阈值）。",
+      "misconception": "「降频只是变慢，和省电无关」：动态功耗与频率线性相关，降一半频率就少一半动态功耗。",
+      "gate_cases": [
+        {"id": "T2.5-1", "title": "算出 P ≈ 0.0545 mW（±5%）", "kind": "power_calc", "alpha": 0.5, "c_f": 1e-11, "vdd": 3.3,
+         "f_hz": 1000000, "expect_mw": 0.0545, "tol": 0.05, "required": true},
+        {"id": "T2.5-2", "title": "频率减半 → 功耗比 0.50（±2%）", "kind": "power_ratio", "f_from": 1000000, "f_to": 500000, "expect_ratio": 0.5, "tol": 0.02, "required": true},
+        {"id": "T2.5-3", "title": "1 块 PCB（4 槽）放下 4 个门且各自真值表全过", "kind": "build_area", "slots": 4, "targets": ["not", "and", "or", "xor"], "max_total_gates": 8, "required": true},
+        {"id": "T2.5-4", "title": "选择题：为什么静态功耗近似为 0", "kind": "quiz",
+         "quiz": {
+           "question": "CMOS 门在稳态几乎不耗电，原因是？",
+           "options": ["管子电阻很大", "任一稳态下电源到地之间总有一只管子截止", "电源电压低", "电流都存进电容了"],
+           "answer": 1,
+           "explain": "互补结构保证稳态时上下两只管子不同时导通，通路被切断。"
+         }, "required": true}
+      ],
+      "grants": {"items": {"M13": 1}, "blueprint": ["KN-PWR-01"], "milestone_badge": "CH02-BOARD"}
+    }
+  }
+}

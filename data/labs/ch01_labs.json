@@ -89,6 +89,7 @@
       "encapsulation": {"name": "MY-XOR", "ports": ["a", "b", "out"]},
       "hint": "XOR = (A ∧ ¬B) ∨ (¬A ∧ B)。先让两条路径各自正确，再或起来；也可以尝试别的等价式。",
       "misconception": "「电路必须和标准答案画得一样」：验收是黑盒的，行为等价即可；不同结构在延迟与成本上仍有差别。",
+      "grants": {"items": {"G01": 1, "G02": 1, "G03": 1}, "bound_first": true},
       "gate_cases": [
         {"id": "T1.4-1", "title": "AND / OR / NOT 三个基础门通过", "kind": "basic", "required": true},
         {"id": "T1.4-2", "title": "XOR 4/4 且延迟 ≤ 12 tick", "kind": "xor", "max_delay": 12, "required": true},
@@ -135,6 +136,7 @@
       "random_cases": 8,
       "hint": "SUM 用异或，CARRY 用与。两个输出可以共享同一个 A/B 输入。",
       "misconception": "「加法器就是 CPU」：半加器只能算 1 位且没有进位输入；它只是更大算术单元的砖。",
+      "grants": {"items": {"G04": 1}, "bound_first": true},
       "gate_cases": [
         {"id": "T1.6-1", "title": "SUM/CARRY 四行真值表 4/4", "kind": "truth", "required": true},
         {"id": "T1.6-2", "title": "输入到输出稳定时间 ≤ 12 tick", "kind": "delay", "max": 12, "required": true},

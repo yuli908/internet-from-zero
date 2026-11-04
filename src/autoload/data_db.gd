@@ -135,6 +135,16 @@ func _validate() -> void:
 		for gid in lab.get("gate_ids", []):
 			if not case_ids.has(str(gid)):
 				errors.append("实验 %s 的 gate_ids 引用了未定义的用例 %s" % [str(lab_id), str(gid)])
+		var grants: Dictionary = chapter.grants(str(lab_id), labs)
+		var gitems: Variant = grants.get("items", {})
+		if not (gitems is Dictionary):
+			errors.append("实验 %s 的 grants.items 必须是字典" % str(lab_id))
+		else:
+			for iid in (gitems as Dictionary).keys():
+				if not catalog.has_item(str(iid)):
+					errors.append("实验 %s 的奖励物品 %s 不存在" % [str(lab_id), str(iid)])
+				if int((gitems as Dictionary)[iid]) < 1:
+					errors.append("实验 %s 的奖励物品 %s 数量非法" % [str(lab_id), str(iid)])
 	for node_id in skill_graph.order:
 		for p in skill_graph.prereqs(str(node_id)):
 			if not skill_graph.has_node(str(p)):

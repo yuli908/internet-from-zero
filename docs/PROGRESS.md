@@ -371,6 +371,33 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   未知 code 兜底、悬空线精确回传。回归 **2033 checks / 0 failures**（23 套件）。
 - **未接 UI**：`src/ui/` 未改；UI 按 `specs/m5/failure_contract.md` 自行渲染。
 
+### 2.21 M5 CH02 数据落地 + CH01 奖励补发（2026-11-04）
+
+- CH01 奖励真正发放：`data/labs/ch01_labs.json` 的 `gate` 段发 `G01/G02/G03`、`half_adder` 段发 `G04`，
+  均带 `"bound_first": true`；读取路径统一为 `ChapterRuntime.grants(lab_id, labs_doc)`
+  （章节内联字段只作覆盖，奖励表只有一份），`ChapterFlow.complete_lab` 改走该入口。
+- 物品侧 `bound_first`：`G01–G04` 四件教学奖励与 `M01/M09/G12` 同口径（首件绑定标记）。
+  现状：`bound_first` 只是数据声明，回收/出售逻辑尚未读取该字段（见偏差 26）。
+- 旧档补发：`PlayerState.backfill_lab_grants()` 在 `SaveManager.load_game` 后调用一次；
+  只补"已通关 + 无 `granted:<lab>` 标记 + 有 grants"的 lab，走 `grant_items` 的 once 路径写标记，
+  因此连续多次读档也只发一次。补发后立即 `save_game(1, true)` 固化。
+- CH02 数据：新增 `data/chapters/ch02_levels.json`（5 节 / 5 目标 / 5 项技能节点引用 / 章末 25 g）、
+  `data/labs/ch02_labs.json`（20 条 gate）；`data/manifest.json` 8 → 10；`tests/test_data.gd` 同步。
+- 判定：新增 `src/core/ch02_checks.gd`，11 种 kind 全部经 `GateResult`/`GateReport` 出口；
+  **落地 17 条 / pending 3 条**（`T2.2-3`、`T2.2-4`、`T2.4-4` 全部因 `static_current`/`rail_margin`
+  仿真层缺口，标 `E_PENDING` 且 `required=false`，不算通过）。
+  新增 code 18–25（只增不改），`specs/m5/failure_contract.md` §2/§8 已同步。
+- 测试：新增 `tests/test_ch01_grants.gd`、`tests/test_ch02.gd`，共 **+120 checks**；
+  全量 **2235 checks / 0 failures**（25 套件）。
+
+### 2.22 金币口径纠偏（2026-11-04）
+
+- CH01 结余：**277–337 g【估值】**（原 252 g 漏算章末技能节点 `CH01` 的 25 g，见偏差 11/§3.1）；
+- CH02 必需支出：**≈70 g**（M13 30 + M14 20 + 线缆/电阻 20）；原 88 g 重复计了 M06 的 18 g
+  （M06 由 2.1 赠送，M14 买成品不耗库存 M06）；
+- CH02 收入 175 g（lab 150 + 章末节点 25），章末结余 382–442 g；已写入 `ch02_levels.json` 的 `economy`
+  块并加 `tests/test_ch02.gd` 断言。**未改** `docs/design/04`、`05` 的 77 配方口径。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -399,6 +426,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 22 | alu4（166 门）无门级网表，`t_settle` 没有可实测的对象 | 按 `components.py::ALU._build()` 关键路径结构推导为 **61 tick**（控制 4 + 补码选择 7 + 行波加 28 + 两级选择 12 + V 标志 10），`tests/test_macro.gd` 用 `SimDelays` 公式重算断言、不硬编码 | 80 门硬上限决定了 ALU 不能进可交互门级视图；没有网表就没有实测条件。若仿真组日后给出 ALU 实测值，以实测为准并改本行，**`docs/simulation/` 不改** |
 | 23 | `docs/design/11` §3 的 8 种判定 kind 为英文小写（`mosfet_region` … `power_ratio`） | trace kind 取**全大写机械映射**（`MOSFET_REGION` … `POWER_RATIO`），映射表在 `SimCircuit.JUDGEMENT_KINDS`；`build_area` 是语法糖，不产生 trace，也不计入 8 种 | 避免自造词、避免小写/大写两套事件名；映射只有一处（`docs/design/11` → 工程常量），UI 按 `specs/m4/ui_contract.md` 接线 |
 | 24 | 教学组失败诊断表 `docs/curriculum/05-failure-diagnostics.md` 定义 code 与 `K/S/C/P/M/R` 语义（任务书要求"按它设计，不要自己发明"） | **该文件未入库**（仓库只有 `05-onboarding-guidance.md`、`06-assessment-and-feedback.md`），全库 grep 无 `error_tags`/诊断表内容。已按六类语义落地机器初值：18 个 code + `GateResult.TAG_MAP`；结构与字段不依赖映射 | 不能凭空等待文档而阻塞 M5 基础设施；文档交付后**只改 `GateResult.TAG_MAP` 一表**（必要时新增 code），不改 `GateReport` 字段、调用方与 UI 契约形状。详见 `specs/m5/failure_contract.md` §3 |
+| 25 | 2.1 的 MOS 器件参数 | **教学归一化值**：`vth 0.9 V / Ron 50 Ω / Id_sat 5 mA / Id_off 1 nA`，不是真实工艺；已调到"同一 Vds 下线性区电流 < 饱和区电流"（Vds=0.2 V 时线性 4000 µA < 饱和 5000 µA），并在 lab 文案写死三组测量条件（Vgs/Vds） | 原 `Id_sat=1000 µA` 低于线性区 4000 µA，与"饱和=封顶"矛盾；教学只需单调关系，不追求 SPICE 精度。见 §2.21 与 `ch02_labs.json` 的 `measure_conditions` |
+| 26 | `bound_first` 首件绑定不可回收 | 仅数据声明（`G01–G04` 与 `M01/M09/G12` 同口径），`EconomyCore` 回收逻辑尚未读取该字段；**防套利目前靠 `granted:<lab>` 一次性发放标记**，不是靠回收拦截 | 改 `EconomyCore.sell` 会破坏既有 `test_economy` 的 M01 回收断言（2033/2115 基线不许退）；需与物品系统单独排期 |
+| 27 | CH02 技能树 24 个节点 / `start_gold_mode: carry` | 只在 `ch02_levels.json` 引用 `SK-TR…SK-POWER` 与 `milestone CH02-1…5`，**未新增 `skilltree.json` 节点**；`start_gold_mode` 字段已写入但 `ChapterRuntime` 未实现 carry 逻辑，按规格回落 `start_gold 0` | 新增 24 节点会让 `tests/test_data.gd` 的"36 节点"断言退；M5 任务只授权 ch02 两份数据 + manifest |
+| 28 | CH02 `static_current` / `rail_margin` | 仿真层（L1）只输出 0/1/X，无稳态电流与输出电平模型；3 条 gate 标 `E_PENDING` + `required=false`（**不算通过**），落地 17/20 | 不写永远通过的假 gate；最小电流模型评估见交付报告 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

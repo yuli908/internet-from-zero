@@ -34,6 +34,7 @@ func load_game(slot: int = 1, quiet: bool = false) -> Dictionary:
 			EventBus.toast(last_message, "warn")
 		elif not quiet:
 			EventBus.toast(last_message, "ok")
+		_backfill_rewards(st)
 		EventBus.state_changed.emit()
 		EventBus.fire("game_loaded")
 	else:
@@ -41,6 +42,20 @@ func load_game(slot: int = 1, quiet: bool = false) -> Dictionary:
 		if not quiet:
 			EventBus.toast(last_message, "error")
 	return res
+
+func _backfill_rewards(st: PlayerState) -> void:
+	## M5：旧档在关卡奖励字段落地前就通关，读档时补发一次（内部走 granted 标记，幂等）。
+	if DataDB.chapter == null or DataDB.catalog == null:
+		return
+	var bf := st.backfill_lab_grants(DataDB.chapter, DataDB.labs_doc, DataDB.catalog)
+	var granted: Dictionary = bf.get("granted", {})
+	if granted.is_empty():
+		return
+	var total := 0
+	for id in granted.keys():
+		total += int(granted[id])
+	EventBus.toast("补发历史奖励：%d 件物品" % total, "ok")
+	save_game(1, true)
 
 func autosave() -> void:
 	if GameState.player == null:

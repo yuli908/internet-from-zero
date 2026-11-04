@@ -8,6 +8,8 @@
     "res://data/tutorial.json",
     "res://data/chapters/ch01_levels.json",
     "res://data/labs/ch01_labs.json",
+    "res://data/chapters/ch02_levels.json",
+    "res://data/labs/ch02_labs.json",
     "res://data/sim/delays.json"
   ]
 }

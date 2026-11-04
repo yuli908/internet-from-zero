@@ -8,7 +8,7 @@ func run(ctx: TestContext) -> void:
 	var kg: KnowledgeGraph = db.skill_graph
 	var ch: ChapterRuntime = db.chapter
 
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 8)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 10)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.eq("items total", cat.items.size(), 86)

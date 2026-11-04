@@ -46,6 +46,27 @@ func objective(id_in: String) -> Dictionary:
 func objective_for_lab(lab_id: String) -> String:
 	return str(lab(lab_id).get("objective", ""))
 
+func grants(lab_id: String, labs_doc: Dictionary = {}) -> Dictionary:
+	## 物品奖励解析：优先章节内联 `grants`，否则回落到实验数据段（`ch01_labs.json` 等）。
+	## 单一数据源仍是 labs 段；章节内联只作覆盖入口，避免两份奖励表打架。
+	var lab_data := lab(lab_id)
+	if lab_data.is_empty():
+		return {}
+	var inline: Variant = lab_data.get("grants", {})
+	if inline is Dictionary and not (inline as Dictionary).is_empty():
+		return inline
+	if labs_doc.is_empty():
+		return {}
+	var key := str(lab_data.get("data_key", ""))
+	var all: Variant = labs_doc.get("labs", {})
+	if not (all is Dictionary):
+		return {}
+	var seg: Variant = (all as Dictionary).get(key, {})
+	if not (seg is Dictionary):
+		return {}
+	var g: Variant = (seg as Dictionary).get("grants", {})
+	return g if g is Dictionary else {}
+
 func requires(lab_id: String) -> Array:
 	var v: Variant = lab(lab_id).get("requires", [])
 	if v == null:
