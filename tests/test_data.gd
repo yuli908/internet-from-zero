@@ -112,7 +112,9 @@ func run(ctx: TestContext) -> void:
 	var sim: Dictionary = db.sim_doc
 	ctx.eq("sim frame ticks", int(sim.get("frame", {}).get("ticks_per_frame", 0)), 4)
 	ctx.eq("sim budget ms", int(sim.get("frame", {}).get("budget_ms", 0)), 5)
-	ctx.eq("gdscript gate limit", int(sim.get("limits", {}).get("gdscript_gates", 0)), 50)
+	ctx.eq("gdscript gate limit", int(sim.get("limits", {}).get("gdscript_gates", 0)), 100)
+	ctx.eq("gdscript dff limit", int(sim.get("limits", {}).get("gdscript_dff", 0)), 100)
+	ctx.eq("gdextension threshold", int(sim.get("limits", {}).get("require_gdextension_above", 0)), 100)
 	ctx.eq("not delay", int(sim.get("gate_delay", {}).get("not", 0)), 1)
 	ctx.eq("xor delay", int(sim.get("gate_delay", {}).get("xor", 0)), 4)
 	ctx.eq("relay delay", int(sim.get("relay", {}).get("delay_per_stage_ticks", 0)), 3)

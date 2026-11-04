@@ -15,7 +15,7 @@ const NODE_SIZE := Vector2(94, 44)
 var graph := CircuitGraph.new()
 var palette: Array = ["and", "or", "not"]
 var selected_gate := "and"
-var max_gates := 99
+var max_gates := 0
 var delay_per_gate := -1
 var last_status := ""
 
@@ -23,17 +23,23 @@ var _link_from := ""
 var _font: Font
 var _mono: Font
 
+func _init() -> void:
+	# 内容侧硬约束：上限与仿真实测同源，不在此处另行硬编码。
+	max_gates = SimDelays.gdscript_gate_limit()
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(520, 340)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_font = UiTheme.cjk_font()
 	_mono = UiTheme.mono_font()
 
-func setup(inputs: Array, outputs: Array, palette_in: Array, max_gates_in: int = 99, delay_in: int = -1) -> void:
+func setup(inputs: Array, outputs: Array, palette_in: Array, max_gates_in: int = -1, delay_in: int = -1) -> void:
 	graph = CircuitGraph.new()
 	palette = palette_in.duplicate()
 	selected_gate = str(palette[0]) if not palette.is_empty() else ""
-	max_gates = max_gates_in
+	# 关卡可以更严（如 12 门），但不能超过 GDScript 实测量；更严的上限照旧生效。
+	var cap := SimDelays.gdscript_gate_limit()
+	max_gates = cap if max_gates_in <= 0 else mini(max_gates_in, cap)
 	delay_per_gate = delay_in
 	var i := 0
 	for raw in inputs:
@@ -59,6 +65,9 @@ func evaluate() -> Dictionary:
 	return graph.evaluate()
 
 func build_sim() -> Dictionary:
+	# 超限不构建：要求走结构级（宏单元/L2 模块），不做静默截断。
+	if gate_count() > max_gates:
+		return {"ok": false, "sim": null, "inputs": [], "outputs": [], "error": "needs_structural_representation"}
 	return SimCircuit.build_graph(graph, delay_per_gate)
 
 func to_dict() -> Dictionary:
@@ -271,7 +280,7 @@ func _on_left(p: Vector2) -> void:
 		queue_redraw()
 		return
 	if gate_count() >= max_gates:
-		last_status = "门数量已达上限 %d" % max_gates
+		last_status = "门数量已达上限 %d：该电路需要结构级表示" % max_gates
 		queue_redraw()
 		return
 	var gid := _next_gate_id()

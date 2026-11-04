@@ -158,6 +158,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | B L2 组合层 | 四级各多少向量通过？L1/L2 混合怎么验？ | 半加器 9/9、全加器 35/35、8 位行波 288/288、2:1 选择器 35/35、4:1 选择器 16/16，**合计 383/383**；混合验证：同一 `SimCircuit` 内 L2 半加器 → L1 xor 门 → `bind(0)` → L2 选择器，4 组输入 + 选择端切换全对 | `tests/test_l2.gd`、§2.3 |
 | C 存档迁移 | 旧档载入会不会丢进度？ | v1/v2 fixture 经真实 `SaveStore` 落盘再 `load_slot()`：`migrated_from` 正确、金币/XP/槽位/时间戳/物品/知识/目标/lab/三类 flag/教程/stats/rng 逐项保留，未知字段原样保留，`scrap`→`gold` 改名生效，v4 明确拒绝；新增 60 项，总计 1410 项 0 失败 | `tests/test_save.gd`、`tests/data/saves/*.json`、§2.4 |
 
+### 2.7 OPT 实现层优化实测（2026-11-04，M3 追加条款 A）
+
+- 改动范围（语义不变）：`src/sim/sim_circuit.gd` 热路径数据化——线网/门用整数 id + `PackedInt32Array`/`PackedByteArray`、
+  fanout 邻接表在 `add_gate` 时预计算（去掉每门每输入的闭包订阅）、门求值走整数三值表、
+  门事件与 DFF 写事件进整数堆并与通用事件按 `(tick, seq)` 合并出队；`src/sim/sim_engine.gd` 只新增
+  `next_seq/peek/pop_next/advance`（共享 seq 与限额记账）。
+- 复现命令（3 次，每次 400 帧、4 tick/帧、50/80/100 三档）：
+  `powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1 -Sizes "50,80,100" -Frames 400`
+- 实测（p95 ms，3 次原值全列，不取最优；证据 `artifacts/logs/bench_opt_run1..3.log`）：
+
+| 规模（门 / DFF） | 优化前 p95（600 帧） | 第 1 次 | 第 2 次 | 第 3 次 | 判定（p95 ≤5 ms） |
+|---|---|---|---|---|---|
+| 50 / 50 | 3.318 | **1.341** | **1.344** | **1.518** | OK 3/3 |
+| 80 / 80 | 5.387（优化前首个超限） | **2.227** | **3.154** | **2.384** | OK 3/3 |
+| 100 / 100 | 7.594 | **3.063** | **3.076** | **2.913** | OK 3/3 |
+
+- 结论：100 门/100 DFF 三档 3 次全部 ≤5 ms（最差 3.154 ms，余量约 1.6×），`data/sim/delays.json` 的
+  `gdscript_gates/gdscript_dff/require_gdextension_above` 定为 **100**；`tests/test_data.gd` 同步断言。
+- 内容侧硬约束（M3-G15）：`CircuitEditor.max_gates` 默认取 `SimDelays.gdscript_gate_limit()`（关卡更严的值继续生效，
+  但不能超过 100）；超限不落门、状态栏显示"…该电路需要结构级表示"，`build_sim()` 返回
+  `{ok:false, error:"needs_structural_representation"}`，不做静默截断。`tests/test_circuit.gd` 新增 7 项断言锁住。
+- 全量回归：**1419 checks, 0 failures**（1410 基线 + 9 项：上限/提示/断言与数据字段）。
+- 只读文档：`docs/simulation/` 的 200 门估算**未改**，偏差见 §3 第 15 行，由仿真组修正。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -176,6 +200,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 12 | 首位玩家初始资源 | 初始金币 120，初始物品 M01/M09 各 1（`ch01_levels.json` 的 `start_gold/start_items`） | 与 `docs/design/03` §3 的初始 120 对齐 |
 | 13 | 货币单位 | 货币单位曾是 `scrap`（废铁），已按负责人裁决改为 **`gold`（金币，单位 g）**；`scrap` 降级为普通材料/回收物（`kind=material`）；旧档通过存档 v3 迁移（`scrap`→`gold`）兼容 | 与 `docs/design/03` §3「金币 g」口径统一；单字货币让材料与通货语义混淆 |
 | 14 | GDScript 门数上限 | 设计写 200 门/200 DFF；实测安全上限取 **50 门/50 DFF**（p95 3.32–4.03 ms）。细化档 70 门 4.69 ms 仍达标、80 门 5.39 ms 超限；因复跑存在抖动（早先一轮 60 门曾 5.03 ms），限值保守定为 50。`data/sim/delays.json` 的 `gdscript_gates/gdscript_dff/require_gdextension_above` 已改为 50，`tests/test_data.gd` 同步断言；ADR 0002 §2.1 判据表同步 | 200 从未实测；按 ADR 0002 §5「实测 <200 即超预算则下调限值并记偏差」执行，避免文档宣称能跑 200 而实际掉帧 |
+| 15 | 仿真文档估算 **200 门**/200 DFF（`docs/simulation/06`） | 实测两档：**优化前 50**（100 门 p95 7.6 ms、200 门 17.6 ms）；**实现层优化后 100**（100 门 3 次 p95 2.91–3.08 ms、400 帧）。上限已写 `gdscript_gates/gdscript_dff/require_gdextension_above = 100`，内容侧编辑器同源卡死，超限提示"该电路需要结构级表示" | 200 是未验证的估算；GDScript 解释执行、无 JIT，热路径（每事件字典 + `Callable.callv` + 闭包订阅）是瓶颈；优化后余量仅约 1.6×，不做 200 的承诺。**`docs/simulation/` 不改**，由仿真组据本行修正 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

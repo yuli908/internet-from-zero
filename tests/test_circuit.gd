@@ -59,3 +59,21 @@ func run(ctx: TestContext) -> void:
 	var bad := HalfAdder.validate(bad_gate)
 	ctx.check("wrong gate rejected", not bool(bad["ok"]))
 	ctx.eq("wrong gate rows", bad["rows"].size(), 4)
+
+	# M3-G15：内容侧门数上限（与 SimDelays 同源；超限拒绝并要求结构级表示）
+	ctx.check("gdscript gate limit is 100", SimDelays.gdscript_gate_limit() == 100)
+	var ed := CircuitEditor.new()
+	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"])
+	ctx.eq("editor cap from delays", ed.max_gates, SimDelays.gdscript_gate_limit())
+	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 500)
+	ctx.eq("editor cap clamped to measured", ed.max_gates, SimDelays.gdscript_gate_limit())
+	ed.setup([{"id": "a", "label": "A"}], [{"id": "out", "label": "O"}], ["and"], 8)
+	ctx.eq("editor cap keeps stricter lab limit", ed.max_gates, 8)
+	for i in range(SimDelays.gdscript_gate_limit() + 1):
+		ed.graph.add_gate("g%d" % i, LogicGates.Type.AND)
+	ed._on_left(Vector2(5, 300))
+	ctx.check("over cap shows structural hint", ed.last_status.contains("该电路需要结构级表示"), ed.last_status)
+	var over := ed.build_sim()
+	ctx.check("over cap build rejected", not bool(over.get("ok", true)))
+	ctx.eq("over cap error", str(over.get("error", "")), "needs_structural_representation")
+	ed.free()

@@ -14,9 +14,9 @@ const DEFAULT_DFF := {"setup": 2, "hold": 1, "clk_to_q": 2}
 const DEFAULT_FRAME := {"render_fps": 60, "budget_ms": 5, "ticks_per_frame": 4}
 const DEFAULT_LIMITS := {
 	"max_events_per_tick": 20000,
-	"gdscript_gates": 50,
-	"gdscript_dff": 50,
-	"require_gdextension_above": 50,
+	"gdscript_gates": 100,
+	"gdscript_dff": 100,
+	"require_gdextension_above": 100,
 }
 
 static var gate_table: Dictionary = DEFAULT_GATE.duplicate()
@@ -62,7 +62,9 @@ static func budget_ms() -> int:
 	return int(frame_table.get("budget_ms", 5))
 
 static func gdscript_gate_limit() -> int:
-	return int(limits_table.get("gdscript_gates", 200))
+	## 玩家可搭建的门级电路上限（内容侧与编辑器共用的单一来源）。
+	## 实测来源：`scripts/bench.ps1 -Sizes "50,80,100"` 三档各 3 次，100 档 p95 ≤5 ms 后定为 100。
+	return int(limits_table.get("gdscript_gates", 100))
 
 static func gate_table_snapshot() -> Dictionary:
 	return gate_table.duplicate()
