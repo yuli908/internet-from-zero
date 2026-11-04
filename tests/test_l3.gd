@@ -3,6 +3,28 @@ extends RefCounted
 ## M3 · L3 时序层（T1 DFF）。向量语义对齐 docs/simulation/ref/tests/test_sequential.py。
 ## 先用本套件锁住 M2 的 add_dff 行为（上升沿、clk→Q=2、下降沿不采样），再验证新增违例路径。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 100
+const EXPECT_GROUPS := {
+	"dff_baseline": 12, "setup_hold_reset": 18, "register": 8,
+	"register_en": 6, "shift_register": 6, "counter": 6,
+	"counter_period": 4, "counter_wrap": 20, "counter_en_load": 5,
+	"counter_too_fast": 2, "snapshot": 13,
+}
+const GROUP_DESCRIPTIONS := {
+	"dff_baseline": "M2 既有 DFF 行为：初值 X、上升沿后 2 tick 更新、下降沿不采样、收敛后队列空；3 级链逐级传播且无亚稳态",
+	"setup_hold_reset": "setup/hold 违例与边界不违例（Q=X + METASTABLE 的 subject/reason/tick）；异步复位优先于采样、撤销后恢复",
+	"register": "4 位寄存器按位采样、复位后清零、无亚稳态",
+	"register_en": "EN=1 装载、t_settle ≤9、EN=0 保持、EN=X 全字变 X",
+	"shift_register": "3 位移位寄存器逐沿移位与无亚稳态",
+	"counter": "4 位计数器位宽与逐沿自增、无亚稳态",
+	"counter_period": "4/8 位计数器实测最小偶数周期 14 / 26",
+	"counter_wrap": "18 个沿覆盖 0..15 并回绕、16 个值全覆盖、无亚稳态",
+	"counter_en_load": "LOAD 优先装入 9、放开后自增到 10、EN=0 保持、无亚稳态",
+	"counter_too_fast": "周期 10 低于实测 14 必然违例：出现 METASTABLE 且至少一位 Q=X",
+	"snapshot": "ifz-sim/2 快照格式/regs/clocks、往返 digest 与 tick、ifz-circuit/1 兼容、非静止态拒绝、切断后续跑与不中断一致",
+}
+
 func run(ctx: TestContext) -> void:
 	_test_m2_baseline(ctx)
 	_test_chain(ctx)
@@ -29,6 +51,7 @@ func _test_m2_baseline(ctx: TestContext) -> void:
 	## M2 既有行为（替换 add_dff 前先用测试锁住）：
 	##  - 上升沿 t=5 采样，Q 在 t=7 变；
 	##  - 下降沿不采样；下一次上升沿 t=15 → t=17 更新。
+	ctx.begin_group("dff_baseline")
 	var c := _mk("l3_m2")
 	c.add_dff("q", "d", "clk")
 	c.set_input("d", SimValue.ONE, 0)
@@ -72,6 +95,7 @@ func _test_chain(ctx: TestContext) -> void:
 
 func _test_setup(ctx: TestContext) -> void:
 	## setup=2：边沿前 1 tick 变 D → Q=X + METASTABLE；边沿前 2 tick 变 → 正常采样。
+	ctx.begin_group("setup_hold_reset")
 	var bad := _mk("l3_setup_bad")
 	bad.add_dff("q", "d", "clk")
 	bad.set_input("clk", SimValue.ONE, 5)
@@ -140,6 +164,7 @@ func _test_reset(ctx: TestContext) -> void:
 	ctx.eq("reset: 撤销后恢复采样 D=1", c.probe("q"), SimValue.ONE)
 
 func _test_register(ctx: TestContext) -> void:
+	ctx.begin_group("register")
 	var c := SimCircuit.new("l3_reg")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -166,6 +191,7 @@ func _test_register(ctx: TestContext) -> void:
 	ctx.check("register: 无亚稳态", c.metastable.is_empty(), str(c.metastable))
 
 func _test_shift_register(ctx: TestContext) -> void:
+	ctx.begin_group("shift_register")
 	var c := SimCircuit.new("l3_shift")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("din", SimValue.ZERO)
@@ -186,6 +212,7 @@ func _test_shift_register(ctx: TestContext) -> void:
 	ctx.check("shift: 无亚稳态", c.metastable.is_empty(), str(c.metastable))
 
 func _test_counter(ctx: TestContext) -> void:
+	ctx.begin_group("counter")
 	var c := SimCircuit.new("l3_counter")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -207,6 +234,7 @@ func _test_counter(ctx: TestContext) -> void:
 
 func _test_counter_period(ctx: TestContext) -> void:
 	## 周期实测：偶数 + 全周期扫描 + 无 METASTABLE + 逐沿正确。写回 data/sim/delays.json 的 `l3`。
+	ctx.begin_group("counter_period")
 	var p4 := SimSequential.measure_counter_period(4)
 	ctx.check("counter4: 找到稳定周期", bool(p4.get("ok", false)), str(p4.get("error", "")))
 	ctx.eq("counter4: 最小偶数周期 = 14", int(p4.get("period", 0)), 14)
@@ -216,6 +244,7 @@ func _test_counter_period(ctx: TestContext) -> void:
 
 func _test_register_en(ctx: TestContext) -> void:
 	## G5：EN=0 保持、EN=1 装载、EN=X → Q=X，t_settle ≤ 9。
+	ctx.begin_group("register_en")
 	var c := SimCircuit.new("l3_reg_en")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -250,6 +279,7 @@ func _test_register_en(ctx: TestContext) -> void:
 
 func _test_counter_wrap(ctx: TestContext) -> void:
 	## G6（1/3）：18 个沿覆盖 0..15 全不同并回绕；周期用 min+6=20（偶数）。
+	ctx.begin_group("counter_wrap")
 	var c := SimCircuit.new("l3_wrap")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -271,6 +301,7 @@ func _test_counter_wrap(ctx: TestContext) -> void:
 
 func _test_counter_en_load(ctx: TestContext) -> void:
 	## G6（2/3）：LOAD 优先、EN=0 保持、释放后继续自增。
+	ctx.begin_group("counter_en_load")
 	var c := SimCircuit.new("l3_cnt_ld")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -308,6 +339,7 @@ func _test_counter_en_load(ctx: TestContext) -> void:
 
 func _test_counter_too_fast(ctx: TestContext) -> void:
 	## G6（3/3）：周期 10（< 实测 14）必然违例 → Q=X + METASTABLE，不静默给假值。
+	ctx.begin_group("counter_too_fast")
 	var c := SimCircuit.new("l3_fast")
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("rst", SimValue.ZERO)
@@ -335,6 +367,7 @@ func _counter_circuit(prefix: String) -> SimCircuit:
 
 func _test_snapshot(ctx: TestContext) -> void:
 	## G10：ifz-sim/2 往返 digest 相同（含 regs/tick）；能恢复 ifz-circuit/1；非静止态被拒。
+	ctx.begin_group("snapshot")
 	var c := _counter_circuit("snap_src")
 	c.run_until(80)
 	c.settle()

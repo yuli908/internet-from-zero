@@ -5,8 +5,25 @@
 
 const LAB_IDS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 49
+const EXPECT_GROUPS := {
+	"lab_config": 14, "voltage": 9, "binary": 5, "boolean": 4,
+	"gate": 7, "signal": 5, "half_adder": 5,
+}
+const GROUP_DESCRIPTIONS := {
+	"lab_config": "6 节 lab 配置齐备、每节 4 条 gate 用例、用例总数 24",
+	"voltage": "电压判定 4 例全过、错误期望值被判失败、0.8/2.0 边界归类",
+	"binary": "二进制实验 4 例全过，缺覆盖 / 缺目标 / 答错三条失败路径",
+	"boolean": "布尔实验 4 例全过，错 AND 与错德摩根定律两条失败路径",
+	"gate": "门电路实验 4 例全过，缺第二结构 / 未封装 / 错 XOR 三条失败路径与延迟上限",
+	"signal": "信号实验 4 例全过，错延迟 / 无毛刺 / 未修复三条失败路径",
+	"half_adder": "半加器实验 4 例全过，未封装 / 错进位两条失败路径与延迟上限",
+}
+
 func run(ctx: TestContext) -> void:
 	var labs: Dictionary = TestUtil.labs_doc().get("labs", {})
+	ctx.begin_group("lab_config")
 	ctx.eq("lab count", labs.size(), 6)
 	for lid in LAB_IDS:
 		ctx.check("lab cfg %s" % lid, labs.has(lid))
@@ -27,6 +44,7 @@ func run(ctx: TestContext) -> void:
 	_half_adder(ctx, labs.get("half_adder", {}))
 
 func _voltage(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("voltage")
 	var rep := LabChecks.voltage(cfg)
 	ctx.check("voltage 4 cases", rep.cases.size() == 4, str(rep.cases.size()))
 	ctx.check("voltage all pass", rep.all_required_passed(), rep.summary())
@@ -44,6 +62,7 @@ func _voltage(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("voltage boundary 2.0 is 1", VoltageModel.judge(2.0, 0.8, 2.0) == SimValue.ONE)
 
 func _binary(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("binary")
 	var visited := {}
 	for v in range(0, 16):
 		visited[str(v)] = true
@@ -65,6 +84,7 @@ func _binary(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("binary wrong quiz fails", not r4.all_required_passed(), r4.summary())
 
 func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("boolean")
 	var filled := {
 		"and": ["0", "0", "0", "1"],
 		"or": ["0", "1", "1", "1"],
@@ -84,6 +104,7 @@ func _boolean(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("boolean wrong demorgan fails", not r3.all_required_passed(), r3.summary())
 
 func _gate(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("gate")
 	var graphs := {
 		"t_and": _and_graph(),
 		"t_or": _or_graph(),
@@ -112,6 +133,7 @@ func _gate(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("xor delay <= 12", LabChecks.measure_delay(_xor_graph_a(), ["a", "b"]) <= 12)
 
 func _signal(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("signal")
 	var rep := LabChecks.signal_cases(cfg, 9, 2, true, 1)
 	ctx.check("signal 4 cases", rep.cases.size() == 4, str(rep.cases.size()))
 	ctx.check("signal all pass", rep.all_required_passed(), rep.summary())
@@ -123,6 +145,7 @@ func _signal(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("signal unfixed fails", not r4.all_required_passed(), r4.summary())
 
 func _half_adder(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("half_adder")
 	var graph := _half_adder_graph()
 	var rep := LabChecks.half_adder(cfg, graph, true)
 	ctx.check("half_adder 4 cases", rep.cases.size() == 4, str(rep.cases.size()))

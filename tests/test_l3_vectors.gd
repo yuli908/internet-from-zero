@@ -6,8 +6,18 @@ extends RefCounted
 
 const VEC_PATH := "res://tests/data/l3_vectors.json"
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 4
+const EXPECT_GROUPS := {"loadable": 0, "vectors": 2, "compare": 2}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "向量文件可读、JSON 可解析：仅在文件缺失或解析失败时才执行的兜底检查",
+	"vectors": "格式标记为 ifz-l3-vectors/1、用例数 ≥24",
+	"compare": "期望条数恰为 51、51 条逐条比对全过",
+}
+
 func run(ctx: TestContext) -> void:
 	var f := FileAccess.open(VEC_PATH, FileAccess.READ)
+	ctx.begin_group("loadable")
 	if f == null:
 		ctx.check("L3 向量文件存在", false, VEC_PATH)
 		return
@@ -17,6 +27,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("L3 向量可解析", false, str(parsed))
 		return
 	var doc: Dictionary = parsed
+	ctx.begin_group("vectors")
 	ctx.eq("L3 向量格式", str(doc.get("format", "")), "ifz-l3-vectors/1")
 	var cases: Array = doc.get("cases", [])
 	ctx.check("L3 向量用例 ≥ 24", cases.size() >= 24, "cases=%d" % cases.size())
@@ -30,6 +41,7 @@ func run(ctx: TestContext) -> void:
 		passed += int(res["passed"])
 		for msg in (res["fails"] as Array):
 			ctx.check("L3 向量 %s：%s" % [str(c.get("name", i)), str(msg)], false)
+	ctx.begin_group("compare")
 	ctx.eq("L3 向量期望条数", rows, 51)
 	ctx.check("L3 向量逐条通过 %d/%d" % [passed, rows], passed == rows)
 

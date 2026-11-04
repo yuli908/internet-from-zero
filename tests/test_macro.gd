@@ -3,6 +3,23 @@ extends RefCounted
 ## M4-G1/G2/G10：宏单元目录、只读分页、展开/折叠边界与预算同源。
 ## 预算数字一律来自 `SimDelays`，测试不硬编码 50/80。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 69
+const EXPECT_GROUPS := {
+	"cells": 12, "pages": 8, "expand_scale": 5, "expand_ok": 9,
+	"fold_determinism": 12, "expand_page": 11, "budget": 8, "alu_settle": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"cells": "目录 3 条、三种宏单元门数、可展开标记、未知宏单元与 cells() 深拷贝",
+	"pages": "alu4 七页合计 166 且每页不超默认上限、decoder3/comparator4 单页、页 id 与三块语义分组",
+	"expand_scale": "alu4/footprint 超规模与未知宏单元两种展开拒绝及错误码、被拒不写门",
+	"expand_ok": "decoder3/comparator4 展开的门数与输入输出端口数、展开后不超绝对上限",
+	"fold_determinism": "展开→折叠→再展开的端口摘要与 state_digest 稳定、未知宏单元与 alu4 只读折叠",
+	"expand_page": "alu4 只读页不建门且标记 read_only、未知页错误码、decoder3 单页展开与无超限页",
+	"budget": "预置门数后 50<合计≤80 允许构建并给 scale_warn、超绝对上限被拒且不写入门",
+	"alu_settle": "alu4/decoder3/comparator4 的 t_settle 与结构推导一致",
+}
+
 func run(ctx: TestContext) -> void:
 	_test_cells(ctx)
 	_test_pages(ctx)
@@ -14,6 +31,7 @@ func run(ctx: TestContext) -> void:
 	_test_alu_settle(ctx)
 
 func _test_cells(ctx: TestContext) -> void:
+	ctx.begin_group("cells")
 	var cells := SimMacro.cells()
 	ctx.eq("M4-G1 宏单元条数", cells.size(), 3)
 	for k in ["decoder3", "comparator4", "alu4"]:
@@ -30,6 +48,7 @@ func _test_cells(ctx: TestContext) -> void:
 	ctx.eq("M4-G1 cells() 是深拷贝（改动不回写）", int(SimMacro.meta("decoder3")["gate_count"]), 11)
 
 func _test_pages(ctx: TestContext) -> void:
+	ctx.begin_group("pages")
 	var limit := SimDelays.gdscript_gate_limit()
 	var alu_pages := SimMacro.pages("alu4")
 	ctx.eq("M4-G1 alu4 页数", alu_pages.size(), 7)
@@ -57,6 +76,7 @@ func _test_pages(ctx: TestContext) -> void:
 	ctx.check("M4-G1 未知页为空", SimMacro.page("alu4", "alu.nope").is_empty())
 
 func _test_expand_scale(ctx: TestContext) -> void:
+	ctx.begin_group("expand_scale")
 	var c := SimCircuit.new("macro_scale")
 	var r := SimMacro.expand("alu4", c, "alu")
 	ctx.check("M4-G2 alu4 整块展开被拒", not bool(r["ok"]))
@@ -67,6 +87,7 @@ func _test_expand_scale(ctx: TestContext) -> void:
 	ctx.eq("M4-G2 未知宏单元错误码", str(u["error"]), "IFZ_E_UNKNOWN_MACRO")
 
 func _test_expand_ok(ctx: TestContext) -> void:
+	ctx.begin_group("expand_ok")
 	var c := SimCircuit.new("macro_expand")
 	var d := SimMacro.expand("decoder3", c, "dec")
 	ctx.check("M4-G2 decoder3 展开成功", bool(d["ok"]), str(d.get("error", "")))
@@ -86,6 +107,7 @@ func _test_expand_ok(ctx: TestContext) -> void:
 
 func _test_fold_determinism(ctx: TestContext) -> void:
 	## 展开 → 折叠 → 再展开（新电路同前缀）→ state_digest 相同。
+	ctx.begin_group("fold_determinism")
 	var a := SimCircuit.new("macro_fold_a")
 	var exp := SimMacro.expand("decoder3", a, "m")
 	ctx.check("M4-G2 首次展开成功", bool(exp["ok"]))
@@ -108,6 +130,7 @@ func _test_fold_determinism(ctx: TestContext) -> void:
 	ctx.eq("M4-G2 alu4 输出端口数", (alu_fold["ports"] as Dictionary)["outputs"].size(), 8)
 
 func _test_expand_page(ctx: TestContext) -> void:
+	ctx.begin_group("expand_page")
 	var c := SimCircuit.new("macro_page")
 	var r := SimMacro.expand_page("alu4", "alu.ctrl", c, "alu")
 	ctx.check("M4-G1 alu4 只读页可用", bool(r["ok"]), str(r.get("error", "")))
@@ -133,6 +156,7 @@ func _test_expand_page(ctx: TestContext) -> void:
 
 func _test_budget(ctx: TestContext) -> void:
 	## 预算同源：50 提示、80 拒绝都由 SimDelays 决定，不写死数字。
+	ctx.begin_group("budget")
 	var limit := SimDelays.gdscript_gate_limit()
 	var hard := SimDelays.gdscript_gate_hard_cap()
 	var c := SimCircuit.new("macro_budget")
@@ -156,6 +180,7 @@ func _test_budget(ctx: TestContext) -> void:
 
 func _test_alu_settle(ctx: TestContext) -> void:
 	## R6：alu4 的 t_settle 按结构推导锁定（无门级网表，不能实测）。
+	ctx.begin_group("alu_settle")
 	var d_not := SimDelays.delay("not")
 	var d_and := SimDelays.delay("and")
 	var d_or := SimDelays.delay("or")

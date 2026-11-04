@@ -2,14 +2,30 @@ extends RefCounted
 
 ## 行为黑盒：多解、错误拓扑、签名、半加器三值。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 18
+const EXPECT_GROUPS := {
+	"structure": 2, "check_target": 5, "multi_solution": 5,
+	"half_adder": 2, "tri_eval": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"structure": "AND 图的 gate_count 与 depth 各为 1",
+	"check_target": "and/or/not 三种目标判定通过、AND 行数 4、以 AND 冒充 XOR 的错误拓扑被拒",
+	"multi_solution": "两种 XOR 接线都判过、A 版行数 4、两解签名互异、B 版恰 4 门",
+	"half_adder": "半加器 4 行真值表全过与 passed 计数",
+	"tri_eval": "含 X 的三值求值：1,X 与 0,X 下 sum/carry 均为 X",
+}
+
 func run(ctx: TestContext) -> void:
 	var and_g := _and_graph()
 	var or_g := _or_graph()
 	var not_g := _not_graph()
 	var bad := _xor_bad_graph()
+	ctx.begin_group("structure")
 	ctx.eq("gate count and", BlackBox.gate_count(and_g), 1)
 	ctx.eq("depth and", BlackBox.depth(and_g), 1)
 
+	ctx.begin_group("check_target")
 	var r_and := BlackBox.check_target(and_g, "and", ["a", "b"], ["out"])
 	ctx.check("and target pass", bool(r_and.get("ok", false)), str(r_and.get("issues", "")))
 	ctx.eq("and rows", int(r_and.get("passed", 0)), 4)
@@ -20,6 +36,7 @@ func run(ctx: TestContext) -> void:
 	var r_bad := BlackBox.check_target(bad, "xor", ["a", "b"], ["out"])
 	ctx.check("wrong topology fails", not bool(r_bad.get("ok", false)))
 
+	ctx.begin_group("multi_solution")
 	var x1 := _xor_graph_a()
 	var x2 := _xor_graph_b()
 	var r1 := BlackBox.check_target(x1, "xor", ["a", "b"], ["out"])
@@ -30,10 +47,12 @@ func run(ctx: TestContext) -> void:
 	ctx.ne("solutions differ", BlackBox.signature(x1), BlackBox.signature(x2))
 	ctx.check("xor B has 4 gates", BlackBox.gate_count(x2) == 4)
 
+	ctx.begin_group("half_adder")
 	var ha := _half_adder_graph()
 	var ha_rows := BlackBox.check_outputs(ha, ["a", "b"], ["sum", "carry"], BlackBox.half_adder_rows())
 	ctx.check("half adder 4 rows", bool(ha_rows.get("ok", false)))
 	ctx.eq("half adder passed", int(ha_rows.get("passed", 0)), 4)
+	ctx.begin_group("tri_eval")
 	var tri := BlackBox.tri_eval(ha, {"a": "1", "b": "X"})
 	ctx.check("tri eval ok", bool(tri.get("ok", false)))
 	ctx.eq("xor 1,X", str(tri.get("values", {}).get("sum", "")), "X")

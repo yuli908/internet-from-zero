@@ -2,6 +2,22 @@ extends RefCounted
 
 ## M3 · T3 TraceSink：5 字段 schema、kind 白名单、环形缓冲、digest 与帧粒度无关。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 34
+const EXPECT_GROUPS := {
+	"schema": 8, "monotonic": 3, "history": 2, "framing": 4,
+	"ring": 6, "reject": 7, "digest": 4,
+}
+const GROUP_DESCRIPTIONS := {
+	"schema": "事件非空、每条恰 5 字段且类型固定、CHANGE/EDGE/SAMPLE/DROP 与 L2/L3 层都出现",
+	"monotonic": "tick 单调不减、kind 全在 15 条白名单内",
+	"history": "CHANGE 总数与逐线计数都等于 history 记录数",
+	"framing": "1 tick/帧 与 4 tick/帧 的 digest、q 值、事件数、逐条事件一致",
+	"ring": "容量 8 保留最新 8 条、丢弃最旧 2 条、条目 tick 与导出格式/丢弃计数",
+	"reject": "未知 kind/layer、空 subject、tick 回退被拒并累计拒绝数，ERR_ADDR 可写入",
+	"digest": "新事件改变摘要、同内容同摘要、乱序 tick 被拒后只剩 1 条",
+}
+
 func run(ctx: TestContext) -> void:
 	_test_schema(ctx)
 	_test_monotonic_and_kinds(ctx)
@@ -30,6 +46,7 @@ func _test_schema(ctx: TestContext) -> void:
 	c.run_until(20)
 	c.settle()
 	var s: TraceSink = c.sink
+	ctx.begin_group("schema")
 	ctx.check("trace: 有事件", s.size() > 0, "size=%d" % s.size())
 	var ok_shape := true
 	var ok_types := true
@@ -72,6 +89,7 @@ func _test_monotonic_and_kinds(ctx: TestContext) -> void:
 		last = int(e["tick"])
 		if not TraceSink.KINDS.has(str(e["kind"])):
 			whitelisted = false
+	ctx.begin_group("monotonic")
 	ctx.check("trace: tick 单调不减", mono)
 	ctx.check("trace: kind 全在白名单", whitelisted)
 	ctx.eq("trace: 白名单条数", TraceSink.KINDS.size(), 15)
@@ -82,6 +100,7 @@ func _test_history_match(ctx: TestContext) -> void:
 	c.run_until(20)
 	c.settle()
 	var s: TraceSink = c.sink
+	ctx.begin_group("history")
 	ctx.eq("trace: CHANGE 总数 == history 条数", s.count_kind("CHANGE"), c.history.size())
 	var per_wire_ok := true
 	for w in ["a", "y", "q", "clk"]:
@@ -101,6 +120,7 @@ func _test_framing_digest(ctx: TestContext) -> void:
 	var four := _mk()
 	for t in range(4, 401, 4):
 		four.run_until(t)
+	ctx.begin_group("framing")
 	ctx.eq("trace: 1 tick/帧 digest == 4 tick/帧 digest", one.trace_digest(), four.trace_digest())
 	ctx.eq("trace: 1 tick/帧 与 4 tick/帧 q 相同", one.probe("q"), four.probe("q"))
 	ctx.eq("trace: 1 tick/帧 与 4 tick/帧 事件数相同", one.sink.size(), four.sink.size())
@@ -115,6 +135,7 @@ func _test_ring_buffer(ctx: TestContext) -> void:
 	var s := TraceSink.new(8)
 	for i in 10:
 		s.record(i, "L2", "CHANGE", "w", {"v": str(i)})
+	ctx.begin_group("ring")
 	ctx.eq("ring: 容量=8 时保留 8 条", s.size(), 8)
 	ctx.eq("ring: 丢弃最旧 2 条", s.dropped_old, 2)
 	ctx.eq("ring: 最旧保留 tick == 2", int(s.entry(0)["tick"]), 2)
@@ -125,6 +146,7 @@ func _test_ring_buffer(ctx: TestContext) -> void:
 
 func _test_reject(ctx: TestContext) -> void:
 	var s := TraceSink.new()
+	ctx.begin_group("reject")
 	ctx.check("reject: 未知 kind 被拒", not s.record(0, "L2", "BOGUS", "w", {}))
 	ctx.eq("reject: 记录数不变", s.size(), 0)
 	ctx.check("reject: 未知 layer 被拒", not s.record(0, "L9", "CHANGE", "w", {}))
@@ -136,6 +158,7 @@ func _test_reject(ctx: TestContext) -> void:
 		s.record(6, "L2", "ERR_ADDR", "w", {}))
 	var d1 := s.digest()
 	s.record(7, "L2", "CHANGE", "w", {"v": "2"})
+	ctx.begin_group("digest")
 	ctx.check("digest: 新事件改变摘要", s.digest() != d1)
 	var t2 := TraceSink.new()
 	t2.record(0, "L2", "CHANGE", "w", {"v": "1"})

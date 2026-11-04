@@ -8,8 +8,24 @@ extends RefCounted
 
 const VEC_PATH := "res://docs/simulation/ref/vectors/l2_vectors.json"
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 36
+const EXPECT_GROUPS := {
+	"loadable": 0, "vector_rows": 9, "determinism": 10,
+	"delays": 4, "module_vectors": 11, "settle": 2,
+}
+const GROUP_DESCRIPTIONS := {
+	"loadable": "向量文件可读、JSON 可解析：仅在文件缺失或解析失败时才执行的兜底检查",
+	"vector_rows": "格式标记与 7 个模块 + alu4 的向量行数（alu4 只登记不比对）",
+	"determinism": "determinism.rows 逐键等于实测行数、总行数 140、随机种子",
+	"delays": "and/or/not/xor 的延迟表与 SimDelays 同源",
+	"module_vectors": "7 个模块逐行比对全过，decoder3/comparator4 门数与预算上限",
+	"settle": "decoder3/comparator4 声明 t_settle 与向量生成器实测一致",
+}
+
 func run(ctx: TestContext) -> void:
 	var f := FileAccess.open(VEC_PATH, FileAccess.READ)
+	ctx.begin_group("loadable")
 	if f == null:
 		ctx.check("L2 参考向量文件存在", false, VEC_PATH)
 		return
@@ -19,6 +35,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("L2 参考向量可解析", false, str(parsed))
 		return
 	var vec: Dictionary = parsed
+	ctx.begin_group("vector_rows")
 	ctx.eq("向量格式", str(vec.get("format", "")), "ifz-l2-vectors/1")
 	ctx.eq("HA 向量行数", (vec.get("half_adder", []) as Array).size(), 9)
 	ctx.eq("FA 向量行数", (vec.get("full_adder", []) as Array).size(), 27)
@@ -29,6 +46,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("comparator4 向量行数", (vec.get("comparator4", []) as Array).size(), 17)
 	ctx.eq("alu4 向量行数（宏单元，不比对）", (vec.get("alu4", []) as Array).size(), 8)
 	# determinism.rows 与逐键实测行数对账：证明总数 140（不是 143）
+	ctx.begin_group("determinism")
 	var rows_meta: Dictionary = (vec.get("determinism", {}) as Dictionary).get("rows", {})
 	var total_rows := 0
 	for k in rows_meta.keys():
@@ -37,6 +55,7 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("向量总行数", total_rows, 140)
 	ctx.eq("随机种子", int((vec.get("determinism", {}) as Dictionary).get("seed", 0)), 539365636)
 	# 延迟表必须与向量生成器同源
+	ctx.begin_group("delays")
 	var gd: Dictionary = vec.get("gate_delay", {})
 	ctx.eq("延迟表 and", int(gd.get("and", 0)), SimDelays.delay("and"))
 	ctx.eq("延迟表 or", int(gd.get("or", 0)), SimDelays.delay("or"))
@@ -52,6 +71,7 @@ func run(ctx: TestContext) -> void:
 	_check_comparator4(ctx, vec.get("comparator4", []))
 
 	# 声明延迟必须与向量生成器实测值一致（t_settle 由延迟表推导）
+	ctx.begin_group("settle")
 	var ts: Dictionary = vec.get("t_settle", {})
 	ctx.eq("decoder3 t_settle", SimModule.declared_settle(SimModule.KIND_DECODER3, 3), int(ts.get("decoder3", -1)))
 	ctx.eq("comparator4 t_settle", SimModule.declared_settle(SimModule.KIND_COMPARATOR4, 4), int(ts.get("comparator4", -1)))
@@ -59,6 +79,7 @@ func run(ctx: TestContext) -> void:
 # ---- 各模块逐行比对 ---------------------------------------------------------
 
 func _check_half_adder(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -80,6 +101,7 @@ func _check_half_adder(ctx: TestContext, rows: Array) -> void:
 	ctx.check("HA 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
 
 func _check_full_adder(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -101,6 +123,7 @@ func _check_full_adder(ctx: TestContext, rows: Array) -> void:
 	ctx.check("FA 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
 
 func _check_ripple8(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -129,6 +152,7 @@ func _check_ripple8(ctx: TestContext, rows: Array) -> void:
 	ctx.check("ripple8 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
 
 func _check_mux2(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -149,6 +173,7 @@ func _check_mux2(ctx: TestContext, rows: Array) -> void:
 	ctx.check("mux2 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
 
 func _check_mux4(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -172,6 +197,7 @@ func _check_mux4(ctx: TestContext, rows: Array) -> void:
 	ctx.check("mux4 参考向量 %d/%d" % [passed, rows.size()], passed == rows.size())
 
 func _check_decoder3(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -205,6 +231,7 @@ func _check_decoder3(ctx: TestContext, rows: Array) -> void:
 		ctx.check("decoder3 门数 ≤ 交互默认上限", c2._g_op.size() <= SimDelays.gdscript_gate_limit())
 
 func _check_comparator4(ctx: TestContext, rows: Array) -> void:
+	ctx.begin_group("module_vectors")
 	var passed := 0
 	for i in rows.size():
 		var row: Array = rows[i]

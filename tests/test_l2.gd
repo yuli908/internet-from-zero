@@ -8,6 +8,27 @@ extends RefCounted
 ##  3. `t_settle` 是实测最坏稳定时间的上界，关键模块给出精确值。
 ## 另验证 L1 门与 L2 模块在同一张网表里混合仿真。
 
+## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
+const EXPECT := 430
+const EXPECT_GROUPS := {
+	"declared": 8, "half_adder": 15, "full_adder": 40,
+	"ripple8_decl": 3, "ripple8_sweep_a0_127": 128, "ripple8_sweep_a128_255": 129,
+	"ripple8_random": 33, "ripple8_carry": 4, "mux2": 40, "mux4": 21, "mixed": 9,
+}
+const GROUP_DESCRIPTIONS := {
+	"declared": "五个模块的 t_settle 声明值，且必须由延迟表推导",
+	"half_adder": "半加器构建、端口数、9 行参考向量、实测最坏稳定时间与声明上界",
+	"full_adder": "全加器构建、端口数、8 行二进制真值表、27 组三值向量、最坏稳定时间与关键路径 10",
+	"ripple8_decl": "8 位行波加法器构建与输入 17 / 输出 9 端口",
+	"ripple8_sweep_a0_127": "a=0..127、b=0x5A、cin 随奇偶的穷举扫描（前半）",
+	"ripple8_sweep_a128_255": "a=128..255 的穷举扫描（后半）与整体失败计数",
+	"ripple8_random": "固定种子 32 条随机向量及其失败计数",
+	"ripple8_carry": "最坏进位链 0xFE+0x00+1 的 52 tick 延迟、声明上界、进位与和",
+	"mux2": "二选一构建、端口数、8 组二进制与 27 组三值向量、选择端延迟 7",
+	"mux4": "四选一构建、端口数、4×4 组数据/选择组合、s0 延迟 13",
+	"mixed": "L1 门读 L2 输出再喂 L2 选择器的混合仿真与选择端切换",
+}
+
 func run(ctx: TestContext) -> void:
 	_declared(ctx)
 	_half_adder(ctx)
@@ -19,6 +40,7 @@ func run(ctx: TestContext) -> void:
 # ---- 声明 -------------------------------------------------------------------
 
 func _declared(ctx: TestContext) -> void:
+	ctx.begin_group("declared")
 	var ha := SimModule.create("half_adder", "ha")
 	var fa := SimModule.create("full_adder", "fa")
 	var add8 := SimModule.create("ripple", "add8", 8)
@@ -40,6 +62,7 @@ func _declared(ctx: TestContext) -> void:
 # ---- 半加器 -----------------------------------------------------------------
 
 func _half_adder(ctx: TestContext) -> void:
+	ctx.begin_group("half_adder")
 	var b := _build("half_adder", "ha")
 	ctx.check("HA build", bool(b.get("ok", false)), str(b.get("error", "")))
 	if not bool(b.get("ok", false)):
@@ -69,6 +92,7 @@ func _half_adder(ctx: TestContext) -> void:
 # ---- 全加器 -----------------------------------------------------------------
 
 func _full_adder(ctx: TestContext) -> void:
+	ctx.begin_group("full_adder")
 	var b := _build("full_adder", "fa")
 	ctx.check("FA build", bool(b.get("ok", false)), str(b.get("error", "")))
 	if not bool(b.get("ok", false)):
@@ -117,6 +141,7 @@ func _full_adder(ctx: TestContext) -> void:
 # ---- 8 位行波进位加法器 -----------------------------------------------------
 
 func _ripple8(ctx: TestContext) -> void:
+	ctx.begin_group("ripple8_decl")
 	var b := _build("ripple", "add8", 8)
 	ctx.check("ripple8 build", bool(b.get("ok", false)), str(b.get("error", "")))
 	if not bool(b.get("ok", false)):
@@ -128,6 +153,7 @@ func _ripple8(ctx: TestContext) -> void:
 
 	# 8 位穷举的一侧：a 取 0..255，b 固定 0x5A，cin 随 a 奇偶交替。
 	var failures := 0
+	ctx.begin_group("ripple8_sweep_a0_127")
 	for a_val in 256:
 		var b_val := 0x5A
 		var ci := a_val & 1
@@ -141,11 +167,14 @@ func _ripple8(ctx: TestContext) -> void:
 		var ok := got == (expect & 0xFF) and cout == str(expect >> 8)
 		if not ok:
 			failures += 1
+		if a_val == 128:
+			ctx.begin_group("ripple8_sweep_a128_255")
 		ctx.check("ripple8 0x%02X+0x%02X+%d" % [a_val, b_val, ci], ok,
 			"和=%d 进位=%s 期望 %d/%d" % [got, cout, expect & 0xFF, expect >> 8])
 	ctx.check("ripple8 sweep failures", failures == 0, str(failures))
 
 	# 固定种子的随机向量（可复现）。
+	ctx.begin_group("ripple8_random")
 	var rng := DeterministicRng.new(7)
 	var rand_fail := 0
 	for _i in 32:
@@ -164,6 +193,7 @@ func _ripple8(ctx: TestContext) -> void:
 	ctx.check("ripple8 random failures", rand_fail == 0, str(rand_fail))
 
 	# 最坏进位链：0xFE+0x00+1 → a0 由 0→1，进位穿过全部 8 级。
+	ctx.begin_group("ripple8_carry")
 	_drive_byte(c, "add8", "a", 0xFE)
 	_drive_byte(c, "add8", "b", 0x00)
 	c.set_input("add8.cin", "1")
@@ -179,6 +209,7 @@ func _ripple8(ctx: TestContext) -> void:
 # ---- 多路选择器 -------------------------------------------------------------
 
 func _mux(ctx: TestContext) -> void:
+	ctx.begin_group("mux2")
 	var b := _build("mux2", "mux2")
 	ctx.check("mux2 build", bool(b.get("ok", false)), str(b.get("error", "")))
 	if bool(b.get("ok", false)):
@@ -207,6 +238,7 @@ func _mux(ctx: TestContext) -> void:
 		ctx.eq("mux2 select delay", d, 7)
 		ctx.check("mux2 within declared", d >= 0 and d <= m.t_settle, "%d > %d" % [d, m.t_settle])
 
+	ctx.begin_group("mux4")
 	var b4 := _build("mux4", "mux4")
 	ctx.check("mux4 build", bool(b4.get("ok", false)), str(b4.get("error", "")))
 	if not bool(b4.get("ok", false)):
@@ -237,6 +269,7 @@ func _mux(ctx: TestContext) -> void:
 # ---- L1 门与 L2 模块混合 -----------------------------------------------------
 
 func _mixed(ctx: TestContext) -> void:
+	ctx.begin_group("mixed")
 	var c := SimCircuit.new("mixed")
 	var ha := SimModule.create("half_adder", "ha")
 	var mux := SimModule.create("mux2", "mux")

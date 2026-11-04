@@ -43,20 +43,10 @@ const SUITES := [
 	"res://tests/test_ch02_sections.gd",
 ]
 
-# TODO(迁移中)：期望数正逐个下沉到套件自己的 `const EXPECT`；已迁 13 个，其余仍在本表。
+# TODO(迁移中)：期望数正逐个下沉到套件自己的 `const EXPECT`；已迁 23 个，其余仍在本表。
 # 全部迁完后本表删除，总数改为运行时求和。
 # 声明的 check 数（2026-11-04 实测，总数 3226）。少一项即该 suite 判红。
 const SUITE_EXPECT := {
-	"test_l2": 430,
-	"test_black_box": 18,
-	"test_lab_checks": 49,
-	"test_l3": 100,
-	"test_l3_vectors": 4,
-	"test_l2_vectors": 36,
-	"test_trace": 34,
-	"test_rewards": 28,
-	"test_macro": 69,
-	"test_ch02_kinds": 49,
 	"test_questions": 37,
 	"test_difficulty": 24,
 	"test_gate_result": 305,
