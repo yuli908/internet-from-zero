@@ -4,7 +4,9 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1 -Sizes "50,60,70,80" -Frames 400
 #
-# 场景：N 个门每 tick 全翻转 + N 级 DFF 每帧一个时钟沿，4 tick/帧，统计每帧耗时 p50/p95/p99/max。
+# 场景：
+#   gate（默认）：N 个门每 tick 全翻转 + N 级 DFF 每帧一个时钟沿；
+#   l3：同上再挂一个 4 位计数器（6 门 + 4 DFF），时钟周期 16 tick，仍 4 tick/帧。
 # 输出：控制台表格 + artifacts/logs/bench.log + artifacts/logs/bench.json。
 # 只负责跑与留证；"是否超预算"是数据结论，不作为脚本失败条件（未跑完才算失败）。
 
@@ -13,6 +15,7 @@ param(
 	[string]$Godot = "C:\tools\godot-4.4.1\godot.cmd",
 	[string]$LogFile = "",
 	[string]$Sizes = "50,100,200,300,400",
+	[string]$Scenario = "gate",
 	[int]$Frames = 600
 )
 
@@ -40,10 +43,11 @@ if (-not (Test-Path $logDir)) {
 }
 
 Write-Host "[bench] root  : $Root"
-Write-Host "[bench] sizes : $Sizes  frames: $Frames"
+Write-Host "[bench] scenario: $Scenario  sizes: $Sizes  frames: $Frames"
 Write-Host "[bench] log   : $LogFile"
 
-$engineArgs = @("--headless", "--path", $Root, "-s", "res://tests/bench_sim.gd", "--", "--sizes=$Sizes", "--frames=$Frames")
+$engineArgs = @("--headless", "--path", $Root, "-s", "res://tests/bench_sim.gd", "--",
+	"--scenario=$Scenario", "--sizes=$Sizes", "--frames=$Frames")
 & $Godot @engineArgs 2>&1 | Out-File -FilePath $LogFile -Encoding utf8
 $code = $LASTEXITCODE
 if ($null -eq $code) { $code = 0 }

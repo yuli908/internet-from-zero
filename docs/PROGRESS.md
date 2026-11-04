@@ -247,6 +247,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
   验收命令见 §9）。
 - 全量回归：**1568 checks, 0 failures**（T4 的 1540 + T5 28 项）。
 
+### 2.12 T6 L3 性能基准（2026-11-04）
+
+- `bench_sim.gd` 新增 `--scenario=l3`：在 gate 场景（N 门每 tick 翻转 + N 级 DFF 链）之上再挂一个
+  **4 位计数器**（+6 门 / +4 DFF），时钟周期 16 tick（> 实测 14），仍 4 tick/帧；
+  `bench.ps1` 加 `-Scenario` 参数透传。
+- 三次复跑（`-Sizes "50,80,100" -Frames 400`，p95 ms）：
+
+  | 规模（含计数器） | 第 1 次 | 第 2 次 | 第 3 次 | 结论 |
+  |---|---|---|---|---|
+  | 50 门 / 54 DFF | 1.778 | 1.645 | 1.537 | ≤5 ms |
+  | 80 门 / 84 DFF | 2.714 | 2.555 | 2.625 | ≤5 ms |
+  | 100 门 / 104 DFF | 3.323 | 3.306 | 3.209 | ≤5 ms |
+
+- 最差 p95 写回 `data/sim/delays.json` 的 `l3.bench.p95_ms_worst`（50→1.78 / 80→2.71 / 100→3.32），
+  `test_data` 断言三档齐全且均 ≤ `frame.budget_ms`（5.0）。
+- 全量回归：**1573 checks, 0 failures**（T5 的 1568 + T6 5 项）；基准日志 `artifacts/logs/bench.{log,json}`。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |

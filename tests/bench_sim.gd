@@ -1,28 +1,32 @@
 extends SceneTree
 
-## L0–L1 性能基准关：N 门 + N DFF，4 tick/帧，统计每帧耗时（含 p50/p95/p99/max）。
+## L0–L3 性能基准关：N 门 + N DFF（+ 可选 4 位计数器），4 tick/帧，统计每帧耗时（含 p50/p95/p99/max）。
 ## 运行：
 ##   & "C:\tools\godot-4.4.1\godot.cmd" --headless --path "D:\ai lm\internet_from_zero" \
 ##       -s "res://tests/bench_sim.gd" -- --sizes=50,100,200,300,400 --frames=600
+##   ... -- --scenario=l3 --sizes=50,80,100 --frames=400
 ## 输出：控制台表格 + artifacts/logs/bench.json。结论只陈述实测，不预设"能守住"。
 
 const DEFAULT_SIZES := [50, 100, 200, 300, 400]
 const DEFAULT_FRAMES := 600
 const WARMUP_FRAMES := 80
+const L3_CLOCK_PERIOD := 16
 
 func _initialize() -> void:
 	SimDelays.configure(_load_delays())
 	var sizes := _parse_sizes()
 	var frames := _parse_int("--frames=", DEFAULT_FRAMES)
+	var scenario := _parse_str("--scenario=", "gate")
 	var budget := float(SimDelays.budget_ms())
 	var ticks := SimDelays.ticks_per_frame()
 	print("=== IFZ BENCH ===")
-	print("godot=%s  budget_ms=%.2f  ticks_per_frame=%d  frames=%d  warmup=%d" % [
-		str(Engine.get_version_info().get("string", "?")), budget, ticks, frames, WARMUP_FRAMES])
+	print("godot=%s  scenario=%s  budget_ms=%.2f  ticks_per_frame=%d  frames=%d  warmup=%d" % [
+		str(Engine.get_version_info().get("string", "?")), scenario, budget, ticks, frames, WARMUP_FRAMES])
 	print("size\tgates\tdff\tp50_ms\tp95_ms\tp99_ms\tmax_ms\tevents\tverdict")
-	var report := {"frame_budget_ms": budget, "ticks_per_frame": ticks, "frames": frames, "rows": []}
+	var report := {"frame_budget_ms": budget, "ticks_per_frame": ticks, "frames": frames,
+		"scenario": scenario, "rows": []}
 	for n in sizes:
-		var row := _bench(n, frames, ticks)
+		var row := _bench(n, frames, ticks, scenario)
 		report["rows"].append(row)
 		print("%d\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\t%s" % [
 			n, int(row["gates"]), int(row["dffs"]), float(row["p50"]), float(row["p95"]),
@@ -40,32 +44,35 @@ func _initialize() -> void:
 	print("=== BENCH DONE ===")
 	quit(0)
 
-func _bench(n: int, frames: int, ticks: int) -> Dictionary:
-	var c := _build(n)
+func _bench(n: int, frames: int, ticks: int, scenario: String) -> Dictionary:
+	var l3 := scenario == "l3"
+	var gate_count := n + (6 if l3 else 0)
+	var dff_count := n + (4 if l3 else 0)
+	var c := _build(n, l3)
 	# 预热：让初值 X 收敛为稳定的 0/1，避免把冷启动成本算进分布。
 	for i in range(WARMUP_FRAMES):
-		_drive_frame(c, i, ticks)
+		_drive_frame(c, i, ticks, l3)
 		c.run(ticks)
 	var samples := PackedFloat64Array()
 	samples.resize(frames)
 	var events := 0
 	for f in range(frames):
 		var before := c.eng.event_count
-		_drive_frame(c, f, ticks)
+		_drive_frame(c, f, ticks, l3)
 		var t0 := Time.get_ticks_usec()
 		var r := c.run(ticks)
 		var used := float(Time.get_ticks_usec() - t0) / 1000.0
 		samples[f] = used
 		events = maxi(events, c.eng.event_count - before)
 		if not bool(r.get("ok", false)):
-			return {"n": n, "gates": n, "dffs": n, "error": str(r.get("error", "")),
+			return {"n": n, "gates": gate_count, "dffs": dff_count, "error": str(r.get("error", "")),
 				"p50": 999.0, "p95": 999.0, "p99": 999.0, "max": 999.0, "events": 0}
 	var sorted_samples := Array(samples)
 	sorted_samples.sort()
 	return {
 		"n": n,
-		"gates": n,
-		"dffs": n,
+		"gates": gate_count,
+		"dffs": dff_count,
 		"p50": _pct(sorted_samples, 0.50),
 		"p95": _pct(sorted_samples, 0.95),
 		"p99": _pct(sorted_samples, 0.99),
@@ -73,11 +80,12 @@ func _bench(n: int, frames: int, ticks: int) -> Dictionary:
 		"events": events,
 	}
 
-func _build(n: int) -> SimCircuit:
+func _build(n: int, with_counter: bool = false) -> SimCircuit:
 	## 结构（宽扇出，保证每 tick 所有元件都有活动，是每帧耗时的上界近似）：
 	##  - n 级 DFF 移位链，由 clk 驱动，每帧一个上升沿；
 	##  - n 个门全部挂在 `fast` 线上（每 tick 翻转一次），门类型轮换 buf/not/nand/and/xor，
-	##    每个 tick 各求值一次，覆盖不同延迟。
+	##    每个 tick 各求值一次，覆盖不同延迟；
+	##  - scenario=l3 时再挂一个 4 位计数器（6 组合门 + 4 DFF），时钟仍走 clk（周期 16 > 实测 14）。
 	var c := SimCircuit.new("bench_%d" % n)
 	c.add_wire("clk", SimValue.ZERO)
 	c.add_wire("din", SimValue.ONE)
@@ -94,17 +102,28 @@ func _build(n: int) -> SimCircuit:
 		var kind: String = kinds[i % kinds.size()]
 		var ins := ["fast"] if (kind == "buf" or kind == "not") else ["fast", "one"]
 		c.add_gate(g, kind, ins, -1)
+	if with_counter:
+		SimSequential.create_counter(c, "cnt", 4, "clk")
 	c.settle()
 	return c
 
-func _drive_frame(c: SimCircuit, f: int, ticks: int) -> void:
+func _drive_frame(c: SimCircuit, f: int, ticks: int, with_counter: bool = false) -> void:
 	## 每帧：fast 每个 tick 翻转一次；clk 在第 0 tick 上升、第 2 tick 下降。
+	## scenario=l3：clk 改为周期 16 的绝对相位（高 8 / 低 8），按帧内偏移只在翻转 tick 写。
 	var base := SimValue.ONE if (f % 2 == 0) else SimValue.ZERO
 	var inv := SimValue.ZERO if base == SimValue.ONE else SimValue.ONE
 	for i in range(ticks):
 		c.set_input("fast", base if (i % 2 == 0) else inv, i)
-	c.set_input("clk", SimValue.ONE, 0)
-	c.set_input("clk", SimValue.ZERO, mini(2, ticks - 1))
+		if with_counter:
+			var t := f * ticks + i
+			var ph := t % L3_CLOCK_PERIOD
+			if ph == 0:
+				c.set_input("clk", SimValue.ONE, i)
+			elif ph == L3_CLOCK_PERIOD / 2:
+				c.set_input("clk", SimValue.ZERO, i)
+	if not with_counter:
+		c.set_input("clk", SimValue.ONE, 0)
+		c.set_input("clk", SimValue.ZERO, mini(2, ticks - 1))
 
 func _pct(sorted_samples: Array, q: float) -> float:
 	var idx := int(ceili(q * float(sorted_samples.size()))) - 1
@@ -133,6 +152,12 @@ func _parse_sizes() -> Array:
 			if not out.is_empty():
 				return out
 	return DEFAULT_SIZES
+
+func _parse_str(prefix: String, fallback: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if str(arg).begins_with(prefix):
+			return str(arg).substr(prefix.length())
+	return fallback
 
 func _parse_int(prefix: String, fallback: int) -> int:
 	for arg in OS.get_cmdline_user_args():

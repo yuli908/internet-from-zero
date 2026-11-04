@@ -117,6 +117,17 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("gdextension threshold", int(sim.get("limits", {}).get("require_gdextension_above", 0)), 80)
 	ctx.eq("L3 counter4 min period", int(sim.get("l3", {}).get("counter4_min_period", 0)), 14)
 	ctx.eq("L3 counter8 min period", int(sim.get("l3", {}).get("counter8_min_period", 0)), 26)
+	var l3b: Dictionary = sim.get("l3", {}).get("bench", {})
+	ctx.eq("L3 bench scenario", str(l3b.get("scenario", "")), "l3")
+	ctx.eq("L3 bench clock period", int(l3b.get("clock_period", 0)), 16)
+	ctx.eq("L3 bench ticks/frame", int(l3b.get("ticks_per_frame", 0)), 4)
+	var p95: Dictionary = l3b.get("p95_ms_worst", {})
+	ctx.eq("L3 bench 三档 p95 齐全", p95.size(), 3)
+	var bench_ok := true
+	for k in ["50", "80", "100"]:
+		if not p95.has(k) or float(p95[k]) > float(sim.get("frame", {}).get("budget_ms", 5)):
+			bench_ok = false
+	ctx.check("L3 bench 三档 p95 均 ≤ 5 ms", bench_ok, str(p95))
 	ctx.eq("not delay", int(sim.get("gate_delay", {}).get("not", 0)), 1)
 	ctx.eq("xor delay", int(sim.get("gate_delay", {}).get("xor", 0)), 4)
 	ctx.eq("relay delay", int(sim.get("relay", {}).get("delay_per_stage_ticks", 0)), 3)
