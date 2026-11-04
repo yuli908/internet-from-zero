@@ -15,7 +15,7 @@ const EXPECT_GROUPS := {
 	"delays": 4, "module_vectors": 11, "settle": 2,
 }
 const GROUP_DESCRIPTIONS := {
-	"loadable": "向量文件可读、JSON 可解析：仅在文件缺失或解析失败时才执行的兜底检查",
+	"loadable": "向量文件可读、JSON 可解析：仅在加载失败时执行（文件缺失或解析失败）的兜底检查",
 	"vector_rows": "格式标记与 7 个模块 + alu4 的向量行数（alu4 只登记不比对）",
 	"determinism": "determinism.rows 逐键等于实测行数、总行数 140、随机种子",
 	"delays": "and/or/not/xor 的延迟表与 SimDelays 同源",

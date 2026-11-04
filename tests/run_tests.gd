@@ -50,6 +50,10 @@ const SUITES := [
 const ABORT_PROBE := "res://tests/_abort_probe.gd"
 const EXPECT_PROBES := "res://tests/_expect_probes.gd"
 const EXPECT_DROPS := "res://tests/expect_drops.txt"
+# 非套件脚本白名单（文件名不含 .gd）：注册守卫扫描 tests/ 时跳过它们。
+const HELPERS := ["test_context", "test_util"]
+
+var _baseline_skips: Array = []
 
 func _initialize() -> void:
 	print("=== Internet From Zero :: test runner ===")
@@ -83,6 +87,21 @@ func _initialize() -> void:
 				"实际 %d / 声明 %d：有 %d 项 check 未执行（中途中止或声明过期）" % [actual, expect, expect - actual])
 		_verify_groups(ctx, name, consts, expect)
 		_verify_drop(ctx, name, consts, path, expect)
+
+	# 基线跳过必须是显式、可数、默认会红的；这里汇总打印一次。
+	var skip_names := ""
+	var bad_skips := 0
+	for s in _baseline_skips:
+		if not skip_names.is_empty():
+			skip_names += ","
+		skip_names += str(s["suite"])
+		if not bool(s["first"]):
+			bad_skips += 1
+	print("EXPECT_BASELINE_SKIPS count=%d bad=%d files=%s" % [_baseline_skips.size(), bad_skips, skip_names])
+
+	# 以下守卫不属于任何套件，改用独立 suite 名，避免失败信息挂到最后一个套件名下。
+	ctx.begin("runner_guard")
+	_verify_registration(ctx)
 
 	print("SUITE_TOTAL expected=%d actual=%d" % [declared, executed])
 	var vt: Dictionary = TestContext.verdict(declared, executed)
@@ -119,6 +138,30 @@ func _abort_probe_is_red() -> bool:
 	print("GUARD_SELFTEST declared=%d actual=%d red=%s (探针中途中止属预期)" % [declared_probe, actual, str(not bool(v["ok"]))])
 	return declared_probe > 0 and actual < declared_probe and not bool(v["ok"])
 
+## 注册守卫：tests/ 下每个 test_*.gd（排除 _ 前缀与 HELPERS）都必须在 SUITES 里；
+## SUITES 里每一项也必须在磁盘上存在。两个方向各查一次，「漏注册」当场红。
+func _verify_registration(ctx: TestContext) -> void:
+	ctx.begin_group("")
+	var dir := DirAccess.open("res://tests")
+	if dir == null:
+		ctx.check("[guard] tests 目录可读", false, "DirAccess 打不开 res://tests")
+		return
+	var registered := {}
+	for p in SUITES:
+		registered[str(p)] = true
+	for f in dir.get_files():
+		if not f.begins_with("test_") or not f.ends_with(".gd"):
+			continue
+		if HELPERS.has(f.get_basename()):
+			continue
+		var full := "res://tests/" + f
+		if not registered.has(full):
+			ctx.check("[guard] 未注册测试文件 %s" % f, false,
+				"tests/%s 不在 SUITES，runner 永远不会执行它" % f)
+	for p in SUITES:
+		if not FileAccess.file_exists(str(p)):
+			ctx.check("[guard] 注册项不存在 %s" % str(p).get_file(), false, str(p))
+
 ## 逐组比对：组和=EXPECT、每组实际计数=声明、组说明有效、单组不过半、无未声明组。
 func _verify_groups(ctx: TestContext, name: String, consts: Dictionary, expect: int) -> void:
 	ctx.begin_group("")  # guard 自身不得计入上一套件最后一组的计数
@@ -132,18 +175,27 @@ func _verify_groups(ctx: TestContext, name: String, consts: Dictionary, expect: 
 	if sum != expect:
 		ctx.check("[guard] %s 分组之和=EXPECT" % name, false, "组和 %d / EXPECT %d" % [sum, expect])
 	var banned := ["", "无", "调整", "优化", "清理", "重构", "misc", "other", "rest", "general"]
+	var zero_groups := 0
 	for g in groups:
 		var want := int(groups[g])
 		var got := int(ctx.group_counts.get(g, 0))
 		if got != want:
 			ctx.check("[guard] %s 组 %s 计数" % [name, str(g)], false,
 				"实际 %d / 声明 %d（漏断言，或该组 label 前缀未生效）" % [got, want])
-		var d := str(descs.get(g, "")).strip_edges()
-		if d in banned:
-			ctx.check("[guard] %s 组 %s 说明" % [name, str(g)], false, "说明缺失或空话：%s" % d)
+		var desc := str(descs.get(g, "")).strip_edges()
+		if desc in banned:
+			ctx.check("[guard] %s 组 %s 说明" % [name, str(g)], false, "说明缺失或空话：%s" % desc)
 		if float(want) > float(expect) / 2.0:
 			ctx.check("[guard] %s 组 %s 不过半" % [name, str(g)], false,
 				"%d > 总数 %d 的一半" % [want, expect])
+		if want == 0:
+			zero_groups += 1
+			if not desc.contains("仅在加载失败时执行"):
+				ctx.check("[guard] %s 组 %s 为 0 但说明未写明「仅在加载失败时执行」" % [name, str(g)], false,
+					desc)
+	if zero_groups > 1:
+		ctx.check("[guard] %s 的 0 计数组过多" % name, false,
+			"%d 个；每个套件最多 1 个 0 组" % zero_groups)
 	for g in ctx.group_counts:
 		if not groups.has(g):
 			ctx.check("[guard] %s 未声明组 %s" % [name, str(g)], false,
@@ -156,7 +208,16 @@ func _verify_drop(ctx: TestContext, name: String, consts: Dictionary, path: Stri
 		return
 	var prev := _expect_in_head(path)
 	if prev <= 0:
-		print("EXPECT_BASELINE %s [skip] no baseline" % name)
+		# 基线取不到必须显式登记：首次提交允许 skip，其余一律红。
+		var rel := str(path).replace("res://", "")
+		var first_commit := _git_show("HEAD:" + rel).is_empty()
+		_baseline_skips.append({"suite": name, "first": first_commit})
+		if first_commit:
+			print("EXPECT_BASELINE %s [skip] 首次提交，无基线" % name)
+		else:
+			print("EXPECT_BASELINE %s [skip] no baseline（基线解析失败，已判红）" % name)
+			ctx.check("[guard] %s 基线不可跳过" % name, false,
+				"HEAD 中既不认 const EXPECT 也没有旧 SUITE_EXPECT 项；跳过必须是显式且会红的")
 		return
 	if expect >= prev:
 		return

@@ -10,7 +10,7 @@ const VEC_PATH := "res://tests/data/l3_vectors.json"
 const EXPECT := 4
 const EXPECT_GROUPS := {"loadable": 0, "vectors": 2, "compare": 2}
 const GROUP_DESCRIPTIONS := {
-	"loadable": "向量文件可读、JSON 可解析：仅在文件缺失或解析失败时才执行的兜底检查",
+	"loadable": "向量文件可读、JSON 可解析：仅在加载失败时执行（文件缺失或解析失败）的兜底检查",
 	"vectors": "格式标记为 ifz-l3-vectors/1、用例数 ≥24",
 	"compare": "期望条数恰为 51、51 条逐条比对全过",
 }
