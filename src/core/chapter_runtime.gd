@@ -46,9 +46,20 @@ func objective(id_in: String) -> Dictionary:
 func objective_for_lab(lab_id: String) -> String:
 	return str(lab(lab_id).get("objective", ""))
 
-func grants(lab_id: String, labs_doc: Dictionary = {}) -> Dictionary:
+func grants(lab_id: String, labs_doc: Dictionary = {}, state: PlayerState = null) -> Dictionary:
 	## 物品奖励解析：优先章节内联 `grants`，否则回落到实验数据段（`ch01_labs.json` 等）。
 	## 单一数据源仍是 labs 段；章节内联只作覆盖入口，避免两份奖励表打架。
+	## 传入 state 时真正执行 `bound_first`：该 lab 已发过（`granted:<lab>`）就返回空单，
+	## 重复刷同一关不会再拿第二件；不传 state 只做数据校验用。
+	var g := _raw_grants(lab_id, labs_doc)
+	if g.is_empty():
+		return {}
+	if state != null and bool(g.get("bound_first", false)):
+		if state.has_flag("granted:%s" % lab_id):
+			return {}
+	return g
+
+func _raw_grants(lab_id: String, labs_doc: Dictionary) -> Dictionary:
 	var lab_data := lab(lab_id)
 	if lab_data.is_empty():
 		return {}

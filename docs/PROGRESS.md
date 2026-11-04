@@ -398,6 +398,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 - CH02 收入 175 g（lab 150 + 章末节点 25），章末结余 382–442 g；已写入 `ch02_levels.json` 的 `economy`
   块并加 `tests/test_ch02.gd` 断言。**未改** `docs/design/04`、`05` 的 77 配方口径。
 
+### 2.23 M5 补修：bound_first 真读 / 2.1 第四测点 / rail_margin 落地（2026-11-04）
+
+- **偏差 26 真修**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 现在真正读取 `bound_first`——
+  该 lab 已有 `granted:<lab>` 标记时返回空奖励表，重复刷同一关不再发放第二件；
+  `ChapterFlow.complete_lab` 与 `PlayerState.backfill_lab_grants` 均传 `state`，旧档补发仍只补一次。
+  物品侧回收（`EconomyCore.sell`）仍未读取 `bound_first`，但重复刷关入口已关闭。
+- **2.1 第四测点**：新增 Vgs=3.3 V / Vds=6.0 V（Id 仍 5000 µA），`measure_conditions` 四点按 Vds 升序；
+  `T2.1-3` 增 `equal_id_vds [3.0, 6.0]` + `equal_id_tol 0`，断言"再加大 Vds 也不涨"，容差 0。
+- **`rail_margin` 落地**（`E_RAIL_MARGIN`(20)，`_judge_rail` 30 行）：
+  "逻辑值 → 电平反查"——先由 `BlackBox.tri_eval` 得到各稳态逻辑输出，再按 `V_high = Vdd·R_L/(R_L+Ron)`、
+  `V_low = Vdd·Ron/(R_L+Ron)` 反算电平，比对 `v_high_min/v_low_max`；纯离散算术，**无器件层/仿真层依赖**。
+  `PENDING_REASONS` 只剩 `static_current`；CH02 落地 **18/20，pending 2**（`T2.2-3`、`T2.4-4`）。
+- 测试：新增 17 checks（bound_first 回收路径 6、2.1 四点 6、rail 合法/越界 4、RAIL_MARGIN trace 1）；
+  全量 **2252 checks / 0 failures**（25 套件）。
+
 ## 3. 偏差表（原规格 / 实际实现 / 原因）
 
 | # | 原规格 | 实际实现 | 原因 |
@@ -426,10 +441,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1
 | 22 | alu4（166 门）无门级网表，`t_settle` 没有可实测的对象 | 按 `components.py::ALU._build()` 关键路径结构推导为 **61 tick**（控制 4 + 补码选择 7 + 行波加 28 + 两级选择 12 + V 标志 10），`tests/test_macro.gd` 用 `SimDelays` 公式重算断言、不硬编码 | 80 门硬上限决定了 ALU 不能进可交互门级视图；没有网表就没有实测条件。若仿真组日后给出 ALU 实测值，以实测为准并改本行，**`docs/simulation/` 不改** |
 | 23 | `docs/design/11` §3 的 8 种判定 kind 为英文小写（`mosfet_region` … `power_ratio`） | trace kind 取**全大写机械映射**（`MOSFET_REGION` … `POWER_RATIO`），映射表在 `SimCircuit.JUDGEMENT_KINDS`；`build_area` 是语法糖，不产生 trace，也不计入 8 种 | 避免自造词、避免小写/大写两套事件名；映射只有一处（`docs/design/11` → 工程常量），UI 按 `specs/m4/ui_contract.md` 接线 |
 | 24 | 教学组失败诊断表 `docs/curriculum/05-failure-diagnostics.md` 定义 code 与 `K/S/C/P/M/R` 语义（任务书要求"按它设计，不要自己发明"） | **该文件未入库**（仓库只有 `05-onboarding-guidance.md`、`06-assessment-and-feedback.md`），全库 grep 无 `error_tags`/诊断表内容。已按六类语义落地机器初值：18 个 code + `GateResult.TAG_MAP`；结构与字段不依赖映射 | 不能凭空等待文档而阻塞 M5 基础设施；文档交付后**只改 `GateResult.TAG_MAP` 一表**（必要时新增 code），不改 `GateReport` 字段、调用方与 UI 契约形状。详见 `specs/m5/failure_contract.md` §3 |
-| 25 | 2.1 的 MOS 器件参数 | **教学归一化值**：`vth 0.9 V / Ron 50 Ω / Id_sat 5 mA / Id_off 1 nA`，不是真实工艺；已调到"同一 Vds 下线性区电流 < 饱和区电流"（Vds=0.2 V 时线性 4000 µA < 饱和 5000 µA），并在 lab 文案写死三组测量条件（Vgs/Vds） | 原 `Id_sat=1000 µA` 低于线性区 4000 µA，与"饱和=封顶"矛盾；教学只需单调关系，不追求 SPICE 精度。见 §2.21 与 `ch02_labs.json` 的 `measure_conditions` |
-| 26 | `bound_first` 首件绑定不可回收 | 仅数据声明（`G01–G04` 与 `M01/M09/G12` 同口径），`EconomyCore` 回收逻辑尚未读取该字段；**防套利目前靠 `granted:<lab>` 一次性发放标记**，不是靠回收拦截 | 改 `EconomyCore.sell` 会破坏既有 `test_economy` 的 M01 回收断言（2033/2115 基线不许退）；需与物品系统单独排期 |
+| 25 | 2.1 的 MOS 器件参数 | **教学归一化值**：`vth 0.9 V / Ron 50 Ω / Id_sat 5 mA / Id_off 1 nA`，不是真实工艺；已调到"同一 Vds 下线性区电流 < 饱和区电流"（Vds=0.2 V 时线性 4000 µA < 饱和 5000 µA），并在 lab 文案写死四组测量条件（Vgs/Vds，含 Vds=6.0 的"不再上涨"点） | 原 `Id_sat=1000 µA` 低于线性区 4000 µA，与"饱和=封顶"矛盾；教学只需单调关系，不追求 SPICE 精度。见 §2.21 与 `ch02_labs.json` 的 `measure_conditions` |
+| 26 | `bound_first` 首件绑定不可回收 | **已真修（2026-11-04）**：`ChapterRuntime.grants(lab_id, labs_doc, state)` 读取 `granted:<lab>`，已领过的 lab 返回空奖励表，重复刷关不再发放（见 §2.23）；`G01–G04` 与 `M01/M09/G12` 同口径。**残留**：`EconomyCore` 的物品回收/出售逻辑仍未读取 `bound_first`（回收端只影响转手，不影响刷关） | 改 `EconomyCore.sell` 会破坏既有 `test_economy` 的 M01 回收断言（基线不许退）；刷关套利口已在发放端关闭，回收端留待物品系统单独排期 |
 | 27 | CH02 技能树 24 个节点 / `start_gold_mode: carry` | 只在 `ch02_levels.json` 引用 `SK-TR…SK-POWER` 与 `milestone CH02-1…5`，**未新增 `skilltree.json` 节点**；`start_gold_mode` 字段已写入但 `ChapterRuntime` 未实现 carry 逻辑，按规格回落 `start_gold 0` | 新增 24 节点会让 `tests/test_data.gd` 的"36 节点"断言退；M5 任务只授权 ch02 两份数据 + manifest |
-| 28 | CH02 `static_current` / `rail_margin` | 仿真层（L1）只输出 0/1/X，无稳态电流与输出电平模型；3 条 gate 标 `E_PENDING` + `required=false`（**不算通过**），落地 17/20 | 不写永远通过的假 gate；最小电流模型评估见交付报告 |
+| 28 | CH02 `static_current` / `rail_margin` | **`rail_margin` 已落地**（18/20）：`_judge_rail` 按逻辑输出反算 V_high/V_low，落 `E_RAIL_MARGIN`(20)，无器件层依赖；`static_current` 仍 `E_PENDING` + `required=false`（2 条 gate：`T2.2-3`、`T2.4-4`，**不算通过**） | 不写永远通过的假 gate；`rail_margin` 只需离散分压算术，故先落地；稳态电流仍等最小 L1 电流模型 |
 
 ### 3.1 偏差 11 的数值组成（避免"25 金币/50 XP"读成单一来源）
 

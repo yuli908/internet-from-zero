@@ -40,8 +40,8 @@ func run(ctx: TestContext) -> void:
 			_contains_all((lab.get("gate_ids", []) as Array), gate_ids_seen))
 		ctx.eq("%s 奖励物品存在" % lid, _missing_item(seg.get("grants", {}), cat), "")
 	ctx.eq("ch02 gate 总数", cases_total, 20)
-	ctx.eq("ch02 pending 数", pending_ids.size(), 3)
-	ctx.eq("ch02 pending 清单", pending_ids, ["T2.2-3", "T2.2-4", "T2.4-4"])
+	ctx.eq("ch02 pending 数", pending_ids.size(), 2)
+	ctx.eq("ch02 pending 清单", pending_ids, ["T2.2-3", "T2.4-4"])
 
 	# ---- 经济口径纠偏（12 §5）：不是 252 / 不是 88 ----
 	var eco: Dictionary = lv.get("economy", {})
@@ -66,6 +66,15 @@ func run(ctx: TestContext) -> void:
 	var t_ok: Dictionary = Ch02ChecksScript.run("transistor", t_cfg, {"answers": t_answers})
 	ctx.check("2.1 正确解全过", bool((t_ok["report"] as GateReport).all_required_passed()))
 	ctx.eq("2.1 pending 0", (t_ok["pending"] as Array).size(), 0)
+	# 第四个测点：Vgs=3.3、Vds=6.0 仍在饱和，Id 与 Vds=3.0 完全相等（容差 0）
+	var dev: Dictionary = t_cfg["device"]
+	ctx.eq("2.1 四个测点", (t_cfg.get("measure_conditions", []) as Array).size(), 4)
+	ctx.eq("2.1 第四测点 Vds", float((t_cfg["measure_conditions"][3] as Dictionary).get("vds", -1)), 6.0)
+	ctx.eq("2.1 Vds 6.0 仍饱和", Ch02ChecksScript.region_of(3.3, 6.0, dev), "saturation")
+	ctx.eq("2.1 Vds 3.0/6.0 的 Id 相等（容差 0）",
+		Ch02ChecksScript.id_ua_of(3.3, 3.0, dev), Ch02ChecksScript.id_ua_of(3.3, 6.0, dev))
+	ctx.eq("2.1 封顶值 5000 µA", Ch02ChecksScript.id_ua_of(3.3, 6.0, dev), 5000.0)
+	ctx.eq("2.1 T2.1-3 声明多点封顶", t_cfg["gate_cases"][2].get("equal_id_vds", []), [3.0, 6.0])
 	var t_bad_quiz := t_answers.duplicate()
 	t_bad_quiz["T2.1-4"] = 0
 	var t_bad: Dictionary = Ch02ChecksScript.run("transistor", t_cfg, {"answers": t_bad_quiz})
@@ -102,8 +111,18 @@ func run(ctx: TestContext) -> void:
 	var i_ok: Dictionary = Ch02ChecksScript.run("inverter", i_cfg, {"graph": _g1("not")})
 	var i_rep: GateReport = i_ok["report"]
 	ctx.check("2.2 正确解 required 全过", i_rep.all_required_passed())
-	ctx.eq("2.2 pending 2", (i_ok["pending"] as Array).size(), 2)
+	ctx.eq("2.2 pending 1", (i_ok["pending"] as Array).size(), 1)
 	ctx.check("2.2 pending 不计入 required", _pending_not_required(i_rep))
+	# rail_margin 已落地：合法电平通过
+	ctx.check("2.2 轨到轨合法电平通过", _code_of(i_rep, "T2.2-4") == "OK")
+	ctx.check("2.2 轨到轨未落失败 code", not (GateResult.E_RAIL_MARGIN in i_rep.failure_codes()))
+	# rail_margin 越界：导通电阻过大 → 高电平被拉低、低电平被抬升
+	var i_bad_rail_cfg: Dictionary = i_cfg.duplicate(true)
+	i_bad_rail_cfg["rail"]["ron_ohm"] = 1000
+	var i_rail: Dictionary = Ch02ChecksScript.run("inverter", i_bad_rail_cfg, {"graph": _g1("not")})
+	ctx.check("2.2 轨到轨越界失败", not bool((i_rail["report"] as GateReport).all_required_passed()))
+	ctx.check("2.2 轨到轨越界落 E_RAIL_MARGIN",
+		GateResult.E_RAIL_MARGIN in (i_rail["report"] as GateReport).failure_codes())
 	var i_bad: Dictionary = Ch02ChecksScript.run("inverter", i_cfg, {"graph": _g1("buf")})
 	ctx.check("2.2 错误解失败", not bool((i_bad["report"] as GateReport).all_required_passed()))
 	ctx.check("2.2 错误解命中真值表 code",
@@ -168,6 +187,8 @@ func run(ctx: TestContext) -> void:
 	ctx.check("2.4 写入 EQUIV trace", sink.count_kind("EQUIV") > 0)
 	Ch02ChecksScript.run("transistor", t_cfg, {"answers": {"default": 1}, "sim": sim})
 	ctx.check("2.1 写入 MOSFET_REGION trace", sink.count_kind("MOSFET_REGION") > 0)
+	Ch02ChecksScript.run("inverter", i_cfg, {"graph": _g1("not"), "sim": sim})
+	ctx.check("2.2 写入 RAIL_MARGIN trace", sink.count_kind("RAIL_MARGIN") > 0)
 	ctx.eq("pending kind 不写假 trace", sink.count_kind("STATIC_CURRENT"), 0)
 
 # ---------------------------------------------------------------- 图构造
@@ -266,6 +287,12 @@ func _missing_item(grants: Dictionary, cat: Catalog) -> String:
 	for raw in items.keys():
 		if not cat.has_item(str(raw)):
 			return "未知物品 %s" % str(raw)
+	return ""
+
+func _code_of(rep: GateReport, cid: String) -> String:
+	for c in rep.cases:
+		if str(c.get("id", "")) == cid:
+			return str(c.get("code_name", ""))
 	return ""
 
 func _pending_not_required(rep: GateReport) -> bool:

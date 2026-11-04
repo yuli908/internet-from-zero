@@ -128,7 +128,7 @@ func backfill_lab_grants(chapter: ChapterRuntime, labs_doc: Dictionary, catalog:
 			continue
 		if has_flag("granted:%s" % lab_id):
 			continue
-		var grants: Dictionary = chapter.grants(lab_id, labs_doc)
+		var grants: Dictionary = chapter.grants(lab_id, labs_doc, self)
 		if grants.is_empty():
 			continue
 		var r := grant_items(lab_id, grants, catalog)

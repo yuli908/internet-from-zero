@@ -44,6 +44,21 @@ func run(ctx: TestContext) -> void:
 	ctx.check("半加器：二次 already", bool(r4.get("already", false)))
 	ctx.eq("半加器：G04 仍为 1", p.item_count("G04"), 1)
 
+	# ---- bound_first 真读：ChapterRuntime.grants 回收路径拦重复刷关 ----
+	var rep := PlayerState.new(14)
+	var g1: Dictionary = ch.grants("gate", db.labs_doc, rep)
+	ctx.check("回收路径：首次有奖励", not g1.is_empty())
+	rep.grant_items("gate", g1, cat)
+	var g2: Dictionary = ch.grants("gate", db.labs_doc, rep)
+	ctx.eq("同 lab 连跑两次：第二次不再发放", g2, {})
+	rep.grant_items("gate", g2, cat)
+	ctx.eq("同 lab 连跑两次：G01 仍为 1", rep.item_count("G01"), 1)
+	var other: Dictionary = ch.grants("half_adder", db.labs_doc, rep)
+	ctx.check("不同 lab 各发各的", not other.is_empty())
+	rep.grant_items("half_adder", other, cat)
+	ctx.eq("不同 lab：G04 入库 1", rep.item_count("G04"), 1)
+	ctx.check("不同 lab：half_adder 也写标记", rep.has_flag("granted:half_adder"))
+
 	# ---- 旧档补发：已通关但从未领奖，读档补一次 ----
 	var legacy := PlayerState.new(12)
 	legacy.mark_lab_completed("gate")

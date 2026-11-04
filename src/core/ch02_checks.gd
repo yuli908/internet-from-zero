@@ -6,14 +6,13 @@ extends RefCounted
 ## 不返回自定义判定结构；额外只回传 `pending`（仿真层尚未支持的用例清单）。
 ##
 ## 已落地 kind：mosfet_region / quiz / truth / x_propagation / target / equiv /
-##              delay / area_max / power_calc / power_ratio / build_area
-## pending kind：static_current（需 L1 稳态电流模型）、rail_margin（需输出电平模型）
+##              delay / area_max / power_calc / power_ratio / build_area / rail_margin
+## pending kind：static_current（需 L1 稳态电流模型）
 ##
 ## 黑盒语义复用 `BlackBox` + `LabChecks`，不复制真值表或仿真器。
 
 const PENDING_REASONS := {
 	"static_current": "L1 仿真层只输出逻辑值，没有稳态电流模型（规格要求 50 tick 平均 Idd）",
-	"rail_margin": "L1 仿真层只输出 0/1/X，没有输出电平模型（规格要求 V_high/V_low 落在轨内）",
 }
 
 static func run(_lab_id: String, cfg: Dictionary, inputs: Dictionary = {}, tracker: GateAttemptTracker = null) -> Dictionary:
@@ -60,6 +59,8 @@ static func run(_lab_id: String, cfg: Dictionary, inputs: Dictionary = {}, track
 				_judge_power_ratio(rep, tracker, c, cid, title, required, answers, sim)
 			"build_area":
 				_judge_build_area(rep, tracker, c, cid, title, required, graphs)
+			"rail_margin":
+				_judge_rail(rep, tracker, cfg, c, cid, title, required, graph, sim)
 			_:
 				rep.add_case(GateResult.E_GENERIC, cid, title, {"kind": kind}, "已知判定 kind",
 					kind, [], "未知判定 kind：%s" % kind, required, 0)
@@ -134,6 +135,28 @@ static func _judge_region(rep: GateReport, tracker: GateAttemptTracker, sim: Sim
 		actual["drift"] = drift
 		detail += "，随 Vds 漂移 %.1f%%" % (drift * 100.0)
 		if drift > tol:
+			ok = false
+			code = GateResult.E_REGION
+	# 多点封顶：同一 Vgs 下，列出的多个 Vds 必须给出同一个 Id（默认容差 0）。
+	if c.has("equal_id_vds"):
+		var probes: Array = c["equal_id_vds"]
+		var vals := []
+		for raw_v in probes:
+			vals.append(id_ua_of(vgs, float(raw_v), dev))
+		var spread := 0.0
+		if not vals.is_empty():
+			var lo: float = vals[0]
+			var hi: float = vals[0]
+			for v in vals:
+				lo = minf(lo, float(v))
+				hi = maxf(hi, float(v))
+			spread = hi - lo
+		var id_tol := float(c.get("equal_id_tol", 0.0))
+		expected["equal_id_vds"] = probes
+		expected["equal_id_tol"] = id_tol
+		actual["equal_id_ua"] = vals
+		detail += "，Vds %s 下 Id=%s µA" % [str(probes), str(vals)]
+		if spread > id_tol:
 			ok = false
 			code = GateResult.E_REGION
 	LabChecks._emit(rep, tracker, code, cid, title, ok, {"vgs": vgs, "vds": vds, "device": dev},
@@ -356,6 +379,48 @@ static func _judge_build_area(rep: GateReport, tracker: GateAttemptTracker, c: D
 	LabChecks._emit(rep, tracker, code, cid, title, ok, {"slots": slots, "max_total_gates": budget},
 		"%d/%d 槽，总门数 ≤%d" % [targets.size(), slots, budget], lines,
 		"%s（%d 槽 / %d 目标 / %d 门）" % [", ".join(lines), slots, targets.size(), total_gates], required)
+
+static func _judge_rail(rep: GateReport, tracker: GateAttemptTracker, cfg: Dictionary,
+		c: Dictionary, cid: String, title: String, required: bool,
+		graph: CircuitGraph, sim: SimCircuit) -> void:
+	## 逻辑值 → 电平反查：先用黑盒求各稳态的逻辑输出，再按上/下拉导通电阻与负载
+	## 分压反算该逻辑值对应的实际电压，比对轨到轨门限。纯离散算术，不依赖模拟求解器。
+	var rail: Dictionary = c.get("rail", cfg.get("rail", {}))
+	var vdd := float(rail.get("vdd", 3.3))
+	var ron := float(rail.get("ron_ohm", 50.0))
+	var load := float(rail.get("load_ohm", 2000.0))
+	var hi_min := float(c.get("v_high_min", rail.get("v_high_min", 3.2)))
+	var lo_max := float(c.get("v_low_max", rail.get("v_low_max", 0.1)))
+	var v_high := vdd * load / (load + ron)
+	var v_low := vdd * ron / (load + ron)
+	var states: Array = c.get("states", [])
+	var ids := _input_ids(cfg, states)
+	var ok := graph != null
+	var code := GateResult.OK if ok else GateResult.E_MISSING_GRAPH
+	var probed := []
+	for row in states:
+		var vals := {}
+		for j in (row as Array).size():
+			vals[str(ids[j])] = "1" if int(row[j]) == 1 else "0"
+		var res: Dictionary = BlackBox.tri_eval(graph, vals) if graph != null else {}
+		var out := str((res.get("values", {}) as Dictionary).get("out", "?")) if bool(res.get("ok", false)) else "?"
+		probed.append({"inputs": row, "out": out})
+		if not ok:
+			continue
+		if out == "1" and v_high < hi_min:
+			ok = false
+			code = GateResult.E_RAIL_MARGIN
+		elif out == "0" and v_low > lo_max:
+			ok = false
+			code = GateResult.E_RAIL_MARGIN
+		elif out != "0" and out != "1":
+			ok = false
+			code = GateResult.E_BUILD
+	LabChecks._emit(rep, tracker, code, cid, title, ok, {"v_high_min": hi_min, "v_low_max": lo_max},
+		"V_high ≥ %.3f V，V_low ≤ %.3f V" % [hi_min, lo_max],
+		{"v_high": v_high, "v_low": v_low, "states": probed},
+		"%d 稳态：V_high=%.3f V，V_low=%.3f V" % [states.size(), v_high, v_low], required)
+	_trace(sim, "rail_margin", cid, {"v_high": v_high, "v_low": v_low})
 
 # ---------------------------------------------------------------- 工具
 

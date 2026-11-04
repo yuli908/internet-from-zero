@@ -18,7 +18,7 @@ func complete_lab(lab_id: String) -> Dictionary:
 		return {"ok": true, "error": "", "newly": false, "already": true}
 	# M3 T5：物品奖励整单校验先于任何状态变更，避免"目标已记完成、奖励却发不出"。
 	# M5：`grants` 的唯一数据源是实验数据段（`data/labs/*.json`），章节内联字段仅作覆盖。
-	var grants: Dictionary = runtime().grants(lab_id, DataDB.labs_doc)
+	var grants: Dictionary = runtime().grants(lab_id, DataDB.labs_doc, p)
 	if not grants.is_empty():
 		var v := p.grant_items(lab_id, grants, DataDB.catalog, true)
 		if not bool(v.get("ok", false)):
