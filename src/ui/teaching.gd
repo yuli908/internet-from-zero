@@ -69,3 +69,67 @@ static func misconception_on_report(cfg: Dictionary, report: GateReport) -> Stri
 		if not bool(c.get("ok", false)) and bool(c.get("required", true)):
 			return misconception_text(cfg)
 	return ""
+
+## 分段课文：sections = [{order, after, title, text}]，按 order 升序。
+## 缺失 sections 时退回 body(+rules) 单段，老数据不炸。
+static func section_list(cfg: Dictionary) -> Array:
+	var raw: Variant = cfg.get("sections", [])
+	var out: Array = []
+	if raw is Array:
+		for item in raw:
+			if not item is Dictionary:
+				continue
+			var d: Dictionary = item
+			var text := str(d.get("text", "")).strip_edges()
+			if text.is_empty():
+				continue
+			out.append({
+				"order": int(d.get("order", out.size() + 1)),
+				"after": maxi(0, int(d.get("after", 0))),
+				"title": str(d.get("title", "")).strip_edges(),
+				"text": text,
+			})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["order"]) < int(b["order"]))
+	if out.is_empty():
+		var body := teaching_text(cfg)
+		if not body.is_empty():
+			out.append({"order": 1, "after": 0, "title": "", "text": body})
+	return out
+
+static func has_sections(cfg: Dictionary) -> bool:
+	var raw: Variant = cfg.get("sections", [])
+	return raw is Array and not (raw as Array).is_empty()
+
+## rules 是阈值速查表；有 sections 时不再单独成块，只作为课文卡附注（信息不丢）。
+static func rules_note(cfg: Dictionary) -> String:
+	var raw: Variant = cfg.get("rules", [])
+	var lines := PackedStringArray()
+	if raw is Array:
+		for r in raw:
+			var s := str(r).strip_edges()
+			if not s.is_empty():
+				lines.append(s)
+	return "\n".join(lines)
+
+## 已完成 done 个 required gate 时解锁的段数（after ≤ done）。
+static func unlocked_count_sections(secs: Array, done: int) -> int:
+	var n := 0
+	for raw in secs:
+		if int((raw as Dictionary).get("after", 0)) <= done:
+			n += 1
+	return n
+
+## 当前段下标：已解锁段的最后一段；某档无段自然回落到前一档最后一段（空档保护）。
+## back 为翻页回看的步数（0 = 最新解锁段）。
+static func current_section_index(secs: Array, done: int, back: int = 0) -> int:
+	var unlocked := unlocked_count_sections(secs, done)
+	return maxi(0, unlocked - 1 - maxi(0, back))
+
+static func current_section(secs: Array, done: int, back: int = 0) -> Dictionary:
+	if secs.is_empty():
+		return {}
+	return secs[current_section_index(secs, done, back)]
+
+## 翻页标签：i/n，n = 已解锁段数（未解锁段不可达，分母随之增长）。
+static func pager_label(index: int, unlocked: int) -> String:
+	return "%d/%d" % [index + 1, maxi(1, unlocked)]

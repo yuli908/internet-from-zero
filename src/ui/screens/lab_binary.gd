@@ -16,8 +16,8 @@ var _value := 0
 
 func _build() -> void:
 	# ---- 左栏：任务 / 8 位开关 / 覆盖进度 ----
+	_install_reader(_reader_slot, 14, UiTheme.F_LABEL)
 	side.add_child(_section("任务"))
-	_add_teaching(side, 12, UiTheme.F_LABEL)
 	side.add_child(Ui.hline())
 	_switches = BitSwitches.new()
 	_switches.setup(int(lab_data.get("bit_count", 8)), 0)

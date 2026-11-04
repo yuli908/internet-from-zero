@@ -13,8 +13,8 @@ var _seen: Dictionary = {}
 func _build() -> void:
 	var th := VoltageModel.thresholds(lab_data)
 	# ---- 左栏：任务说明 / 电压读数 / 调压 ----
+	_install_reader(_reader_slot, 14, UiTheme.F_LABEL)
 	side.add_child(_section("任务"))
-	_add_teaching(side, 12)
 	side.add_child(Ui.hline())
 	side.add_child(_section("当前电压"))
 	_value_label = Ui.mono("0.00 V", UiTheme.F_H1, UiTheme.AMBER)

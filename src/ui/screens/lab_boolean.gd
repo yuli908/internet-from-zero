@@ -9,8 +9,8 @@ var _dm_note: Label
 
 func _build() -> void:
 	# ---- 左栏：任务说明 / 提示 ----
+	_install_reader(_reader_slot, 14, UiTheme.F_LABEL)
 	side.add_child(_section("任务"))
-	_add_teaching(side, 12)
 	var hint_card := _hint_card(str(lab_data.get("hint", "点击格子循环 0 → 1 → ?；填完运行验收。")))
 	side.add_child(hint_card)
 	side.add_child(Ui.hline())

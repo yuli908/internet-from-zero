@@ -7,6 +7,7 @@ extends Control
 signal solved(lab_id: String)
 
 const Teach = preload("res://src/ui/teaching.gd")
+const SectionReaderGd = preload("res://src/ui/widgets/section_reader.gd")
 
 var main: Control
 var lab_id := ""
@@ -21,6 +22,12 @@ var inspector: VBoxContainer
 
 var _side_card: PanelContainer
 var _inspector_card: PanelContainer
+## 左栏：阅读槽（课文卡固定）+ 控件滚动区（课文永不滚动）。
+var _reader_slot: VBoxContainer
+var _side_scroll: ScrollContainer
+var _reader: Control
+## 本次会话内已通过的 required gate（不必等整页全过，用于逐档解锁课文）。
+var _session_gates: Dictionary = {}
 var _header_title: Label
 var _header_code: Label
 var _status_badge: Label
@@ -142,8 +149,16 @@ func _build_shell(meta: Dictionary) -> void:
 	_side_card.custom_minimum_size = Vector2(248, 0)
 	_side_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(_side_card)
+	# 阅读槽在滚动区之外：课文卡固定，控件区（side）在下方滚动。
+	var side_outer := Ui.vbox(6)
+	side_outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_side_card.add_child(side_outer)
+	_reader_slot = Ui.vbox(0)
+	side_outer.add_child(_reader_slot)
+	_side_scroll = Ui.scroll()
+	side_outer.add_child(_side_scroll)
 	side = Ui.vbox(6)
-	_side_card.add_child(side)
+	_side_scroll.add_child(side)
 
 	center = Ui.vbox(8)
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -210,6 +225,39 @@ func _finish_shell() -> void:
 	## 子类 `_build()` 结束后调用：没用的检查器列直接隐藏，把宽度让给编辑区。
 	if _inspector_card != null and inspector.get_child_count() == 0:
 		_inspector_card.visible = false
+	_refresh_reader()
+
+## 分段课文阅读卡：默认挂左栏阅读槽（固定不滚动）；1.4 例外挂中栏讲解带。
+func _install_reader(host: Control = null, chars_per_line: int = 13, font_size: int = UiTheme.F_LABEL, pager_in_head: bool = false) -> Control:
+	if host == null:
+		host = _reader_slot
+	_reader = SectionReaderGd.new()
+	# rules 只在有 sections 时作为课文卡附注（否则随 body 一起兜底，不再另起一块）。
+	var note := Teach.rules_note(lab_data) if Teach.has_sections(lab_data) else ""
+	# 附注作为「首段之后的固定小注」：进 lab 第一屏就可见，且不与讲阈值来源的正文段同屏重复。
+	_reader.configure(Teach.section_list(lab_data), chars_per_line, font_size, pager_in_head, note, 1 if not note.is_empty() else 0)
+	host.add_child(_reader)
+	_teach_label = _reader.text_label
+	_refresh_reader()
+	return _reader
+
+## 已完成 required gate 数（存档里的 ∪ 本次会话跑过的），决定课文解锁到哪一档。
+func _required_done() -> int:
+	var n := 0
+	for raw in lab_data.get("gate_cases", []):
+		if not raw is Dictionary:
+			continue
+		var c: Dictionary = raw
+		if not bool(c.get("required", true)):
+			continue
+		var cid := str(c.get("id", ""))
+		if gate_passed(cid) or bool(_session_gates.get(cid, false)):
+			n += 1
+	return n
+
+func _refresh_reader(reset_to_latest: bool = true) -> void:
+	if _reader != null:
+		_reader.set_done(_required_done(), reset_to_latest)
 
 func refresh_status() -> void:
 	if GameState.player == null:
@@ -265,6 +313,7 @@ func pass_report(report: GateReport) -> bool:
 			mark_gate(str(c.get("id", "")), true)
 	EventBus.state_changed.emit()
 	complete_once()
+	_refresh_reader()
 	return true
 
 func show_report(report: GateReport) -> void:
@@ -298,12 +347,16 @@ func show_report(report: GateReport) -> void:
 	for raw in report.cases:
 		var c: Dictionary = raw
 		_attempt = maxi(_attempt, int(c.get("attempt", 0)))
+		# 单条 required gate 通过即可解锁对应课文，不必等整页全过。
+		if bool(c.get("ok", false)) and bool(c.get("required", true)):
+			_session_gates[str(c.get("id", ""))] = true
 	var mis := Teach.misconception_on_report(lab_data, report)
 	if _feedback_label != null:
 		_feedback_label.text = mis
 		_feedback_label.tooltip_text = mis
 		_feedback_label.visible = not mis.is_empty()
 	_on_attempt(_attempt)
+	_refresh_reader()
 
 func _on_attempt(_a: int) -> void:
 	pass
@@ -395,7 +448,7 @@ static func flat_text(s: String) -> String:
 func teach_probe() -> Dictionary:
 	var t := _teach_label.text if _teach_label != null else ""
 	var h := _hint_label.text if _hint_label != null else ""
-	return {
+	var out := {
 		"lab": lab_id,
 		"teach_len": t.length(),
 		"teach_src_len": Teach.teaching_text(lab_data).length(),
@@ -404,6 +457,25 @@ func teach_probe() -> Dictionary:
 		"hint_visible": _hint_box != null and _hint_box.visible,
 		"misconception": _feedback_label.text if _feedback_label != null else "",
 	}
+	if _reader != null:
+		out["reader"] = _reader.probe()
+	return out
+
+## 截图用：按真实 gate_cases 造一份「前 n 条 required 已通过」的结果，驱动逐档解锁。
+func _shot_partial(n: int) -> void:
+	var rep := GateReport.new()
+	var i := 0
+	for raw in lab_data.get("gate_cases", []):
+		if not raw is Dictionary:
+			continue
+		var c: Dictionary = raw
+		if not bool(c.get("required", true)):
+			continue
+		i += 1
+		if i <= n:
+			rep.add(str(c.get("id", "")), "ok", true, "")
+	if rep.cases.size() > 0:
+		show_report(rep)
 
 func _shot_hooks() -> void:
 	## 仅截图模式：--shot-fail 用真实数据跑一次必然失败的验收，用于拍失败态（含误区条）。
@@ -414,7 +486,50 @@ func _shot_hooks() -> void:
 			call("_reset_for_fail_shot")
 		if has_method("_run_cases"):
 			call("_run_cases")
+	var done := int(CliArgs.value("shot-done", "0"))
+	if done > 0:
+		_shot_partial(done)
+	var flips := int(CliArgs.value("shot-flip", "0"))
+	if flips > 0 and _reader != null:
+		for k in flips:
+			_reader.flip(-1)
+	call_deferred("_shot_probe_print")
+
+## 布局完成后再打印：setup 阶段节点尚未入树，rect 会读到 0。
+## 只等 1 帧，必须落在 main.gd 截图前的 4 帧预算内（否则证据打印会被 quit 截断）。
+func _shot_probe_print() -> void:
+	if not is_inside_tree():
+		return
+	await get_tree().process_frame
 	var p := teach_probe()
 	print("IFZ_TEACH lab=%s teach_len=%d src_len=%d match=%s hint_len=%d hint_visible=%s misconception_len=%d" % [
 		str(p["lab"]), int(p["teach_len"]), int(p["teach_src_len"]), str(p["teach_match"]),
 		int(p["hint_len"]), str(p["hint_visible"]), str(p["misconception"]).length()])
+	if _reader != null:
+		var r: Dictionary = _reader.probe()
+		var scroll_h := _side_scroll.size.y if _side_scroll != null else 0.0
+		var slot_h := _reader_slot.size.y if _reader_slot != null else 0.0
+		print("IFZ_READER lab=%s idx=%d after=%d unlocked=%d total=%d pager=%s prev_disabled=%s next_disabled=%s in_scroll=%s rect=%s text_len=%d body_h=%.0f reader_h=%.0f slot_h=%.0f scroll_h=%.0f" % [
+			str(p["lab"]), int(r["index"]), int(r["after"]), int(r["unlocked"]), int(r["total"]),
+			str(r["pager"]), str(r["prev_disabled"]), str(r["next_disabled"]), str(r["in_scroll"]),
+			str(r["rect"]), str(r["text"]).length(), 544.0, float(r["rect"][3]), slot_h, scroll_h])
+	if CliArgs.has_flag("shot-scroll"):
+		await _shot_scroll_probe()
+	var parts := PackedStringArray()
+	for c in center.get_children():
+		if c is Control and (c as Control).visible:
+			parts.append("%dx%d" % [int((c as Control).size.x), int((c as Control).size.y)])
+	print("IFZ_CENTER lab=%s h=%.0f children=%s" % [lab_id, center.size.y, " ".join(parts)])
+
+func _shot_scroll_probe() -> void:
+	## 控件区滚到底后，阅读卡位置不变（课文卡在滚动区外）。
+	if _side_scroll == null or _reader == null:
+		return
+	var before: Rect2 = _reader.get_global_rect()
+	var before_scroll: Rect2 = _side_scroll.get_global_rect()
+	_side_scroll.scroll_vertical = 10000
+	await get_tree().process_frame
+	var after: Rect2 = _reader.get_global_rect()
+	print("IFZ_SCROLL lab=%s offset=%d reader_before=%s reader_after=%s scroll_rect=%s fixed=%s" % [
+		lab_id, _side_scroll.scroll_vertical, str(before), str(after), str(before_scroll),
+		str(before.position == after.position)])

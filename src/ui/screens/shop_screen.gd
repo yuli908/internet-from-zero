@@ -858,9 +858,9 @@ func _attach_hover(row: Control, w: float, h: float) -> void:
 	row.mouse_exited.connect(_set_row_hover.bind(row, tint, frame, false))
 
 func _set_row_hover(row: Control, tint: ColorRect, frame: Panel, hot: bool) -> void:
-	var old := row.get_meta("hover_tween", null) as Tween
-	if old != null:
-		old.kill()
+	var old: Variant = row.get_meta("hover_tween", false)
+	if old is Tween:
+		(old as Tween).kill()
 	if not UiTheme.motion:
 		tint.color = Color(1.0, 1.0, 1.0, 0.06 if hot else 0.0)
 		frame.modulate.a = 1.0 if hot else 0.0
@@ -874,9 +874,9 @@ func _set_row_hover(row: Control, tint: ColorRect, frame: Panel, hot: bool) -> v
 func _clear_children(container: Node) -> void:
 	for c in container.get_children():
 		if c is Control:
-			var tw := (c as Control).get_meta("hover_tween", null) as Tween
-			if tw != null:
-				tw.kill()
+			var tw: Variant = (c as Control).get_meta("hover_tween", false)
+			if tw is Tween:
+				(tw as Tween).kill()
 		container.remove_child(c)
 		c.queue_free()
 

@@ -728,6 +728,12 @@ func _refresh() -> void:
 		_header_task.text = _chapter_name()
 		_header_sub.text = ""
 	_set_rail_active("labs", true)
+	# 没有可进入的 lab 时按钮灰化并给 tooltip，不允许"能点但没反应"。
+	var entry := _entry_lab()
+	_update_rail_lock("labs", entry.is_empty())
+	var labs_btn: Button = _rail_buttons.get("labs", null)
+	if labs_btn != null:
+		labs_btn.tooltip_text = "进入最后一节" if not entry.is_empty() else "本章还没有可进入的实验"
 	var archive_on := done >= 3
 	_rail_buttons["archive"].disabled = not archive_on
 	var diag_on := p.has_flag("gate:T%d.1-1" % _chapter_number())
@@ -755,12 +761,32 @@ func _go(id: String) -> void:
 	if main != null and main.has_method("show_screen"):
 		main.show_screen(id)
 
+## 入口兜底：章末全部完成时 next_objective() 为空，回落到本章最后一个已解锁 lab，
+## 而不是"看起来能点、点了没反应"。
+static func resolve_entry_lab(current: String, labs: Array, unlocked: Dictionary) -> String:
+	if not current.is_empty():
+		return current
+	for i in range(labs.size() - 1, -1, -1):
+		var lid := str(labs[i])
+		if bool(unlocked.get(lid, false)):
+			return lid
+	return ""
+
+func _labs_unlocked() -> Dictionary:
+	var out := {}
+	for lid in _labs:
+		out[str(lid)] = ChapterFlow.is_lab_unlocked(str(lid))
+	return out
+
+func _entry_lab() -> String:
+	return resolve_entry_lab(_current_lab, _labs, _labs_unlocked())
+
 func _enter_current_lab() -> void:
-	if _current_lab.is_empty():
+	var target := _entry_lab()
+	if target.is_empty():
+		EventBus.toast("本章还没有可进入的实验", "error")
 		return
-	if not ChapterFlow.is_lab_unlocked(_current_lab):
-		return
-	select_lab(_current_lab, true)
+	select_lab(target, true)
 
 func select_lab(lab_id: String, announce: bool = true) -> void:
 	if not LAB_PATHS.has(lab_id):

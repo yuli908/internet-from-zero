@@ -13,7 +13,8 @@ var _quiz_status: Label
 var _wave: Waveform
 
 func _build() -> void:
-	# ---- 左栏：三段实验 ----
+	# ---- 左栏：课文卡（固定）+ 三段实验（随控件区滚动） ----
+	_install_reader(_reader_slot, 14, UiTheme.F_LABEL)
 	var chain: Dictionary = lab_data.get("chain", {})
 	side.add_child(_section("A · 三级非门延迟"))
 	side.add_child(Ui.label("每级 %d tick，串联 %d 级。" % [int(chain.get("delay_per_stage", 3)), int(chain.get("stages", 3))], UiTheme.F_META, UiTheme.MUTED))
@@ -47,7 +48,6 @@ func _build() -> void:
 	_wave = Waveform.new()
 	wm.add_child(_wave)
 	center.add_child(Ui.wrap("波形只显示 C 变化后的 F 跳变；窄脉冲宽度 ≥1 tick 即视为可观测毛刺。", UiTheme.F_BODY, UiTheme.MUTED))
-	_add_teaching(center, 30)
 	# 提示层：画布下方讲解带，attempt ≥ 1 才显形。
 	_add_hint(center, 30)
 

@@ -2,6 +2,10 @@ extends LabBase
 
 ## 1.4 门级：用 AND/OR/NOT 搭出目标函数。黑盒验收，允许多解。
 
+## 中栏讲解带实际高度由最长段（170 字 / 每行 40 字 = 5 行）决定：实测 176。
+## 目标条 46 + 调色板 44 + 带 176 + 3×6 间距 = 284，画布给 258 → 中栏合计 542 ≤ 544。
+const GATE_CANVAS_H := 258
+
 var _editor: CircuitEditor
 var _graphs: Dictionary = {}
 var _current_task := ""
@@ -61,10 +65,10 @@ func _build() -> void:
 	var editor_card := Ui.card_tight(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	editor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	editor_card.custom_minimum_size = Vector2(0, 370)
+	editor_card.custom_minimum_size = Vector2(0, GATE_CANVAS_H)
 	center.add_child(editor_card)
 	_editor = CircuitEditor.new()
-	_editor.custom_minimum_size = Vector2(696, 370)
+	_editor.custom_minimum_size = Vector2(696, GATE_CANVAS_H)
 	_editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor.changed.connect(_on_editor_changed)
@@ -83,9 +87,10 @@ func _build() -> void:
 		pal.add_child(b)
 		_pal_buttons[gs] = b
 	pal.add_child(Ui.spacer())
-	# 教学层：画布下方讲解带（这一版此前整段不显示）。
-	_add_teaching(center, 36, UiTheme.F_META)
-	center.add_child(Ui.spacer())
+	# 教学层：画布下方讲解带 = 分段课文阅读卡（例外，不走左栏）；翻页并到标题行压高度。
+	_install_reader(center, 40, UiTheme.F_LABEL, true)
+	# 讲解带吃掉一部分间距，保证中栏总高不越过 544。
+	center.add_theme_constant_override("separation", 6)
 
 	# ---- 右栏：目标真值表 + 验收 ----
 	inspector.add_child(_section("目标真值表"))
@@ -156,6 +161,7 @@ func _switch_task(id: String) -> void:
 	_editor.setup(inputs, [{"id": "out", "label": "OUT"}], task.get("palette", ["not", "and", "or"]), int(lab_data.get("max_gates", 12)))
 	if doc is Dictionary:
 		_editor.load_dict(doc)
+	_fit_editor_nodes()
 	_task_hint.text = str(task.get("title", id))
 	_target_label.text = "OUT = %s" % _target_expr(str(task.get("target", "")))
 	_rebuild_truth(task)
@@ -310,9 +316,21 @@ func scripted_solve() -> bool:
 		_switch_task(tid)
 		_graphs[tid] = _scripted_graph(t)
 		_editor.load_dict((_graphs[tid] as CircuitGraph).to_dict())
+		_fit_editor_nodes()
 	_encapsulate()
 	_run_cases()
 	return is_done()
+
+## 画布高度压到 GATE_CANVAS_H 后，把低于画布的节点上移，避免被裁切（不改图结构）。
+func _fit_editor_nodes() -> void:
+	var max_y := float(GATE_CANVAS_H - 48)
+	for raw in _editor.graph.nodes.values():
+		var n: Dictionary = raw
+		var p: Vector2 = n.get("pos", Vector2.ZERO)
+		if p.y > max_y:
+			p.y = max_y
+			n["pos"] = p
+	_editor.queue_redraw()
 
 func _scripted_graph(task: Dictionary) -> CircuitGraph:
 	var g := CircuitGraph.new()
