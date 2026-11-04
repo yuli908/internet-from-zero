@@ -29,6 +29,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("所有段逐段 ≤260 字", longest <= 260, "最长 %d，合计 %d 段" % [longest, total])
 
 	_assert_done_tiers(ctx, cfg)
+	_assert_duplicate_after(ctx, cfg)
 	_assert_gap_protection(ctx, cfg)
 	_assert_all_reachable(ctx, cfg)
 	_assert_paging(ctx, cfg)
@@ -61,6 +62,41 @@ func _assert_done_tiers(ctx: TestContext, cfg: Dictionary) -> void:
 				"%d/%d" % [r.index + 1, r.unlocked])
 		r.free()
 
+## 同一档出现两段时：默认停在已解锁末段（后一段），回翻能看到前一段。
+func _assert_duplicate_after(ctx: TestContext, cfg: Dictionary) -> void:
+	var ok_default := true
+	var ok_back := true
+	var detail := ""
+	for id in LABS:
+		var secs := Teach.section_list(cfg[id])
+		if secs.is_empty():
+			continue
+		var max_after := 0
+		for raw in secs:
+			max_after = maxi(max_after, int((raw as Dictionary).get("after", 0)))
+		var n_at := 0
+		for raw in secs:
+			if int((raw as Dictionary).get("after", 0)) == max_after:
+				n_at += 1
+		if n_at < 2:
+			continue
+		var r = Reader.new()
+		r.configure(secs, 14, 16)
+		r.set_done(max_after)
+		if r.index != secs.size() - 1 or int(r.current().get("after", -1)) != max_after:
+			ok_default = false
+			detail = "%s 默认 idx=%d" % [id, r.index]
+		var second := Reader.flat_text(r.text_label.text)
+		if not r.flip(-1) or r.index != secs.size() - 2 or int(r.current().get("after", -1)) != max_after:
+			ok_back = false
+			detail = "%s 回翻 idx=%d" % [id, r.index]
+		if Reader.flat_text(r.text_label.text) == second:
+			ok_back = false
+			detail = "%s 回翻文字未变" % id
+		r.free()
+	ctx.check("after 重复档：done=末档默认显示后一段", ok_default, detail)
+	ctx.check("after 重复档：回翻能看到同一档的前一段", ok_back, detail)
+
 ## 五条主断言之三：某档无段时必须沿用前一档最后一段，绝不留白。
 func _assert_gap_protection(ctx: TestContext, cfg: Dictionary) -> void:
 	for id in LABS:
@@ -82,7 +118,7 @@ func _assert_gap_protection(ctx: TestContext, cfg: Dictionary) -> void:
 			"实际 after=%d" % int(r.current().get("after", -1)))
 		r.free()
 
-## 五条主断言之一（反向）：33 段逐段都能翻回去，且屏上文字与数据一致。
+## 五条主断言之一（反向）：每一段都能翻回去，且屏上文字与数据一致（段数实读）。
 func _assert_all_reachable(ctx: TestContext, cfg: Dictionary) -> void:
 	var ok := true
 	var detail := ""
@@ -140,61 +176,76 @@ func _assert_body_fallback(ctx: TestContext, cfg: Dictionary) -> void:
 			r.count_label.text == "1/1" and r.prev_btn.disabled and r.next_btn.disabled)
 		r.free()
 
-## rules 不单独成块：有 sections 时只作为课文卡附注，且只挂在首段（避免与讲阈值来源的正文段同屏重复）。
+## rules 与 sections 去重：有 sections 时一律不渲染 rules；只有删掉 sections 的副本才兜底出现。
 func _assert_rules(ctx: TestContext, cfg: Dictionary) -> void:
-	var lvl: Dictionary = cfg["level"]
-	var secs := Teach.section_list(lvl)
-	var note := Teach.rules_note(lvl)
-	ctx.check("level 有 rules 可作附注", not note.is_empty(), note)
-	var r = Reader.new()
-	r.configure(secs, 14, 16, false, note, 1)
-	r.set_done(4)
-	ctx.check("附注内容=完整 rules（信息不丢）", Reader.flat_text(r.note_label.text) == _flat(note))
+	for id in LABS:
+		var secs := Teach.section_list(cfg[id])
+		var note := Teach.fallback_note(cfg[id])
+		var r = Reader.new()
+		r.configure(secs, 14, 16, false, note, 0)
+		r.set_done(4)
+		var note_flat: String = Reader.flat_text(r.note_label.text) if r.note_label != null else ""
+		var note_shown: bool = r.note_label != null and r.note_label.visible
+		ctx.check("%s 有 sections 时不渲染 rules（附注为空）" % id,
+			note.is_empty() and note_flat.is_empty() and not note_shown,
+			"note=%d 字" % note_flat.length())
+		r.free()
+	var copy: Dictionary = JSON.parse_string(JSON.stringify(cfg["level"]))
+	copy.erase("sections")
+	var rules := Teach.rules_note(copy)
+	var fb := Teach.fallback_note(copy)
+	ctx.check("删掉 sections 后 rules 作为兜底出现", not fb.is_empty() and fb == rules, fb)
+	var fr = Reader.new()
+	fr.configure(Teach.section_list(copy), 14, 16, false, fb, 0)
+	fr.set_done(4)
+	ctx.check("兜底附注保留完整 rules（信息不丢）", Reader.flat_text(fr.note_label.text) == _flat(rules))
 	var all_keep := true
-	for raw in lvl.get("rules", []):
-		var rule := _flat(str(raw))
-		if not rule.is_empty() and Reader.flat_text(r.note_label.text).find(rule) < 0:
+	for raw in copy.get("rules", []):
+		var line := _flat(str(raw))
+		if not line.is_empty() and Reader.flat_text(fr.note_label.text).find(line) < 0:
 			all_keep = false
-	ctx.check("每条规则都保留在附注里", all_keep)
-	var idx1 := _index_of_order(secs, 1)
-	ctx.check("首段（固定小注）附注显形", idx1 >= 0 and _note_visible(r, idx1))
-	var idx3 := _index_of_order(secs, 3)
-	ctx.check("讲阈值来源的 order 3 不再重复渲染附注", idx3 >= 0 and not _note_visible(r, idx3))
-	var idx5 := _index_of_order(secs, secs.size())
-	ctx.check("其他段附注隐藏（只有一处渲染）", idx5 >= 0 and not _note_visible(r, idx5))
-	ctx.check("正文段不含 rules 整块文本", Reader.flat_text(r.text_label.text) != _flat(note))
-	r.free()
+	ctx.check("兜底附注逐条保留每条规则", all_keep)
+	ctx.check("兜底附注在唯一段落上可见", _note_visible(fr, 0))
+	fr.free()
+	var src := FileAccess.get_file_as_string("res://src/ui/screens/lab_base.gd")
+	ctx.check("UI 侧用同一 fallback_note 决定 rules 去留", src.find("Teach.fallback_note(lab_data)") >= 0)
 
-## 几何硬线：课文不缩字号、不在卡内滚动，只能靠卡高固定；卡高必须给控件区留出滚动空间。
-## 左栏可用 544（内容区），阅读卡 + 6 间距后余量即控件滚动区高度。
+## 几何硬线：课文不缩字号、不在卡内滚动；任何可达状态下控件滚动区 ≥80 px。
+## 左栏 544 = 阅读卡 + 6 间距 + 控件滚动区 → 卡高上限 544-6-80 = 458。
 func _assert_geometry(ctx: TestContext, cfg: Dictionary) -> void:
+	var card_cap := 544.0 - 6.0 - 80.0
 	for id in ["level", "binary", "boolean", "signal", "half_adder"]:
 		var secs := Teach.section_list(cfg[id])
-		var note := Teach.rules_note(cfg[id]) if Teach.has_sections(cfg[id]) else ""
-		var r = Reader.new()
-		r.configure(secs, 14, 16, false, note, 1 if not note.is_empty() else 0)
 		var worst := 0.0
 		var worst_order := 0
 		for i in secs.size():
+			# 每段新建一个实例：容器的最小尺寸缓存只在首次计算时读取当前文本，
+			# 同一实例连续 set_index 会读到旧缓存（headless 下没有帧来刷新布局）。
+			var r = Reader.new()
+			Engine.get_main_loop().root.add_child(r)
+			r.configure(secs, 14, 16, false, Teach.fallback_note(cfg[id]), 0)
+			r.set_done(4)
 			r.set_index(i)
 			var h := float(r.get_combined_minimum_size().y)
 			if h > worst:
 				worst = h
 				worst_order = int((secs[i] as Dictionary).get("order", 0))
-		ctx.check("%s 最长段阅读卡 ≤538（544 内容区留 6 给控件滚动）" % id, worst <= 538.0,
-			"最坏 order=%d 卡高 %.0f，控件滚动余量 %.0f" % [worst_order, worst, 544.0 - 6.0 - worst])
-		r.free()
-	var g := Reader.new()
-	g.configure(Teach.section_list(cfg["gate"]), 40, 16, true)
+			r.free()
+		ctx.check("%s 每一段阅读卡 ≤458（控件滚动区 ≥80）" % id, worst <= card_cap,
+			"最坏 order=%d 卡高 %.0f，控件滚动区 %.0f" % [worst_order, worst, 544.0 - 6.0 - worst])
 	var gw := 0.0
-	for i in g.sections.size():
+	for i in Teach.section_list(cfg["gate"]).size():
+		var g = Reader.new()
+		Engine.get_main_loop().root.add_child(g)
+		g.configure(Teach.section_list(cfg["gate"]), 40, 16, true)
+		g.set_done(4)
 		g.set_index(i)
 		gw = maxf(gw, float(g.get_combined_minimum_size().y))
+		g.free()
 	ctx.check("gate 中栏讲解带 ≤178（目标条 46 + 调色板 44 + 画布 258 + 间距 18 后合计 ≤544）", gw <= 178.0,
 		"带高 %.0f" % gw)
 	ctx.check("gate 中栏合计 ≤544", 46.0 + 44.0 + 258.0 + 18.0 + gw <= 544.0,
 		"合计 %.0f" % (46.0 + 44.0 + 258.0 + 18.0 + gw))
-	g.free()
 
 ## 阅读卡在滚动区之外（控件滚动时课文卡固定）。
 func _assert_reader_slot(ctx: TestContext) -> void:

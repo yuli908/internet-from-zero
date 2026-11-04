@@ -232,10 +232,10 @@ func _install_reader(host: Control = null, chars_per_line: int = 13, font_size: 
 	if host == null:
 		host = _reader_slot
 	_reader = SectionReaderGd.new()
-	# rules 只在有 sections 时作为课文卡附注（否则随 body 一起兜底，不再另起一块）。
-	var note := Teach.rules_note(lab_data) if Teach.has_sections(lab_data) else ""
-	# 附注作为「首段之后的固定小注」：进 lab 第一屏就可见，且不与讲阈值来源的正文段同屏重复。
-	_reader.configure(Teach.section_list(lab_data), chars_per_line, font_size, pager_in_head, note, 1 if not note.is_empty() else 0)
+	# rules 只在没有 sections 时随 body 兜底；有 sections 时正文已讲同一件事，不再挂第二份。
+	var note := Teach.fallback_note(lab_data)
+	# 兜底附注与唯一段落同屏即可，不需要按段锚定。
+	_reader.configure(Teach.section_list(lab_data), chars_per_line, font_size, pager_in_head, note, 0)
 	host.add_child(_reader)
 	_teach_label = _reader.text_label
 	_refresh_reader()

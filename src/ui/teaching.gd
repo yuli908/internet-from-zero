@@ -100,7 +100,8 @@ static func has_sections(cfg: Dictionary) -> bool:
 	var raw: Variant = cfg.get("sections", [])
 	return raw is Array and not (raw as Array).is_empty()
 
-## rules 是阈值速查表；有 sections 时不再单独成块，只作为课文卡附注（信息不丢）。
+## rules 是阈值速查表。有 sections 时一律不渲染（正文已讲同一件事，避免两处重复）；
+## 只有 sections 缺失时才随 body 一起兜底成单段，保证信息不丢。
 static func rules_note(cfg: Dictionary) -> String:
 	var raw: Variant = cfg.get("rules", [])
 	var lines := PackedStringArray()
@@ -110,6 +111,10 @@ static func rules_note(cfg: Dictionary) -> String:
 			if not s.is_empty():
 				lines.append(s)
 	return "\n".join(lines)
+
+## 课文卡附注：唯一定义「rules 何时出现」的地方，UI 与断言共用。
+static func fallback_note(cfg: Dictionary) -> String:
+	return "" if has_sections(cfg) else rules_note(cfg)
 
 ## 已完成 done 个 required gate 时解锁的段数（after ≤ done）。
 static func unlocked_count_sections(secs: Array, done: int) -> int:

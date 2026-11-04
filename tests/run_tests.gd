@@ -73,7 +73,7 @@ const SUITE_EXPECT := {
 	"test_denominator": 46,
 	"test_teaching": 46,
 	"test_ch01_sections": 260,
-	"test_ch01_sections_ui": 250,
+	"test_ch01_sections_ui": 256,
 	"test_ch02_body": 23,
 }
 
