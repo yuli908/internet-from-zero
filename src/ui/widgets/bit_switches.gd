@@ -21,10 +21,10 @@ func setup(count: int = 8, initial: int = 0) -> void:
 		_bits.append(bit)
 		var row := Ui.hbox(8)
 		var weight := 1 << i
-		var name_label := Ui.mono("b%d" % i, 13, UiTheme.MUTED)
+		var name_label := Ui.mono("b%d" % i, 14, UiTheme.MUTED)
 		name_label.custom_minimum_size = Vector2(34, 0)
 		row.add_child(name_label)
-		var wlabel := Ui.label("×%d" % weight, 10, UiTheme.MUTED)
+		var wlabel := Ui.label("×%d" % weight, 14, UiTheme.MUTED)
 		wlabel.custom_minimum_size = Vector2(52, 0)
 		row.add_child(wlabel)
 		var btn := Ui.toggle("0", func(): _on_toggle(i), bit == 1)

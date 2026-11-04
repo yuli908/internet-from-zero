@@ -1,4 +1,4 @@
-class_name CircuitEditor
+﻿class_name CircuitEditor
 extends Control
 
 ## 点击式组合逻辑编辑器：
@@ -28,8 +28,9 @@ func _init() -> void:
 	max_gates = SimDelays.gdscript_gate_limit()
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(520, 340)
+	custom_minimum_size = Vector2(696, 416)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	tooltip_text = "点 A/B 节点翻转输入；点输出端口再点输入端口连线；右键删门或断线"
 	_font = UiTheme.cjk_font()
 	_mono = UiTheme.mono_font()
 
@@ -45,12 +46,12 @@ func setup(inputs: Array, outputs: Array, palette_in: Array, max_gates_in: int =
 	var i := 0
 	for raw in inputs:
 		var n: Dictionary = raw
-		graph.add_input(str(n.get("id", "a")), str(n.get("label", n.get("id", ""))), Vector2(26, 46 + i * 84))
+		graph.add_input(str(n.get("id", "a")), str(n.get("label", n.get("id", ""))), Vector2(40, 70 + i * 180))
 		i += 1
 	i = 0
 	for raw in outputs:
 		var n: Dictionary = raw
-		graph.add_output(str(n.get("id", "out")), str(n.get("label", n.get("id", ""))), Vector2(-1, 46 + i * 84))
+		graph.add_output(str(n.get("id", "out")), str(n.get("label", n.get("id", ""))), Vector2(590, 139))
 		i += 1
 	changed.emit()
 	queue_redraw()
@@ -99,11 +100,16 @@ func _ensure_layout() -> void:
 
 func _draw() -> void:
 	_ensure_layout()
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.043, 0.059, 0.075), true)
+	draw_rect(Rect2(Vector2.ZERO, size), UiTheme.BOARD_SUNK, true)
 	for x in range(0, int(size.x), 32):
-		draw_line(Vector2(x, 0), Vector2(x, size.y), UiTheme.alpha(UiTheme.BORDER, 0.18), 1.0)
+		draw_line(Vector2(x, 0), Vector2(x, size.y), UiTheme.alpha(UiTheme.LINE, 0.45), 1.0)
 	for y in range(0, int(size.y), 32):
-		draw_line(Vector2(0, y), Vector2(size.x, y), UiTheme.alpha(UiTheme.BORDER, 0.18), 1.0)
+		draw_line(Vector2(0, y), Vector2(size.x, y), UiTheme.alpha(UiTheme.LINE, 0.45), 1.0)
+
+	if gate_count() == 0:
+		var slot := Rect2(Vector2(210, 130), Vector2(136, 92))
+		_draw_dashed_rect(slot, UiTheme.alpha(UiTheme.AMBER, 0.35))
+		draw_string(_font, Vector2(slot.position.x + 6, slot.position.y - 4), "门槽 136×92", HORIZONTAL_ALIGNMENT_LEFT, slot.size.x - 12, UiTheme.F_META, UiTheme.AMBER)
 
 	var ev := graph.evaluate()
 	var values: Dictionary = ev.get("values", {})
@@ -134,26 +140,40 @@ func _draw() -> void:
 
 		if kind == CircuitGraph.KIND_INPUT:
 			var on := bool(n.get("value", false))
-			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 20), "%s = %d" % [str(n.get("label", id)), 1 if on else 0], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 16, UiTheme.OK if on else UiTheme.MUTED)
-			draw_string(_font, Vector2(r.position.x + 8, r.position.y + 37), "点击翻转", HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 10, UiTheme.MUTED)
+			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 18), "%s = %d" % [str(n.get("label", id)), 1 if on else 0], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 18, UiTheme.OK if on else UiTheme.MUTED)
 		elif kind == CircuitGraph.KIND_GATE:
 			var gname := LogicGates.gate_key(int(n["gate"]))
-			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 27), gname, HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 16, 20, UiTheme.TEXT)
+			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 24), gname, HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 16, 22, UiTheme.TEXT)
 			var v := str(values.get(id, "X"))
-			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 41), "→ %s" % v, HORIZONTAL_ALIGNMENT_RIGHT, r.size.x - 16, 10, UiTheme.OK if v == "1" else UiTheme.MUTED)
+			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 39), "→ %s" % v, HORIZONTAL_ALIGNMENT_RIGHT, r.size.x - 16, UiTheme.F_META, UiTheme.OK if v == "1" else UiTheme.MUTED)
 		else:
 			var src := str(n.get("a", ""))
 			var v := str(values.get(src, "X")) if not src.is_empty() else "X"
-			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 20), str(n.get("label", id)), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 14, UiTheme.TEXT)
-			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 38), "= %s" % v, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 14, UiTheme.OK if v == "1" else UiTheme.MUTED)
+			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 18), str(n.get("label", id)), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 16, UiTheme.TEXT)
+			draw_string(_mono, Vector2(r.position.x + 8, r.position.y + 36), "= %s" % v, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16, 16, UiTheme.OK if v == "1" else UiTheme.MUTED)
 		_draw_ports(id)
 
 	if not _link_from.is_empty():
-		draw_string(_font, Vector2(12, size.y - 12), "已选起点 %s，点击目标输入端口完成连线（右键取消）" % _link_from, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, 11, UiTheme.AMBER)
+		draw_string(_font, Vector2(12, size.y - 16), "已选起点 %s，点击目标输入端口完成连线（右键取消）" % _link_from, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.AMBER)
 	elif last_status.is_empty():
-		draw_string(_font, Vector2(12, size.y - 12), "选中门：%s · 左键放门/连线 · 右键断线/删门" % selected_gate, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, 11, UiTheme.MUTED)
+		draw_string(_font, Vector2(12, size.y - 16), "选中门：%s · 左键放门/连线 · 右键断线/删门" % selected_gate, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.MUTED)
 	else:
-		draw_string(_font, Vector2(12, size.y - 12), last_status, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, 11, UiTheme.AMBER)
+		draw_string(_font, Vector2(12, size.y - 16), last_status, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, UiTheme.F_META, UiTheme.AMBER)
+
+func _draw_dashed_rect(r: Rect2, color: Color) -> void:
+	var step := 7.0
+	var x := r.position.x
+	while x < r.end.x:
+		var x2 := minf(x + 4.0, r.end.x)
+		draw_line(Vector2(x, r.position.y), Vector2(x2, r.position.y), color, 1.0)
+		draw_line(Vector2(x, r.end.y), Vector2(x2, r.end.y), color, 1.0)
+		x += step
+	var y := r.position.y
+	while y < r.end.y:
+		var y2 := minf(y + 4.0, r.end.y)
+		draw_line(Vector2(r.position.x, y), Vector2(r.position.x, y2), color, 1.0)
+		draw_line(Vector2(r.end.x, y), Vector2(r.end.x, y2), color, 1.0)
+		y += step
 
 func _draw_link(src_id: String, dst_id: String, port: int, values: Dictionary) -> void:
 	if src_id.is_empty() or not graph.nodes.has(src_id):
@@ -287,10 +307,13 @@ func _on_left(p: Vector2) -> void:
 		queue_redraw()
 		return
 	var gid := _next_gate_id()
+	var slot := Rect2(Vector2(210, 130), Vector2(136, 92))
 	var pos := Vector2(
 		clampf(p.x - NODE_SIZE.x * 0.5, 8.0, maxf(8.0, size.x - NODE_SIZE.x - 8.0)),
 		clampf(p.y - NODE_SIZE.y * 0.5, 8.0, maxf(8.0, size.y - NODE_SIZE.y - 34.0))
 	)
+	if gate_count() == 0 and slot.has_point(p):
+		pos = slot.position + Vector2(21, 24)
 	graph.add_gate(gid, LogicGates.from_string(selected_gate), selected_gate.to_upper(), pos)
 	last_status = "放置 %s（%s）" % [selected_gate.to_upper(), gid]
 	changed.emit()

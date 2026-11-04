@@ -1,93 +1,112 @@
 extends LabBase
 
-## 1.4 门级：用 AND/OR/NOT 搭出目标函数。行为黑盒验收，允许多解。
+## 1.4 门级：用 AND/OR/NOT 搭出目标函数。黑盒验收，允许多解。
 
 var _editor: CircuitEditor
 var _graphs: Dictionary = {}
 var _current_task := ""
 var _encapsulated := false
-var _report_box: VBoxContainer
 var _live: Label
 var _task_buttons: Dictionary = {}
 var _task_hint: Label
+var _target_label: Label
+var _truth_box: VBoxContainer
+var _enc_btn: Button
+var _enc_label: Label
 
 func _build() -> void:
-	var root := Ui.vbox(8)
-	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(root)
-	root.add_child(_build_header(str(lab_data.get("title", "门级")), str(lab_data.get("subtitle", ""))))
-	root.add_child(_body_card(str(lab_data.get("body", ""))))
-	root.add_child(_hint_card(str(lab_data.get("hint", ""))))
-
-	var row := Ui.hbox(10)
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(row)
-
-	var left := Ui.card(UiTheme.PANEL_2, UiTheme.BORDER, 8)
-	left.custom_minimum_size = Vector2(232, 0)
-	row.add_child(left)
-	var lm := Ui.margin4(8, 8, 8, 8)
-	left.add_child(lm)
-	var lcol := Ui.vbox(5)
-	lm.add_child(lcol)
-	lcol.add_child(Ui.label("任务", 11, UiTheme.MUTED))
-	_task_hint = Ui.wrap("", 10, UiTheme.MUTED)
-	_task_hint.custom_minimum_size = Vector2(0, 40)
-	lcol.add_child(_task_hint)
-	lcol.add_child(Ui.hline())
+	# ---- 左栏：任务与封装 ----
+	side.add_child(_section("任务"))
+	_task_hint = Ui.wrap("", UiTheme.F_BODY, UiTheme.MUTED)
+	_task_hint.custom_minimum_size = Vector2(0, 76)
+	side.add_child(_task_hint)
+	side.add_child(Ui.hline())
 	for raw in _all_tasks():
 		var t: Dictionary = raw
 		var tid := str(t.get("id", ""))
-		var b := Ui.button(str(t.get("title", tid)), func(): _switch_task(tid), false)
+		var b := Ui.button(_short_title(str(t.get("title", tid))), func(): _switch_task(tid), false)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(0, 32)
-		lcol.add_child(b)
+		b.tooltip_text = str(t.get("title", tid))
+		b.custom_minimum_size = Vector2(0, UiTheme.CONTROL_H)
+		b.add_theme_font_size_override("font_size", UiTheme.F_LABEL)
+		side.add_child(b)
 		_task_buttons[tid] = b
-	lcol.add_child(Ui.spacer())
-	lcol.add_child(Ui.hline())
-	lcol.add_child(Ui.label("调色板", 11, UiTheme.MUTED))
-	var pal := Ui.hbox(5)
-	lcol.add_child(pal)
-	for g in ["not", "and", "or"]:
-		var gs := str(g)
-		pal.add_child(Ui.ghost(gs.to_upper(), func(): _editor.set_selected_gate(gs)))
+	side.add_child(Ui.spacer())
+	side.add_child(Ui.hline())
+	side.add_child(_section("封装"))
 	_enc_btn = Ui.button("封装 MY-XOR", func(): _encapsulate(), false)
-	lcol.add_child(_enc_btn)
-	_enc_label = Ui.muted("未封装", 10)
-	lcol.add_child(_enc_label)
-	lcol.add_child(Ui.ghost("重置当前任务", func(): _reset_task()))
+	_enc_btn.custom_minimum_size = Vector2(0, UiTheme.CONTROL_H)
+	side.add_child(_enc_btn)
+	_enc_label = Ui.muted("未封装", UiTheme.F_META)
+	side.add_child(_enc_label)
+	side.add_child(Ui.ghost("重置当前任务", func(): _reset_task()))
 
-	var right := Ui.vbox(6)
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.add_child(right)
-	var editor_card := Ui.card(UiTheme.PANEL, UiTheme.BORDER, 8)
+	# ---- 中栏：目标条 + 696×416 编辑器 + 调色板 ----
+	var target_card := Ui.card(UiTheme.BOARD_HIGH, UiTheme.LINE)
+	target_card.custom_minimum_size = Vector2(0, 40)
+	center.add_child(target_card)
+	var tm := Ui.margin4(12, 4, 12, 4)
+	target_card.add_child(tm)
+	var trow := Ui.hbox(12)
+	tm.add_child(trow)
+	var tag := Ui.label("目标", UiTheme.F_META, UiTheme.MUTED)
+	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	trow.add_child(tag)
+	_target_label = Ui.label("", UiTheme.F_LABEL, UiTheme.CHALK)
+	_target_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	trow.add_child(_target_label)
+	trow.add_child(Ui.spacer())
+	var cap_label := Ui.muted("门上限 %d" % int(lab_data.get("max_gates", 12)), UiTheme.F_META)
+	cap_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	trow.add_child(cap_label)
+
+	var editor_card := Ui.card_tight(UiTheme.BOARD_SUNK, UiTheme.LINE)
 	editor_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(editor_card)
-	var em := Ui.margin4(4, 4, 4, 4)
-	editor_card.add_child(em)
+	editor_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	editor_card.custom_minimum_size = Vector2(0, 418)
+	center.add_child(editor_card)
 	_editor = CircuitEditor.new()
-	_editor.custom_minimum_size = Vector2(0, 300)
+	_editor.custom_minimum_size = Vector2(696, 416)
+	_editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor.changed.connect(_on_editor_changed)
-	em.add_child(_editor)
+	editor_card.add_child(_editor)
 
-	var bar := Ui.hbox(8)
-	right.add_child(bar)
-	_live = Ui.mono("等待搭建", 12, UiTheme.MUTED)
-	bar.add_child(_live)
-	bar.add_child(Ui.spacer())
-	bar.add_child(Ui.button("运行验收 T1.4", func(): _run_cases(), true))
+	var pal := Ui.hbox(8)
+	pal.custom_minimum_size = Vector2(0, UiTheme.CONTROL_H)
+	center.add_child(pal)
+	var pal_tag := Ui.label("调色板", UiTheme.F_META, UiTheme.MUTED)
+	pal_tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pal.add_child(pal_tag)
+	for g in ["not", "and", "or"]:
+		var gs := str(g)
+		var b := Ui.ghost(gs.to_upper(), func(): _editor.set_selected_gate(gs))
+		b.custom_minimum_size = Vector2(76, UiTheme.CONTROL_H)
+		pal.add_child(b)
+	pal.add_child(Ui.spacer())
+	var hint := Ui.muted("点调色板 → 点门槽/空白放门 → 点输出端口再点输入端口连线", UiTheme.F_BODY)
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hint.clip_text = true
+	pal.add_child(hint)
+	center.add_child(Ui.spacer())
 
-	_report_box = Ui.vbox(2)
-	root.add_child(_report_box)
+	# ---- 右栏：目标真值表 + 验收 ----
+	inspector.add_child(_section("目标真值表"))
+	_truth_box = Ui.vbox(2)
+	inspector.add_child(_truth_box)
+	inspector.add_child(Ui.hline())
+	inspector.add_child(_section("OUT 当前值"))
+	_live = Ui.mono("X", UiTheme.F_BODY_LG, UiTheme.MUTED)
+	inspector.add_child(_live)
+	inspector.add_child(Ui.wrap("黑盒只看 a/b → out 的行为，允许多解。", UiTheme.F_BODY, UiTheme.MUTED))
+	inspector.add_child(Ui.spacer())
+	inspector.add_child(Ui.button("运行验收 T1.4", func(): _run_cases(), true))
 
 	_load_state()
 	_switch_task(_current_task if not _current_task.is_empty() else str(_all_tasks()[0].get("id", "")))
+	_finish_shell()
 
 func _all_tasks() -> Array:
-	## 配置里的 4 个任务 + 从 xor 任务派生的「第二结构」任务。
 	var out := []
 	var xor_task := {}
 	for raw in lab_data.get("tasks", []):
@@ -97,16 +116,22 @@ func _all_tasks() -> Array:
 			xor_task = t
 	if xor_task.is_empty():
 		return out
-	var second := {
+	out.append({
 		"id": "t_xor_2",
 		"title": "任务 E：XOR 第二结构",
 		"target": "xor",
 		"palette": xor_task.get("palette", ["not", "and", "or"]),
 		"input_ids": xor_task.get("input_ids", ["a", "b"]),
 		"second_of": str(xor_task.get("id", "t_xor")),
-	}
-	out.append(second)
+	})
 	return out
+
+func _short_title(title: String) -> String:
+	## 左栏宽 248，按钮文字截到 10 字，完整标题放 tooltip，避免撑破栏宽。
+	var t := title.trim_prefix("任务 ")
+	if t.length() <= 11:
+		return t
+	return t.substr(0, 10) + "…"
 
 func _task_by_id(id: String) -> Dictionary:
 	for raw in _all_tasks():
@@ -115,13 +140,11 @@ func _task_by_id(id: String) -> Dictionary:
 			return t
 	return {}
 
-var _enc_btn: Button
-var _enc_label: Label
-
 func _switch_task(id: String) -> void:
 	if id.is_empty():
 		return
-	_save_current()
+	if not _current_task.is_empty() and _current_task != id:
+		_save_current()
 	var task := _task_by_id(id)
 	var inputs := []
 	for iid in task.get("input_ids", ["a", "b"]):
@@ -131,15 +154,62 @@ func _switch_task(id: String) -> void:
 		doc = (_graphs[id] as CircuitGraph).to_dict()
 	_current_task = id
 	_editor.setup(inputs, [{"id": "out", "label": "OUT"}], task.get("palette", ["not", "and", "or"]), int(lab_data.get("max_gates", 12)))
-	# setup 会触发 changed → _save_state，写下当前任务；因此要先取旧文档，再回填。
 	if doc is Dictionary:
 		_editor.load_dict(doc)
-	_task_hint.text = "%s\n目标：%s；验收只看 a/b → out 的行为。" % [str(task.get("title", id)), str(task.get("target", ""))]
+	_task_hint.text = "%s\n目标：%s。验收只看 a/b → out 的行为。" % [str(task.get("title", id)), str(task.get("target", ""))]
+	_target_label.text = "OUT = %s" % _target_expr(str(task.get("target", "")))
+	_rebuild_truth(task)
 	for key in _task_buttons.keys():
 		var b: Button = _task_buttons[key]
-		b.modulate = Color(1, 1, 1, 1) if str(key) == id else Color(1, 1, 1, 0.65)
+		var on := str(key) == id
+		b.add_theme_stylebox_override("normal", UiTheme.flat(UiTheme.CHALK if on else UiTheme.BOARD_HIGH, UiTheme.CHALK if on else UiTheme.LINE))
+		b.add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.CHALK)
 	_on_editor_changed()
 	_update_enc_label()
+
+func _target_expr(target: String) -> String:
+	match target:
+		"not": return "NOT a"
+		"and": return "a AND b"
+		"or": return "a OR b"
+		"xor": return "a XOR b"
+	return target
+
+func _target_out(target: String, a: bool, b: bool) -> bool:
+	match target:
+		"not": return not a
+		"and": return a and b
+		"or": return a or b
+		"xor": return a != b
+	return false
+
+func _rebuild_truth(task: Dictionary) -> void:
+	for c in _truth_box.get_children():
+		c.queue_free()
+	var target := str(task.get("target", ""))
+	var header := Ui.hbox(6)
+	header.add_theme_constant_override("separation", 6)
+	for t in (["a", "out"] if target == "not" else ["a", "b", "out"]):
+		var l := Ui.label(t, UiTheme.F_META, UiTheme.MUTED)
+		l.custom_minimum_size = Vector2(54, 0)
+		header.add_child(l)
+	_truth_box.add_child(header)
+	var rows := [[false], [true]] if target == "not" else [[false, false], [false, true], [true, false], [true, true]]
+	for raw in rows:
+		var row_vals: Array = raw
+		var row := Ui.hbox(6)
+		var a: bool = row_vals[0]
+		row.add_child(_cell("1" if a else "0", UiTheme.CYAN))
+		if target != "not":
+			var b: bool = row_vals[1]
+			row.add_child(_cell("1" if b else "0", UiTheme.CYAN))
+		row.add_child(_cell("1" if _target_out(target, a, bool(row_vals[1]) if row_vals.size() > 1 else false) else "0", UiTheme.CHALK_BRIGHT))
+		_truth_box.add_child(row)
+
+func _cell(text: String, color: Color) -> Label:
+	var l := Ui.mono(text, UiTheme.F_BODY, color)
+	l.custom_minimum_size = Vector2(54, 0)
+	return l
 
 func _save_current() -> void:
 	if _current_task.is_empty() or _editor == null:
@@ -147,12 +217,14 @@ func _save_current() -> void:
 	_graphs[_current_task] = CircuitGraph.from_dict(_editor.to_dict())
 
 func _on_editor_changed() -> void:
+	if _editor == null or _live == null:
+		return
 	var ev := _editor.evaluate()
 	var values: Dictionary = ev.get("values", {})
 	var out := str(values.get("out", "X"))
 	var ok := bool(ev.get("ok", true))
-	_live.text = "OUT = %s · 门 %d · %s" % [out, _editor.gate_count(), "无环" if ok else "存在环"]
-	_live.add_theme_color_override("font_color", UiTheme.OK if out == "1" else (UiTheme.DANGER if out == "X" else UiTheme.MUTED))
+	_live.text = "%s · 门 %d · %s" % [out, _editor.gate_count(), "无环" if ok else "存在环"]
+	_live.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if out == "1" else (UiTheme.DANGER if out == "X" else UiTheme.MUTED))
 	_save_state()
 
 func _encapsulate() -> void:
@@ -174,7 +246,7 @@ func _update_enc_label() -> void:
 	if _enc_label == null:
 		return
 	_enc_label.text = "已封装 MY-XOR" if _encapsulated else "未封装"
-	_enc_label.add_theme_color_override("font_color", UiTheme.OK if _encapsulated else UiTheme.MUTED)
+	_enc_label.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if _encapsulated else UiTheme.MUTED)
 	if _enc_btn != null:
 		_enc_btn.disabled = _encapsulated
 
@@ -189,20 +261,11 @@ func _reset_task() -> void:
 func _run_cases() -> void:
 	_save_current()
 	var rep := LabChecks.gate(lab_data, _graphs, {"encapsulated": _encapsulated})
-	_show_report(rep)
+	show_report(rep)
 	if pass_report(rep):
 		EventBus.toast("1.4 门级 gate 全部通过", "ok")
 	else:
 		EventBus.toast("仍有 gate 未通过：三基础门、XOR 延迟、封装、第二结构", "warn")
-
-func _show_report(rep: GateReport) -> void:
-	for c in _report_box.get_children():
-		c.queue_free()
-	for raw in rep.cases:
-		var c: Dictionary = raw
-		var ok := bool(c.get("ok", false))
-		var color := UiTheme.OK if ok else UiTheme.DANGER
-		_report_box.add_child(Ui.label("%s %s  %s" % ["✓" if ok else "✗", str(c.get("id", "")), str(c.get("detail", ""))], 10, color))
 
 func _save_state() -> void:
 	if _editor != null and not _current_task.is_empty():
@@ -227,12 +290,9 @@ func _load_state() -> void:
 	_encapsulated = bool(st.get("encapsulated", false))
 
 func scripted_solve() -> bool:
-	## 脚本走查：按任务逐个搭好正确电路（等价于用户点调色板并连线后的状态），
-	## 再调用真实的「封装 + 运行验收」→ pass_report → complete_lab 发奖链路。
 	for raw in _all_tasks():
 		var t: Dictionary = raw
 		var tid := str(t.get("id", ""))
-		# 先切换（会把上一任务的编辑器状态存回 _graphs），再注入脚本图，避免被空图覆盖。
 		_switch_task(tid)
 		_graphs[tid] = _scripted_graph(t)
 		_editor.load_dict((_graphs[tid] as CircuitGraph).to_dict())
@@ -245,13 +305,13 @@ func _scripted_graph(task: Dictionary) -> CircuitGraph:
 	var ids: Array = task.get("input_ids", ["a", "b"])
 	for i in ids.size():
 		var iid := str(ids[i])
-		g.add_input(iid, iid.to_upper(), Vector2(30, 70 + i * 110))
-	g.add_output("out", "OUT", Vector2(390, 140))
+		g.add_input(iid, iid.to_upper(), Vector2(40, 70 + i * 180))
+	g.add_output("out", "OUT", Vector2(590, 139))
 	var target := str(task.get("target", ""))
 	var tid := str(task.get("id", ""))
-	var y := 140.0
+	var y := 139.0
 	if target == "not":
-		g.add_gate("g_not", LogicGates.Type.NOT, "NOT", Vector2(200, y))
+		g.add_gate("g_not", LogicGates.Type.NOT, "NOT", Vector2(330, y))
 		g.link(str(ids[0]), "g_not", 0)
 		g.link("g_not", "out", 0)
 		return g
@@ -262,7 +322,7 @@ func _scripted_graph(task: Dictionary) -> CircuitGraph:
 	if target == "and" or target == "or":
 		var gt: int = LogicGates.Type.AND if target == "and" else LogicGates.Type.OR
 		var label := "AND" if target == "and" else "OR"
-		g.add_gate("g1", gt, label, Vector2(200, y))
+		g.add_gate("g1", gt, label, Vector2(330, y))
 		g.link(a, "g1", 0)
 		g.link(b, "g1", 1)
 		g.link("g1", "out", 0)
@@ -270,27 +330,24 @@ func _scripted_graph(task: Dictionary) -> CircuitGraph:
 	if target != "xor":
 		return g
 	if tid == "t_xor_2":
-		# 第二结构：(a|b) & ~(a&b)
-		g.add_gate("g1", LogicGates.Type.AND, "AND", Vector2(140, y - 70))
-		g.add_gate("g2", LogicGates.Type.OR, "OR", Vector2(140, y + 90))
-		g.add_gate("g3", LogicGates.Type.NOT, "NOT", Vector2(255, y - 70))
-		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(355, y))
+		g.add_gate("g1", LogicGates.Type.AND, "AND", Vector2(210, y - 80))
+		g.add_gate("g2", LogicGates.Type.OR, "OR", Vector2(210, y + 100))
+		g.add_gate("g3", LogicGates.Type.NOT, "NOT", Vector2(330, y - 80))
+		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(450, y))
 		g.link(a, "g1", 0); g.link(b, "g1", 1)
 		g.link(a, "g2", 0); g.link(b, "g2", 1)
 		g.link("g1", "g3", 0)
 		g.link("g2", "g4", 0); g.link("g3", "g4", 1)
 		g.link("g4", "out", 0)
 	else:
-		# 标准结构：(a & ~b) | (~a & b)
-		g.add_gate("g1", LogicGates.Type.NOT, "NOT", Vector2(130, y - 80))
-		g.add_gate("g2", LogicGates.Type.NOT, "NOT", Vector2(130, y + 120))
-		g.add_gate("g3", LogicGates.Type.AND, "AND", Vector2(255, y - 80))
-		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(255, y + 120))
-		g.add_gate("g5", LogicGates.Type.OR, "OR", Vector2(355, y))
+		g.add_gate("g1", LogicGates.Type.NOT, "NOT", Vector2(210, y - 100))
+		g.add_gate("g2", LogicGates.Type.NOT, "NOT", Vector2(210, y + 160))
+		g.add_gate("g3", LogicGates.Type.AND, "AND", Vector2(330, y - 100))
+		g.add_gate("g4", LogicGates.Type.AND, "AND", Vector2(330, y + 160))
+		g.add_gate("g5", LogicGates.Type.OR, "OR", Vector2(450, y))
 		g.link(a, "g1", 0); g.link(b, "g2", 0)
 		g.link(a, "g3", 0); g.link("g2", "g3", 1)
 		g.link(b, "g4", 0); g.link("g1", "g4", 1)
 		g.link("g3", "g5", 0); g.link("g4", "g5", 1)
 		g.link("g5", "out", 0)
 	return g
-

@@ -31,11 +31,11 @@ func _draw() -> void:
 	for i in range(0, span + 1, 4):
 		var x := plot.position.x + plot.size.x * float(i) / float(span)
 		draw_line(Vector2(x, plot.position.y), Vector2(x, plot.end.y), UiTheme.alpha(UiTheme.BORDER, 0.35), 1.0)
-		draw_string(_font, Vector2(x - 12, plot.position.y - 6), str(i), HORIZONTAL_ALIGNMENT_CENTER, 24, 10, UiTheme.MUTED)
+		draw_string(_font, Vector2(x - 12, plot.position.y - 6), str(i), HORIZONTAL_ALIGNMENT_CENTER, 24, 14, UiTheme.MUTED)
 	if label.is_empty():
-		draw_string(_font, Vector2(plot.position.x, plot.position.y - 18), "wire", HORIZONTAL_ALIGNMENT_LEFT, 200, 11, UiTheme.MUTED)
+		draw_string(_font, Vector2(plot.position.x, plot.position.y - 18), "wire", HORIZONTAL_ALIGNMENT_LEFT, 200, 14, UiTheme.MUTED)
 	else:
-		draw_string(_font, Vector2(plot.position.x, plot.position.y - 18), label, HORIZONTAL_ALIGNMENT_LEFT, 300, 11, UiTheme.ACCENT)
+		draw_string(_font, Vector2(plot.position.x, plot.position.y - 18), label, HORIZONTAL_ALIGNMENT_LEFT, 300, 14, UiTheme.ACCENT)
 
 	var hi_y := plot.position.y + 10.0
 	var lo_y := plot.end.y - 10.0

@@ -1,4 +1,4 @@
-﻿extends LabBase
+extends LabBase
 
 ## 1.2 二进制：8 位开关、十进制/十六进制、覆盖 0–15、三进制辨析。
 
@@ -10,62 +10,59 @@ var _cov: Label
 var _target_status: Dictionary = {}
 var _quiz_answer := -1
 var _quiz_status: Label
-var _report_box: VBoxContainer
 var _visited: Dictionary = {}
 var _achieved: Dictionary = {}
 var _value := 0
 
 func _build() -> void:
-	var root := Ui.vbox(10)
-	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(root)
-	root.add_child(_build_header(str(lab_data.get("title", "二进制")), str(lab_data.get("subtitle", ""))))
-	root.add_child(_body_card(str(lab_data.get("body", ""))))
-	root.add_child(_hint_card("提示：位权是 2 的幂；0x2F 只是十六进制写法，数值仍是 47。"))
-
-	var row := Ui.hbox(12)
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(row)
-
-	var sw_card := Ui.card(UiTheme.PANEL_2, UiTheme.BORDER, 8)
-	sw_card.custom_minimum_size = Vector2(230, 0)
-	row.add_child(sw_card)
-	var sm := Ui.margin4(10, 8, 10, 8)
-	sw_card.add_child(sm)
-	var scol := Ui.vbox(6)
-	sm.add_child(scol)
-	scol.add_child(Ui.label("8 位开关", 12, UiTheme.TEXT))
+	# ---- 左栏：任务 / 8 位开关 / 覆盖进度 ----
+	side.add_child(_section("任务"))
+	var body := Ui.wrap(str(lab_data.get("body", "")), UiTheme.F_LABEL, UiTheme.MUTED)
+	body.custom_minimum_size = Vector2(0, 64)
+	side.add_child(body)
+	side.add_child(Ui.hline())
 	_switches = BitSwitches.new()
 	_switches.setup(int(lab_data.get("bit_count", 8)), 0)
+	_switches.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_switches.changed.connect(_on_bits_changed)
-	scol.add_child(_switches)
+	side.add_child(_switches)
+	side.add_child(Ui.hline())
+	_cov = Ui.label("覆盖 0 / 16", UiTheme.F_LABEL, UiTheme.MUTED)
+	side.add_child(_cov)
+	side.add_child(Ui.ghost("全部清零", func(): _switches.set_value(0)))
 
-	var right := Ui.vbox(8)
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(right)
-
-	var read_card := Ui.card(UiTheme.PANEL_3, UiTheme.BORDER, 8)
-	right.add_child(read_card)
-	var rm := Ui.margin4(12, 9, 12, 9)
+	# ---- 中栏：数值读数 / 目标值 / 辨析题 ----
+	var read_card := Ui.card(UiTheme.BOARD_SUNK, UiTheme.LINE)
+	center.add_child(read_card)
+	var rm := Ui.margin4(14, 10, 14, 10)
 	read_card.add_child(rm)
-	var rcol := Ui.vbox(4)
-	rm.add_child(rcol)
-	_dec = Ui.mono("0", 30, UiTheme.AMBER)
-	rcol.add_child(_dec)
-	_hex = Ui.mono("0x00", 18, UiTheme.ACCENT)
-	rcol.add_child(_hex)
-	_bin = Ui.mono("0000 0000", 14, UiTheme.MUTED)
-	rcol.add_child(_bin)
-	_cov = Ui.label("覆盖 0 / 16", 11, UiTheme.MUTED)
-	rcol.add_child(_cov)
+	var rrow := Ui.hbox(16)
+	rm.add_child(rrow)
+	var dec_col := Ui.vbox(2)
+	dec_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rrow.add_child(dec_col)
+	dec_col.add_child(_section("十进制"))
+	_dec = Ui.mono("0", 40, UiTheme.AMBER)
+	dec_col.add_child(_dec)
+	var hex_col := Ui.vbox(2)
+	hex_col.custom_minimum_size = Vector2(150, 0)
+	rrow.add_child(hex_col)
+	hex_col.add_child(_section("十六进制"))
+	_hex = Ui.mono("0x00", 26, UiTheme.CYAN)
+	hex_col.add_child(_hex)
+	var bin_col := Ui.vbox(2)
+	rrow.add_child(bin_col)
+	bin_col.add_child(_section("二进制"))
+	_bin = Ui.mono("0000 0000", UiTheme.F_H2, UiTheme.MUTED)
+	bin_col.add_child(_bin)
 
-	var target_card := Ui.card(UiTheme.PANEL, UiTheme.BORDER, 8)
-	right.add_child(target_card)
-	var tm := Ui.margin4(12, 8, 12, 8)
+	var target_card := Ui.card(UiTheme.alpha(UiTheme.CHALK, 0.04), UiTheme.LINE)
+	center.add_child(target_card)
+	var tm := Ui.margin4(14, 10, 14, 10)
 	target_card.add_child(tm)
-	var tcol := Ui.vbox(4)
+	var tcol := Ui.vbox(6)
 	tm.add_child(tcol)
-	tcol.add_child(Ui.label("摆出目标值", 11, UiTheme.MUTED))
+	tcol.add_child(_section("摆出目标值"))
 	for raw in lab_data.get("targets", []):
 		var t: Dictionary = raw
 		var arr := _task_row("%s（%s）" % [str(t.get("label", "")), str(t.get("hint", ""))])
@@ -74,30 +71,35 @@ func _build() -> void:
 
 	var quiz: Dictionary = lab_data.get("quiz", {})
 	if not quiz.is_empty():
-		var q_card := Ui.card(UiTheme.PANEL, UiTheme.BORDER, 8)
-		right.add_child(q_card)
-		var qm := Ui.margin4(12, 8, 12, 8)
+		var q_card := Ui.card(UiTheme.alpha(UiTheme.CYAN, 0.04), UiTheme.alpha(UiTheme.CYAN, 0.35))
+		center.add_child(q_card)
+		var qm := Ui.margin4(14, 10, 14, 10)
 		q_card.add_child(qm)
-		var qcol := Ui.vbox(5)
+		var qcol := Ui.vbox(6)
 		qm.add_child(qcol)
-		qcol.add_child(Ui.label("辨析题", 11, UiTheme.MUTED))
-		qcol.add_child(Ui.wrap(str(quiz.get("question", "")), 12, UiTheme.TEXT))
+		qcol.add_child(_section("辨析题"))
+		qcol.add_child(Ui.wrap(str(quiz.get("question", "")), UiTheme.F_BODY, UiTheme.CHALK))
 		var opts := GridContainer.new()
 		opts.columns = 2
+		opts.add_theme_constant_override("h_separation", 8)
+		opts.add_theme_constant_override("v_separation", 6)
 		qcol.add_child(opts)
 		var options: Array = quiz.get("options", [])
 		for i in options.size():
 			var idx := i
-			opts.add_child(Ui.ghost("%d. %s" % [i + 1, str(options[i])], func(): _pick_quiz(idx)))
-		_quiz_status = Ui.label("未选择", 11, UiTheme.MUTED)
+			var b := Ui.ghost("%d. %s" % [i + 1, str(options[i])], func(): _pick_quiz(idx))
+			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			opts.add_child(b)
+		_quiz_status = Ui.label("未选择", UiTheme.F_LABEL, UiTheme.MUTED)
 		qcol.add_child(_quiz_status)
+	center.add_child(Ui.spacer())
 
-	var run := Ui.hbox(8)
-	right.add_child(run)
-	run.add_child(Ui.button("运行验收 T1.2", func(): _run_cases(), true))
+	# ---- 右栏：进度与验收 ----
+	inspector.add_child(_section("验收"))
+	inspector.add_child(Ui.wrap("覆盖 0–15、摆出两个目标、答对辨析题，三条 gate 全过才记账。", UiTheme.F_META, UiTheme.MUTED))
+	inspector.add_child(Ui.spacer())
+	inspector.add_child(Ui.button("运行验收 T1.2", func(): _run_cases(), true))
 
-	_report_box = Ui.vbox(3)
-	root.add_child(_report_box)
 	_load_state()
 
 func _on_bits_changed(v: int) -> void:
@@ -111,6 +113,7 @@ func _on_bits_changed(v: int) -> void:
 		if bool(_visited.get(str(i), false)):
 			covered += 1
 	_cov.text = "覆盖 %d / 16" % covered
+	_cov.add_theme_color_override("font_color", UiTheme.CHALK_BRIGHT if covered >= 16 else UiTheme.MUTED)
 	for raw in lab_data.get("targets", []):
 		var t: Dictionary = raw
 		var tid := str(t.get("id", ""))
@@ -134,7 +137,7 @@ func _pick_quiz(idx: int) -> void:
 
 func _run_cases() -> void:
 	var rep := LabChecks.binary(lab_data, _visited, _achieved, _quiz_answer)
-	_show_report(rep)
+	show_report(rep)
 	if pass_report(rep):
 		EventBus.toast("1.2 二进制 gate 全部通过", "ok")
 	else:
@@ -152,15 +155,6 @@ func _bin4(v: int) -> String:
 	for i in range(3, -1, -1):
 		s += "1" if ((v >> i) & 1) == 1 else "0"
 	return s
-
-func _show_report(rep: GateReport) -> void:
-	for c in _report_box.get_children():
-		c.queue_free()
-	for raw in rep.cases:
-		var c: Dictionary = raw
-		var ok := bool(c.get("ok", false))
-		var color := UiTheme.OK if ok else UiTheme.DANGER
-		_report_box.add_child(Ui.label("%s %s  %s" % ["✓" if ok else "✗", str(c.get("id", "")), str(c.get("detail", ""))], 11, color))
 
 func _save_state() -> void:
 	save_state({"value": _value, "visited": _visited, "achieved": _achieved, "quiz": _quiz_answer})
