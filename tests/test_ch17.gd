@@ -2,7 +2,7 @@ extends RefCounted
 
 ## Ch17 结构 + 判据校验（15 段）。
 ## 分母口径：required 且非 pending 的 gate 数，按 Ch17Checks.deferred_gates(cfg) 现算；
-## 17.1 消息字段位宽与超长拒绝接口未批 → T17.1-1 挂 pending，4 降为 3。
+## 17.1 字段位宽与超长拒绝接口已由内容侧定稿落地 → T17.1-1 转 ready，4 全进分母。
 ## 负例断言给出精确失败码；断言能红，不是恒真。
 
 const LABS := ["msg_format", "presence_offline", "two_client_chat"]
@@ -15,10 +15,11 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch17Checks = preload("res://src/core/ch17_checks.gd")
+const MsgFields = preload("res://src/core/msg_fields.gd")
 
-const EXPECT := 55
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "negative": 7}
-const GROUP_DESCRIPTIONS := {"loadable": "ch17_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T17.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 11）", "pending_total": "全章 pending 条数=1，且进分母计数=11", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计）", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限均精确判红"}
+const EXPECT := 75
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t17_1_fields": 12, "negative": 15}
+const GROUP_DESCRIPTIONS := {"loadable": "ch17_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T17.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 12）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计）", "t17_1_fields": "17.1 字段边界现算：8 行、四字段逐字段、四种拒绝原因与首错即止", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限/四类 reason/首错顺序均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch17_labs.json")
@@ -69,7 +70,7 @@ func run(ctx: TestContext) -> void:
 		counted_sum += int(d["counted"])
 		total += secs.size()
 	ctx.begin_group("pending_total")
-	ctx.check("全章 pending=1、进分母=11", pending_sum == 1 and counted_sum == 11,
+	ctx.check("全章 pending=0、进分母=12", pending_sum == 0 and counted_sum == 12,
 		"pending=%d counted=%d" % [pending_sum, counted_sum])
 
 	ctx.begin_group("total_sections")
@@ -82,6 +83,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
 
+	_fields(ctx, labs)
 	_negative(ctx, labs)
 
 func _orders(secs: Array) -> String:
@@ -191,8 +193,11 @@ func _good(cfg: Dictionary) -> Dictionary:
 		var cid := str(g.get("id", ""))
 		match str(g.get("kind", "")):
 			"table":
-				out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
-					"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
+				if g.has("fields"):
+					out[cid] = _answer_fields(g)
+				else:
+					out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
+						"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
 			"skip_layer":
 				var st := str(g.get("stage", ""))
 				out[cid] = {"stages": [st, "downstream"], "missing": st, "downstream_ok": false}
@@ -201,6 +206,105 @@ func _good(cfg: Dictionary) -> Dictionary:
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
 	return out
+
+## 17.1 好答案：accepted/reason 由 `MsgFields.evaluate` 从原始字段现算，不抄期望值。
+func _answer_fields(g: Dictionary) -> Dictionary:
+	var spec: Dictionary = g.get("fields", {})
+	var rows: Array = []
+	for raw in (g.get("expect_rows", []) as Array):
+		var er: Dictionary = (raw as Dictionary).duplicate(true)
+		var ev: Dictionary = MsgFields.evaluate(er, spec)
+		er["accepted"] = bool(ev["accepted"])
+		er["reason"] = str(ev["reason"])
+		rows.append(er)
+	return {"rows": rows, "meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
+
+func _gate_case(cfg: Dictionary, cid: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == cid:
+			return raw
+	return {}
+
+## 17.1 字段边界只给「数据写了什么」不算数：8 行、四字段、四类 reason、位宽与首错顺序都要现算核一遍。
+func _fields(ctx: TestContext, labs: Dictionary) -> void:
+	ctx.begin_group("t17_1_fields")
+	var cfg: Dictionary = labs.get("msg_format", {})
+	var g: Dictionary = _gate_case(cfg, "T17.1-1")
+	var spec: Dictionary = g.get("fields", {})
+	var rows: Array = g.get("expect_rows", [])
+
+	ctx.eq("S1–S8 行数", rows.size(), 8)
+	ctx.check("msg 唯一且非空", _unique_msgs(rows), str(rows.size()))
+
+	var acc_ok := true
+	var reason_ok := true
+	var dist := {}
+	for raw in rows:
+		var r: Dictionary = raw
+		var ev: Dictionary = MsgFields.evaluate(r, spec)
+		var reason := str(r.get("reason", "__missing__"))
+		if bool(ev["accepted"]) != bool(r.get("accepted", false)):
+			acc_ok = false
+		if not MsgFields.REASON_ENUM.has(reason) \
+				or str(ev["reason"]) != reason \
+				or (bool(r.get("accepted", false)) and reason != ""):
+			reason_ok = false
+		dist[reason] = int(dist.get(reason, 0)) + 1
+	ctx.check("每行 accepted 由公式现算一致", acc_ok, str(dist))
+	ctx.check("reason 在枚举内、accepted=true 时为空、且与现算一致", reason_ok, str(dist))
+
+	ctx.check("S2 len=0 与 S3 len=256 取闭区间合法",
+		bool(rows[1].get("accepted", false)) and bool(rows[2].get("accepted", false)), "")
+	ctx.check("S4 len=257 拒且 reason=too_long", str(rows[3].get("reason", "")) == "too_long",
+		str(rows[3].get("reason", "")))
+	ctx.check("S7 len=6 负载 4 B → bad_length(len_payload_mismatch)",
+		str(rows[6].get("reason", "")) == "bad_length"
+			and str(MsgFields.evaluate(rows[6], spec)["detail"]) == "len_payload_mismatch",
+		str(MsgFields.evaluate(rows[6], spec)))
+	ctx.check("S5 len=65536 → bad_length(len_out_of_field)，位宽先于上限",
+		str(rows[4].get("reason", "")) == "bad_length"
+			and str(MsgFields.evaluate(rows[4], spec)["detail"]) == "len_out_of_field",
+		str(MsgFields.evaluate(rows[4], spec)))
+	ctx.check("S8 ts=16777216 → bad_ts", str(rows[7].get("reason", "")) == "bad_ts",
+		str(rows[7].get("reason", "")))
+
+	var fw: Dictionary = (g.get("thresholds", {}) as Dictionary).get("field_width", {})
+	var bits: Dictionary = fw.get("bits", {})
+	var sum_bits := int(bits.get("type", 0)) + int(bits.get("len", 0)) + int(bits.get("ts", 0))
+	var hb := int((( _gate_case(cfg, "T17.1-3").get("expect_values", {}) as Dictionary)
+		.get("header_bytes", -1)))
+	ctx.check("位宽按 bit 给出、相加=头长（与 T17.1-3 header_bytes 一致）、负载写作可变",
+		sum_bits == hb * 8 and int(fw.get("header_bytes", -1)) == hb
+			and str(fw.get("payload_bits", "")).contains("可变"),
+		"%d bit / header_bytes=%d" % [sum_bits, hb])
+
+	var meta: Dictionary = g.get("expect_meta", {})
+	var meta_ok := true
+	for k in ["four_fields_ok", "roundtrip_ok", "oversize_rejected", "p09_grant", "field_width_ok"]:
+		if not bool(meta.get(k, false)):
+			meta_ok = false
+	ctx.check("meta 五项为真（含 field_width_ok）", meta_ok, str(meta))
+
+	ctx.check("reason 分布覆盖四类 + 通过：3 空 / 1 too_long / 2 bad_length / 1 bad_type / 1 bad_ts",
+		int(dist.get("", 0)) == 3 and int(dist.get("too_long", 0)) == 1
+			and int(dist.get("bad_length", 0)) == 2 and int(dist.get("bad_type", 0)) == 1
+			and int(dist.get("bad_ts", 0)) == 1,
+		str(dist))
+
+func _unique_msgs(rows: Array) -> bool:
+	var seen := {}
+	for raw in rows:
+		var m := str((raw as Dictionary).get("msg", ""))
+		if m.is_empty() or seen.has(m):
+			return false
+		seen[m] = true
+	return true
+
+func _detail(report: GateReport, cid: String) -> String:
+	for c in report.cases:
+		if str(c.get("id", "")) == cid:
+			return str(c.get("detail", ""))
+	return ""
 
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:
@@ -269,3 +373,35 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c7: int = _code(r7["report"], "T17.3-1")
 	print("RED-PROBE Ch17 T17.3-1 T17.3-1 第 1 向时延 90 超过上限 50 -> code=%d" % c7)
 	ctx.eq("T17.3-1 T17.3-1 第 1 向时延 90 超过上限 50判红 E_DELAY_MISMATCH", c7, GateResult.E_DELAY_MISMATCH)
+
+	# 17.1 四种拒绝原因各命中一次 + 首错即止 + payload 列（字段名不是原因）。
+	_probe_17_1(ctx, labs, 0, "accepted", false,
+		"S1 合法行写成拒绝（too_long 类被误用）", "")
+	_probe_17_1(ctx, labs, 3, "reason", "len",
+		"S4 reason 写成字段名 len（不是语义原因）", "")
+	_probe_17_1(ctx, labs, 4, "reason", "too_long",
+		"S5 位宽溢出误报 too_long（两组违例取靠前）", "len_out_of_field")
+	_probe_17_1(ctx, labs, 6, "accepted", true,
+		"S7 只比上限不比负载，判通过", "")
+	_probe_17_1(ctx, labs, 7, "accepted", true,
+		"S8 ts 越界判通过", "")
+	_probe_17_1(ctx, labs, 2, "accepted", false,
+		"S3 上限实现成 len>=256 就拒（off-by-one 反向）", "")
+	_probe_17_1(ctx, labs, 0, "payload_bytes", 5,
+		"S1 payload 列被漏核（字节数 6 报 5）", "")
+
+## 单点改一条 17.1 行，贴实测 code；want_detail 非空时再核首错原因。
+func _probe_17_1(ctx: TestContext, labs: Dictionary, idx: int, key: String, val: Variant,
+		label: String, want_detail: String) -> void:
+	var ans := _good(labs["msg_format"])
+	var rows: Array = (ans["T17.1-1"]["rows"] as Array).duplicate(true)
+	rows[idx][key] = val
+	ans["T17.1-1"]["rows"] = rows
+	var r: Dictionary = Ch17Checks.run("msg_format", labs["msg_format"], {"answers": ans})
+	var c: int = _code(r["report"], "T17.1-1")
+	var d: String = _detail(r["report"], "T17.1-1")
+	print("RED-PROBE Ch17 T17.1-1 %s -> code=%d detail=%s" % [label, c, d])
+	ctx.eq("T17.1-1 %s判红 E_TABLE_CELL" % label, c, GateResult.E_TABLE_CELL)
+	if not want_detail.is_empty():
+		ctx.check("T17.1-1 %s 首错即止细节含 %s" % [label, want_detail],
+			d.contains(want_detail), d)

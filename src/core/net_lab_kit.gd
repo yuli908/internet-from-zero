@@ -9,6 +9,8 @@ const Kit := preload("res://src/core/lab_gate_kit.gd")
 const ObjectGraph := preload("res://src/core/object_graph.gd")
 const CertScript := preload("res://src/core/cert_script.gd")
 const SamplingLink := preload("res://src/core/sampling_link.gd")
+const MsgFields := preload("res://src/core/msg_fields.gd")
+const OutboundLink := preload("res://src/core/outbound_link.gd")
 
 static func is_pending(c: Dictionary) -> bool:
 	return str(c.get("content_status", c.get("status", "ready"))) != "ready"
@@ -92,13 +94,14 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 		return
 	var rows: Array = rows_v
 	var sampling := c.has("sampling")
+	var outbound := c.has("outbound")
 	var want: Array = c.get("expect_rows", [])
 	var keys: Array = c.get("keys", [])
-	if want.is_empty() and not sampling:
+	if want.is_empty() and not sampling and not outbound:
 		Kit.emit(rep, tracker, GateResult.E_UNKNOWN_TARGET, c, false, got,
 			"expect_rows", "missing", "gate 配置缺 expect_rows")
 		return
-	if not sampling:
+	if not sampling and not outbound:
 		if keys.is_empty():
 			keys = (want[0] as Dictionary).keys()
 		if rows.size() != want.size():
@@ -121,6 +124,31 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 					"表里有重复键 %s：唯一性未成立" % k)
 				return
 			seen[k] = true
+	# 消息字段边界（19 §2.7）：cfg 声明 `fields{...}` 时，真值由
+	# `src/core/msg_fields.gd::evaluate` 按 §2.3 首错即止现算；期望表只做第二道对照。
+	# 放在逐格比对之前：位宽/上限判定顺序错必须先报语义，不能被普通填错(7)吞掉。
+	if c.has("fields"):
+		var mres: Dictionary = MsgFields.validate_gate(got, c)
+		if not bool(mres["ok"]):
+			Kit.emit(rep, tracker, int(mres["code"]), c, false, mres["input"],
+				mres["expected"], mres["actual"], str(mres["detail"]))
+			return
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, mres["actual"],
+			"四字段逐字段一致；四种拒绝原因按首错即止", mres["actual"],
+			str(mres["detail"]))
+		return
+	# 出网（19 §2.10）：cfg 声明 `outbound{}` 时，真值由 `src/sim/world_port.gd` 现跑
+	# 本机 loopback 真 TCP 得出；提交必须指认「发送侧字节」与「本机终端字节」两个读取点。
+	# 放在逐格比对之前：字节被改写/顺序颠倒要先报语义(10)，不能被普通填错(7)吞掉。
+	if outbound:
+		var ores: Dictionary = OutboundLink.validate_gate(got, c)
+		if not bool(ores["ok"]):
+			Kit.emit(rep, tracker, int(ores["code"]), c, false, ores["input"],
+				ores["expected"], ores["actual"], str(ores["detail"]))
+			return
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, ores["actual"],
+			"同一份真实字节在两个读取点被读到", ores["actual"], str(ores["detail"]))
+		return
 	# 时延越限：cfg 可选 `delay:{key,max}`。只在该列越上限时报 9（语义本就属 E_DELAY_MISMATCH），
 	# 值在限内但与机器不符仍归 7。这样 data 里写的 9 是可发射的，不是死判据。
 	var delay_cfg: Dictionary = c.get("delay", {})
