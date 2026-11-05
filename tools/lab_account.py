@@ -8,6 +8,10 @@
                           + 节级 deferred（required、gate ready，但所在 lab 非 ready）
                           + required=false（可选 gate）
   任一项不成立，脚本以退出码 1 结束，不许把数字抄进文档。
+  四桶恒等式按定义恒成立，所以另加逐条账目完整性校验（空 id / 重复 id /
+  required 非布尔 / status 取值未知），任一条账目对不上也以退出码 1 结束。
+  调用方（scripts/run_tests.ps1）据此映射：有 TOTAL 且“验算：闭合”才放行；
+  正常退出码 0，账目不闭合 1（入口映射为 8），脚本没跑起来/无 TOTAL 行为 9。
 
 用法：python tools/lab_account.py
 """
@@ -46,8 +50,28 @@ def lab_status(cfg, level_status):
     return level_status.get(str(cfg.get("id", "")), "ready")
 
 
+def load_level_gate_ids():
+    """章节级 gate 声明，按 chapter -> data_key -> [gate_id]。
+
+    这是与 data/labs 独立的第二份声明：只改 lab 的 gate 数、不改这里，账目就对不上。
+    """
+    out = {}
+    for path in glob.glob(os.path.join(LEVELS_DIR, "*_levels.json")):
+        chapter = os.path.basename(path).replace("_levels.json", "")
+        with open(path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        per = {}
+        for lab in doc.get("labs", []):
+            per[str(lab.get("data_key", ""))] = [str(x) for x in lab.get("gate_ids", [])]
+        out[chapter] = per
+    return out
+
+
 def scan():
     level_status = load_level_status()
+    level_gate_ids = load_level_gate_ids()
+    problems = []
+    seen_ids = {}
     per_chapter = {}
     counted_list = []
     pending_list = []
@@ -59,13 +83,33 @@ def scan():
             doc = json.load(fh)
         row = {"labs": 0, "segs": 0, "gates": 0, "pending": 0, "counted": 0,
                "section_deferred": 0, "optional": 0}
+        declared = level_gate_ids.get(chapter, {})
         for lab_id, cfg in (doc.get("labs") or {}).items():
             row["labs"] += 1
             row["segs"] += len(cfg.get("sections") or [])
-            ready_lab = lab_status(cfg, level_status) == "ready"
+            got_ids = [str(g.get("id", "")) for g in cfg.get("gate_cases") or []]
+            if lab_id in declared and sorted(got_ids) != sorted(declared[lab_id]):
+                problems.append("%s/%s: gate 数与 levels 声明不符（数据 %s / levels %s）"
+                                % (chapter, lab_id, sorted(got_ids), sorted(declared[lab_id])))
+            st = lab_status(cfg, level_status)
+            if st not in ("ready", "deferred"):
+                problems.append("%s/%s: lab content_status=%r 未知" % (chapter, lab_id, st))
+            ready_lab = st == "ready"
             for g in cfg.get("gate_cases") or []:
                 row["gates"] += 1
                 gid = str(g.get("id", ""))
+                if not gid:
+                    problems.append("%s/%s: 有 gate 缺 id" % (chapter, lab_id))
+                else:
+                    key = (chapter, lab_id, gid)
+                    if key in seen_ids:
+                        problems.append("%s/%s/%s: gate id 重复" % key)
+                    seen_ids[key] = True
+                if "required" in g and not isinstance(g["required"], bool):
+                    problems.append("%s/%s/%s: required 非布尔（%r）" % (chapter, lab_id, gid, g["required"]))
+                for k in ("content_status", "status"):
+                    if k in g and str(g[k]) not in ("ready", "pending"):
+                        problems.append("%s/%s/%s: %s=%r 未知" % (chapter, lab_id, gid, k, g[k]))
                 required = bool(g.get("required", True))
                 if not required:
                     row["optional"] += 1
@@ -81,12 +125,16 @@ def scan():
                     continue
                 row["counted"] += 1
                 counted_list.append((chapter, lab_id, gid))
+            if lab_id in declared:
+                declared.pop(lab_id)
+        for missing in sorted(declared):
+            problems.append("%s/%s: levels 声明了该 lab，但数据文件里没有" % (chapter, missing))
         per_chapter[chapter] = row
-    return per_chapter, pending_list, section_deferred_list, optional_list
+    return per_chapter, pending_list, section_deferred_list, optional_list, problems
 
 
 def main():
-    per_chapter, pending, section_deferred, optional = scan()
+    per_chapter, pending, section_deferred, optional, problems = scan()
     print("file                     labs  segs  gates  pending  section_def  optional  counted")
     for chapter, r in per_chapter.items():
         print("%-24s %4d  %4d  %5d  %7d  %11d  %8d  %7d"
@@ -109,7 +157,12 @@ def main():
     print("恒等式：%d = %d 进分母 + %d pending + %d 节级 deferred + %d required=false"
           % (total["gates"], total["counted"], total["pending"],
              total["section_deferred"], total["optional"]))
-    ok = total["gates"] == total["counted"] + total["pending"] + excluded
+    if problems:
+        print()
+        print("账目完整性问题（%d 条）：" % len(problems))
+        for p in problems:
+            print("  %s" % p)
+    ok = total["gates"] == total["counted"] + total["pending"] + excluded and not problems
     print("验算：%s" % ("闭合" if ok else "不闭合"))
     if not ok:
         sys.exit(1)

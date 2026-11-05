@@ -13,9 +13,13 @@
 #   5  FAIL  引擎返回码非 0（结果看着绿但进程异常）
 #   6  FAIL  工程或 Godot 启动器不存在（环境问题，不跑）
 #   7  FAIL  测试进程超过 -TimeoutSec 未退出（退出期自旋/死锁），已强杀（CI 兜底，绝不允许挂死）
+#   8  FAIL  总账不闭合（四桶恒等式或逐条账目完整性/与 levels 的 gate 数不符）
+#   9  FAIL  总账没跑起来（无 python / 脚本缺失 / 输出里没有 TOTAL 行）
 #
 # 判定只读 runner 的三条终结行（RESULT / 终结行 / SUITE_TOTAL），
 # 不采用「grep 到 FAIL 就 exit 1」的粗口径。
+# 测试跑完后还会跑 tools/lab_account.py：总账先于测试终结判定报错（8/9），
+# 这样「某 lab 的 gate 数被改坏」时不会被测试红盖住；测试自身的红仍完整写在日志与上方关键行里。
 # -ReplayLog 不跑 Godot，用现成日志走同一套判定，专门用来验证红/绿判定本身。
 #
 # 输出同时写入 artifacts/logs/tests.log；开跑前先删旧日志，禁止读到上一轮的 PASS。
@@ -134,6 +138,31 @@ foreach ($line in $lines) {
 		Write-Host $line
 	}
 }
+
+# ------------------------------------------------- 总账：一次扫 20 个 labs + 20 个 levels
+# 8 = 账不闭合（恒等式、逐条完整性、或与 levels 的 gate 声明不符）
+# 9 = 总账没跑起来（无 python / 脚本缺失 / 无 TOTAL 行）；与测试红（1）分开。
+$accountScript = Join-Path $Root "tools\lab_account.py"
+if ($null -eq (Get-Command python -ErrorAction SilentlyContinue)) {
+	Fail-Exit "总账没跑起来：找不到 python（无法执行 tools/lab_account.py）" 9
+}
+if (-not (Test-Path $accountScript)) {
+	Fail-Exit "总账没跑起来：找不到 $accountScript" 9
+}
+$accountText = (& python $accountScript 2>&1 | Out-String)
+$accountCode = $LASTEXITCODE
+foreach ($line in ($accountText -split "`r?`n")) {
+	if ($line -match "TOTAL|恒等式|验算|原因=|账目完整性|gate 数与 levels|levels 声明了") {
+		Write-Host $line
+	}
+}
+if ($accountText -notmatch "TOTAL") {
+	Fail-Exit "总账脚本没有输出 TOTAL 行（脚本没跑起来或输出被截断）" 9
+}
+if ($accountCode -ne 0 -or $accountText -notmatch "验算：闭合") {
+	Fail-Exit "账不闭合（恒等式或逐条完整性校验失败；详见上方总账输出）" 8
+}
+Write-Host "[run_tests] 总账：闭合" -ForegroundColor Green
 
 # ------------------------------------------------- 判定：只读 runner 的三条终结行
 $checks = -1
