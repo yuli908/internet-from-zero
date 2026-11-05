@@ -2,6 +2,9 @@ extends RefCounted
 
 ## M4-G3/G4：8 种 CH02 判定 kind 的白名单、固定 payload 键、机械映射与帧粒度摘要一致。
 ## 口径：`docs/design/11` §3 的判定 kind 全大写；`build_area` 是语法糖，不产生 trace。
+## 注意：本套件是**形状测试**——`static_current` 只有映射、没有生产者
+## （`ch02_checks.gd` 无对应判定，T2.2-3/T2.4-4 仍 pending，见 `docs/design/20`）。
+## 假 payload 只证明管道形状，不证明判据实现。
 
 const CASES := {
 	"mosfet_region": {"kind": "MOSFET_REGION",
@@ -23,7 +26,7 @@ const EXPECT_GROUPS := {
 }
 const GROUP_DESCRIPTIONS := {
 	"kind_whitelist": "trace kind 白名单条数为 15",
-	"kind_mapping": "8 个判定 kind 与 trace kind 逐项映射、白名单含每个 kind、build_area 被排除且不产生 trace",
+	"kind_mapping": "8 个判定 kind 与 trace kind 逐项映射、白名单含每个 kind、build_area 被排除且不产生 trace（static_current 仅映射、无生产者）",
 	"write_all": "8 个判定 kind 都能写入、落库 8 条无拒绝、字段仍为 5、首末 kind 与互异性",
 	"reject": "未开 trace / 未知 kind / build_area / 缺固定键 / 类型不符各类拒绝与拒绝计数",
 	"framing": "含 CH02 kind 的事件流在 1 tick/帧 与 4 tick/帧 下 digest、事件数、拒绝数与逐条事件一致",

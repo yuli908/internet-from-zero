@@ -78,7 +78,7 @@
         {"id": "T2.2-1", "title": "反相真值表 2/2（0→1，1→0）", "kind": "truth", "rows": [[0], [1]], "expected": [1, 0], "required": true},
         {"id": "T2.2-2", "title": "输入 X 时输出 X（三值传播）", "kind": "x_propagation", "expect": "X", "required": true},
         {"id": "T2.2-3", "title": "两种稳态下静态电流 ≤ 1 µA", "kind": "static_current", "max_ua": 1.0, "states": [[0], [1]], "required": true,
-         "status": "pending", "pending_reason": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd"},
+         "status": "pending", "pending_reason": "缺口在编辑器：2.2 调色板仅 NOT 门，无法搭出两管同时导通；补模型会让 T2.2-3/T2.4-4 变成恒绿死判据"},
         {"id": "T2.2-4", "title": "输出轨到轨：高 ≥ 3.2 V，低 ≤ 0.1 V", "kind": "rail_margin",
          "v_high_min": 3.2, "v_low_max": 0.1, "states": [[0], [1]], "required": true}
       ],
@@ -136,7 +136,7 @@
         {"id": "T2.4-2", "title": "稳定时间 ≤ 8 tick（NAND 2 t × 3 级）", "kind": "delay", "max": 8, "required": true},
         {"id": "T2.4-3", "title": "门数 ≤ 5（含封装）", "kind": "area_max", "max_gates": 5, "required": true},
         {"id": "T2.4-4", "title": "全部稳态静态电流 ≤ 1 µA", "kind": "static_current", "max_ua": 1.0, "states": [[0,0],[0,1],[1,0],[1,1]], "required": true,
-         "status": "pending", "pending_reason": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd"}
+         "status": "pending", "pending_reason": "缺口在编辑器：2.2 调色板仅 NOT 门，无法搭出两管同时导通；补模型会让 T2.2-3/T2.4-4 变成恒绿死判据"}
       ],
       "grants": {"items": {"G04": 1}, "blueprint": ["KN-EQUIV-01"]}
     },

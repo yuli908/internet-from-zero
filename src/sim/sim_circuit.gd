@@ -211,6 +211,7 @@ func note_metastable(t: int, subject: String, reason: String) -> void:
 const JUDGEMENT_KINDS := {
 	"mosfet_region": "MOSFET_REGION",
 	"x_propagation": "X_PROPAGATION",
+	# PLACEHOLDER: 无生产者（ch02_checks.gd 无 static_current 判定；T2.2-3/T2.4-4 仍 pending，见 docs/design/20）
 	"static_current": "STATIC_CURRENT",
 	"rail_margin": "RAIL_MARGIN",
 	"equiv": "EQUIV",
