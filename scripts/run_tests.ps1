@@ -12,6 +12,7 @@
 #   4  FAIL  SUITE_TOTAL expected≠actual（有 check 未执行：套件中途中止或被跳过）
 #   5  FAIL  引擎返回码非 0（结果看着绿但进程异常）
 #   6  FAIL  工程或 Godot 启动器不存在（环境问题，不跑）
+#   7  FAIL  测试进程超过 -TimeoutSec 未退出（退出期自旋/死锁），已强杀（CI 兜底，绝不允许挂死）
 #
 # 判定只读 runner 的三条终结行（RESULT / 终结行 / SUITE_TOTAL），
 # 不采用「grep 到 FAIL 就 exit 1」的粗口径。
@@ -23,7 +24,8 @@ param(
 	[string]$Root = "",
 	[string]$Godot = "C:\tools\godot-4.4.1\godot.cmd",
 	[string]$LogFile = "",
-	[string]$ReplayLog = ""
+	[string]$ReplayLog = "",
+	[int]$TimeoutSec = 240
 )
 
 $ErrorActionPreference = "Continue"
@@ -76,8 +78,46 @@ if ($replay) {
 	Write-Host "[run_tests] root : $Root"
 	Write-Host "[run_tests] log  : $LogFile"
 
-	& $Godot --headless --path $Root -s "res://tests/run_tests.gd" 2>&1 | Out-File -FilePath $LogFile -Encoding utf8
-	$engineCode = $LASTEXITCODE
+	# 带超时启动：Godot 走独立进程并落盘 stdout/stderr，避免管道缓冲导致 WaitForExit 假死，
+	# 同时给 CI 一个硬上限——测试跑完若进程仍自旋，超时即强杀并判红，绝不让 CI 卡住。
+	# 用 ProcessStartInfo 而不是 Start-Process：PS5.1 的 -PassThru 取不到 ExitCode（实测为 null），
+	# 会误判成引擎异常。这里经 cmd.exe /c 启动，stdout/stderr 异步收进同一个缓冲区，
+	# 既保留 2>&1 的合并口径，又能拿到真实返回码；再加 WaitForExit(超时) 兜底，绝不挂死 CI。
+	$psi = New-Object System.Diagnostics.ProcessStartInfo
+	$psi.FileName = "cmd.exe"
+	$psi.Arguments = '/c ""' + $Godot + '" --headless --path "' + $Root + '" -s res://tests/run_tests.gd 2>&1"'
+	$psi.UseShellExecute = $false
+	$psi.CreateNoWindow = $true
+	$psi.WorkingDirectory = $Root
+	$psi.RedirectStandardOutput = $true
+	$psi.RedirectStandardError = $true
+
+	$proc = [System.Diagnostics.Process]::Start($psi)
+	$buffer = New-Object System.Text.StringBuilder
+	$subs = @()
+	$subs += Register-ObjectEvent -InputObject $proc -EventName OutputDataReceived -MessageData $buffer -Action {
+		[void]$Event.MessageData.AppendLine($EventArgs.Data)
+	}
+	$subs += Register-ObjectEvent -InputObject $proc -EventName ErrorDataReceived -MessageData $buffer -Action {
+		[void]$Event.MessageData.AppendLine($EventArgs.Data)
+	}
+	$proc.BeginOutputReadLine()
+	$proc.BeginErrorReadLine()
+
+	if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
+		& taskkill /PID $proc.Id /T /F 2>&1 | Out-Null
+		$partial = $buffer.ToString()
+		$partial | Out-File -FilePath $LogFile -Encoding utf8
+		foreach ($s in $subs) { Unregister-Event -SubscriptionId $s.Id -ErrorAction SilentlyContinue }
+		$tail = $partial
+		if ($tail.Length -gt 2000) { $tail = $tail.Substring($tail.Length - 2000) }
+		Fail-Exit "测试进程超过 $TimeoutSec 秒未退出（退出期自旋/死锁？），已强杀。日志尾部：`n$tail" 7
+	}
+	$proc.WaitForExit()  # 等异步读取把最后几行刷完
+	foreach ($s in $subs) { Unregister-Event -SubscriptionId $s.Id -ErrorAction SilentlyContinue }
+
+	$engineCode = $proc.ExitCode
+	$buffer.ToString() | Out-File -FilePath $LogFile -Encoding utf8
 	if ($null -eq $engineCode) { $engineCode = -1 }  # 取不到返回码按异常处理，不当 0
 }
 
