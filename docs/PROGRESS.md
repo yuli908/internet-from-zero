@@ -746,7 +746,7 @@ CH08（3 节 `protocol_editor` / `handshake` / `capture`，各 5 段、共 12 �
 - `段` = 各 lab `sections` 长度之和；
 - `gate` = 各 lab `gate_cases` 条目数（CH01/CH02 的 gate 也在这张表里，故两章 `p1_gates` 为空不影响计数）；
 - `pending` = `gate_cases` 里 `content_status`/`status != "ready"` 的条目数（不进分母、不判红）；
-- `进分母` = `required` 且非 pending 的 gate 数，与 `LabGateKit.deferred_gates` 同一口径（`required=false` 的 gate 不计，如 CH05 的 `T5.4-5`）。
+- `进分母` = `required` 且所在 lab 为 `ready`、且 gate 自身非 pending 的条目数，与 `LabGateKit.deferred_gates` 同一口径：`required=false` 的 gate 不计（如 CH05 的 `T5.4-5`）；**整节 deferred 的 lab 一条都不计**（如 CH02 `replace`，`data/chapters/ch02_levels.json` 标 `content_status: deferred`，其 3 条非 pending 的 required gate 不计入）。
 
 ### 10.1 逐文件统计原文（2026-11-05 脚本实扫 20 个文件，非手工加总）
 
@@ -773,7 +773,7 @@ ch18_labs.json         4     20     16        1
 ch19_labs.json         5     25     20        1
 final_labs.json        3      9      9        1
 TOTAL                 84    420    334       17
-gates_in_denominator = 316
+gates_in_denominator = 313（含整节 deferred 的 CH02 `replace`，其 3 条非 pending required 不计）
 ```
 
 ### 10.2 20 行总账（一章一行，数字全部来自 10.1）
@@ -781,7 +781,7 @@ gates_in_denominator = 316
 | 章 | lab | 段 | gate | pending | 进分母 | 入库日期 | 提交 |
 |---|---|---|---|---|---|---|---|
 | CH01 | 6 | 34 | 24 | 0 | 24 | 2026-11-04 | `0d63b67` |
-| CH02 | 5 | 25 | 20 | 2 | 18 | 2026-11-04 | `cd057cf` |
+| CH02 | 5 | 25 | 20 | 2 | 15 | 2026-11-04 | `cd057cf` |
 | CH03 | 4 | 21 | 16 | 0 | 16 | 2026-11-05 | `de7bc7a` |
 | CH04 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `42e2911` |
 | CH05 | 4 | 21 | 17 | 0 | 16 | 2026-11-05 | `9773238` |
@@ -800,48 +800,50 @@ gates_in_denominator = 316
 | CH18 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `04f2483` |
 | CH19 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `5164c4c` |
 | 终章 | 3 | 9 | 9 | 1 | 8 | 2026-11-05 | `f4452d9` |
-| **合计** | **84** | **420** | **334** | **17** | **316** | — | — |
+| **合计** | **84** | **420** | **334** | **17** | **313** | — | — |
 
-交叉校验：`test_gate_result` 的 `EXPECT = 315` 是**该套件自身 15 个分组的检查数**，与"进分母 gate 数"无关（此前一版把它误写成"与脚本合计一致"，已更正）。进分母数只能以 10.1 的脚本读数为准：**316**。
+交叉校验：`test_gate_result` 的 `EXPECT = 315` 是**该套件自身 15 个分组的检查数**，与"进分母 gate 数"无关（此前一版把它误写成"与脚本合计一致"，已更正）。进分母数只能以 10.1 的脚本读数为准：**313**。
 
 ### 10.2b 与上一版（`19 pending / 315 进分母`）的逐项对照
 
 | 项 | 旧值 | 新值（实扫） | 变化来源 |
 |---|---|---|---|
 | CH05 进分母 | 17 | 16 | 旧版按 `gate − pending` 算，把 `required=false` 的 `T5.4-5`（quiz）也算进了分母；按 `deferred_gates` 口径应排除 |
+| CH02 进分母 | 18 | 15 | **本轮复核新发现**：`replace` 整节在 `ch02_levels.json` 里是 `content_status: deferred`，`deferred_gates` 把该节 3 条非 pending 的 required 全排除；旧版按 gate 级口径多算了 3 条 |
 | CH13 pending / 进分母 | 1 / 11 | 0 / 12 | 13.1 源码行映射已转正（`4fc45ec` 前后），旧表未同步 |
 | CH14 pending / 进分母 | 1 / 11 | 0 / 12 | 本会话 `2b4ebb9`：`T14.2-1` 逐值标签导出转正 |
 | 全书 pending | 19 | 17 | 上两项各 −1 |
-| 全书进分母 | 315 | 316 | CH13 +1、CH14 +1、CH05 −1 |
+| 全书进分母 | 315 | 313 | CH13 +1、CH14 +1、CH05 −1、**CH02 −3** |
 | gate / 段 / lab | 334 / 420 / 84 | 334 / 420 / 84 | 无变化 |
 
 ### 10.3 全量检查（2026-11-05 复跑，原文）
 
 ```
-SUITE_TOTAL expected=7354 actual=7354
-RESULT: 7356 checks, 0 failures
+SUITE_TOTAL expected=7361 actual=7361
+RESULT: 7363 checks, 0 failures
 ```
 
-60 个套件；`SUITE_TOTAL` 只统计套件自身（7354），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
+60 个套件；`SUITE_TOTAL` 只统计套件自身（7361），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
 `[guard] 自测：故意中断的 suite 被判红` 与 `[guard] 防线自检探针存在`（`tests/run_tests.gd` §runner 尾部）。
+（上一版为 7354 / 7356；+7 全部来自 `test_ch16` 的 `t16_3_real` 3 条 + 新负例 4 条，见 §10.5。）
 
 ### 10.4 口径错因（两版差异必须点名，不允许"以最新版为准"）
 
 - **581 段 / 340 gate 那一版是错的**，错在把课件稿里尚未落库的内容当成已落库计入：`docs/curriculum/*.md` 里的 JSON 块合计 **78 lab / 386 段 / 312 gate**，`data/labs` 合计 **84 lab / 420 段 / 334 gate**，两组数各自、以及相加（806 段 / 646 gate）都得不到 581 / 340，即该版在仓库里**无任何可复现来源**。
 - **415 段 / 335 gate 那一版也是错的**，错在 20 行表上手工逐行加总（段少 5、gate 多 1），不是脚本读数。
-- 唯一有效值：**84 lab / 420 段 / 334 gate / 17 pending / 316 进分母**，与 `SUITE_TOTAL 7354` / `RESULT 7356` 同时在库。
+- 唯一有效值：**84 lab / 420 段 / 334 gate / 17 pending / 313 进分母**，与 `SUITE_TOTAL 7361` / `RESULT 7363` 同时在库。本轮对 20 个 lab 文件 + 20 个 levels 文件做了整节 deferred 复核，313 为按 `deferred_gates` 逐节算出的读数（此前一版 316 漏算了 CH02 `replace` 的整节 deferred）。
 
 ### 10.5 套件期望数变化溯源（CH16 / CH17）
 
-- `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ 现在 **71**（positive 5 / negative 7）。
-  +1 = 正向探针「`T16.3-1` 时延 12 在限内 -> code=0」；+1 = 负向探针「`T16.3-1` 第 1 行时延 60 超过上限 30 -> code=9」。
-  两条都由 `4fc45ec`（9 号洞：`table` 增可选 `delay{key,max}`，越限先发 `E_DELAY_MISMATCH(9)`）带出。
+- `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ `4fc45ec` 后 **71**（positive 5 / negative 7，+2 为 `delay` 上限正负探针）→ 本会话 **78**（positive 5 / t16_3_real 3 / negative 11）。
+  +3 = `t16_3_real` 三条真判据（逐行对数据、时间戳来自时钟事件、时延逐条由 got−sent 且非固定常数）；
+  +4 = 四条新负例（时延改固定 12→9、`got_at` 抄 `sent_at`→9、`req_id` 绑错→7、`client_seq` 绑错→7）。
 - `test_ch17`：库里只有 `080b693` 一版，**55**（positive 3 / negative 7）；提交前的估算值 54（= 15×3+9）从未入库。
   从 54 到 55 的 +1 就是第 7 条负例「`T17.3-1` 第 1 向时延 90 超过上限 50 -> code=9」，与 CH16 同一条发射路径。
 
 ### 10.6 未写入的承诺
 
-`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展，合计 42 人日。当前状态：**3 项已实施**（§2.1 13.1、§2.3 14.1、§2.5 15.2；其中 15.2 只到接口形成、`T15.2-1` 仍 pending）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。其余 **7 项未批准、未实施**（§2.2 13.2、§2.4 15.1、§2.6 16.3、§2.7 17.1、§2.8 18.4、§2.9 19.3、§2.10 F1）。
+`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**4 项已实施**（§2.1 13.1、§2.3 14.1、§2.5 15.2、§2.6 16.3；其中 15.2 只到接口形成、`T15.2-1` 仍 pending；16.3 由本会话落成逐请求事件时钟时延）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。其余 **6 项未批准、未实施**（§2.2 13.2、§2.4 15.1、§2.7 17.1、§2.8 18.4、§2.9 19.3、§2.10 F1）。
 这 10 项对应 CH13–CH19 与终章里"课文要求玩家能指认、数据侧却只有布尔位/汇总数"的 gate：**课文里有这些要求，判据目前只是布尔位**。任一项落地必须同时给单测（越限/缺失各一例）、一条 `RED-PROBE ... -> code=N` 实测原文，并同步删除对应章降级清单里的该条。
 
 ### 10.7 仍缺四样
@@ -857,7 +859,7 @@ RESULT: 7356 checks, 0 failures
 
 | 位置 | 谁留下的 | 规模 | 内容状态 | 处置 |
 |---|---|---|---|---|
-| `docs/simulation/**`（9 篇 md + `ref/simcore/components.py` + `ref/run_all.py` + `ref/verify_report.md`） | 「硬件与系统仿真」工作流（另一会话；其约定写入范围仅 `docs/simulation/`） | 12 文件，+565/−106 | 不是失效代码，是该工作流的文档与参考实现增量；**本会话没有该工作流的验收口径，未复跑** | 不入库，登记为**未完成/待续**；由该工作流会话复跑 `docs/simulation/ref/run_all.py` 后自行提交 |
+| `docs/simulation/**` | 「硬件与系统仿真」工作流（另一会话；其约定写入范围仅 `docs/simulation/`） | 已跟踪改动 12 文件（+565/−106）：`01_model_layers.md`、`02_determinism.md`、`03_components.md`、`06_performance.md`、`07_api_contract.md`、`08_testing.md`、`09_feasibility_risks.md`、`README.md`、`ref/run_all.py`、`ref/simcore/components.py`、`ref/verify_report.md`、`ref/simcore/__pycache__/components.cpython-313.pyc`；另有未跟踪 7 项：`10_l3_timing.md`、`ref/event_counts.json`、`ref/export_vectors.py`、`ref/measure_events.py`、`ref/tests/test_devices.py`、`ref/tests/__pycache__/test_devices.cpython-313.pyc`、`ref/vectors/` | 不是失效代码，是该工作流的文档与参考实现增量；**本会话没有该工作流的验收口径，未复跑** | 不入库，登记为**未完成/待续**；由该工作流会话复跑 `docs/simulation/ref/run_all.py` 后自行提交（提交信息需说明范围） |
 | `docs/simulation/ref/simcore/__pycache__/components.cpython-313.pyc` | 同上 | 二进制 | 误入版本库的生成物（该文件已被跟踪） | 待该工作流决定是否从库中清出；本轮不动 |
 | `artifacts/shots/selfcheck.png` | 某会话自检工具输出 | 1 图 | 与本轮无关 | 保留，不入库 |
 | `artifacts/probe_{en,framing,period,snap}.gd`(+`.uid`) | 某会话临时取证脚本 | 8 个未跟踪文件 | 临时探针，工程文件不删 | 保留，登记为待续 |
