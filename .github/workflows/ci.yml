@@ -166,7 +166,7 @@ jobs:
             Write-Host "::group::test failure summary (exit=$code)"
             Get-Content $stepLog | Select-String -Pattern "\[run_tests\] FAIL|RESULT:|SUITE_TOTAL|=== FAILED|^  FAIL " | Select-Object -Last 12 | ForEach-Object { Write-Host $_.Line }
             Write-Host "::endgroup::"
-            Write-Host "::error::Full test suite failed (exit=$code: $meaning). ASCII key lines: $asciiKey"
+            Write-Host "::error::Full test suite failed (exit=$code, meaning: $meaning). ASCII key lines: $asciiKey"
             Write-Host "See uploaded artifact 'logs' -> tests-step.log / tests.log"
             exit $code
           }
