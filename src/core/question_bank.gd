@@ -9,6 +9,10 @@ extends RefCounted
 const FORMAT := "ifz-questions/1"
 const BANKS := ["exercises", "quiz"]
 const TYPES := ["understanding", "compute", "build", "debug", "open", "memory"]
+## 选项字段：`options`（新题库）与 `choices`（M4 fixture 旧名）等价，读取时以 `options` 优先。
+const OPTION_KEYS := ["options", "choices"]
+## 干扰项来源标签：只允许这三类，且每个错误选项都要标到。
+const DISTRACTOR_KINDS := ["常见误判", "相邻概念", "数值边界"]
 ## docs/curriculum/06 §3 的错因码（C1–C9），只做常量与校验。
 const ERROR_CODES := ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9"]
 
@@ -82,12 +86,58 @@ func validate() -> Array:
 			errs.append("题目 %s 的 rubric 权重和 = %d ≠ 100" % [tag, total])
 		if typ == "build" and not has_correct:
 			errs.append("搭建题 %s 的 rubric 缺'正确性'维" % tag)
+		var opts: Array = _options_raw(it)
+		if not opts.is_empty():
+			var texts := {}
+			for raw_o in opts:
+				var t := str(raw_o).strip_edges()
+				if t.is_empty():
+					errs.append("题目 %s 的 options 有空项" % tag)
+				elif texts.has(t):
+					errs.append("题目 %s 的 options 有重复项：%s（等于给了两个正确答案）" % [tag, t])
+				else:
+					texts[t] = true
+			if opts.size() < 2:
+				errs.append("题目 %s 的 options < 2" % tag)
+			if not it.has("answer"):
+				errs.append("题目 %s 有 options 但缺 answer" % tag)
+			var notes: Variant = it.get("distractor_notes", null)
+			if it.has("options") and not (notes is Array):
+				errs.append("题目 %s 有 options 但缺 distractor_notes（干扰项必须标来源）" % tag)
+			if notes is Array:
+				var covered := {}
+				for raw_n in (notes as Array):
+					if not (raw_n is Dictionary):
+						errs.append("题目 %s 的 distractor_notes 有非对象项" % tag)
+						continue
+					var n: Dictionary = raw_n
+					var kind := str(n.get("kind", ""))
+					var why := str(n.get("why", "")).strip_edges()
+					if not DISTRACTOR_KINDS.has(kind):
+						errs.append("题目 %s 的干扰项 kind 非法：%s" % [tag, kind])
+					if why.is_empty():
+						errs.append("题目 %s 的干扰项 why 为空" % tag)
+					if not (n.get("index", null) is int):
+						errs.append("题目 %s 的干扰项 index 必须是 int" % tag)
+						continue
+					var idx := int(n["index"])
+					if covered.has(idx):
+						errs.append("题目 %s 的干扰项 index %d 重复" % [tag, idx])
+					covered[idx] = true
+					if it.has("answer") and idx == int(it.get("answer", -1)):
+						errs.append("题目 %s 把正确项 %d 标成了干扰项" % [tag, idx])
+				if it.has("answer") and (it["answer"] is int):
+					for oi in opts.size():
+						if oi != int(it["answer"]) and not covered.has(oi):
+							errs.append("题目 %s 的干扰项 index %d 没有来源标注" % [tag, oi])
 		if it.has("answer"):
 			var ct := typeof(it["answer"])
 			if ct != TYPE_INT and ct != TYPE_FLOAT:
 				errs.append("题目 %s 的 answer 必须是 int（选项下标）" % tag)
 			elif int(it["answer"]) < 0:
 				errs.append("题目 %s 的 answer 不能为负" % tag)
+			elif not opts.is_empty() and int(it["answer"]) >= opts.size():
+				errs.append("题目 %s 的 answer 越界：%d / %d 项" % [tag, int(it["answer"]), opts.size()])
 		if it.has("answer_value"):
 			var at := typeof(it["answer_value"])
 			if at != TYPE_INT and at != TYPE_FLOAT:
@@ -136,6 +186,19 @@ func score(id: String, response: Dictionary) -> Dictionary:
 
 static func error_codes() -> Array:
 	return ERROR_CODES.duplicate()
+
+## 读取选项数组（`options` 优先，兼容 fixture 的旧名 `choices`）；非选题返回空数组。
+static func _options_raw(it: Dictionary) -> Array:
+	for k in OPTION_KEYS:
+		var v: Variant = it.get(k, null)
+		if v is Array:
+			return v
+	return []
+
+func options_of(id: String) -> Array:
+	if not by_id.has(id):
+		return []
+	return _options_raw(by_id[id]).duplicate()
 
 static func _res(ok: bool, score_v: int, detail: String, code: String) -> Dictionary:
 	return {"ok": ok, "score": score_v, "max": 100, "detail": detail, "error_code": code}
