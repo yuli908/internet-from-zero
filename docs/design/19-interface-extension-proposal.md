@@ -153,21 +153,22 @@ RED-PROBE CH15 T15.3-1 emit 行 reason 改错(type_changed→ret_changed) -> cod
 - **影响面**：`T15.1-1` 原为 ready，进分母与 pending 不变（CH15 仍 15 进分母、1 pending）；`test_ch15` 74→79（15.1 跨源 + 2 负例）→ 89（15.3 接线 `t15_3_real` 3 条 + 5 类 reason 负例 7 条）。
 - **估时**：4 人日（原估）。
 
-### 2.5 15.2 句柄编号映射（`T15.2-1`）
+### 2.5 15.2 句柄编号映射（`T15.2-1`，已实施 2026-11-05）
 
 - **课文原话**：「需技术侧扩接口：socket→栈映射判据（`{fd, calls[], frames[]}`） / 最小替代：抓包面板须能列出本次 send/recv 的帧，且与协议栈日志同一编号；无帧即红。」
-- **现在缺什么**：只有「抓到帧」布尔位；fd、调用序号、帧编号三者互相对不上，也看不出哪一帧属于哪个句柄。
+- **原缺失**：只有「抓到帧」布尔位；fd、调用序号、帧编号三者互相对不上，也看不出哪一帧属于哪个句柄。
 - **要的字段**：
 
 ```json
 {
-  "handles": [{"fd": 3, "socket_id": "s1", "calls": [{"n": 1, "op": "send"}]}],
-  "frames": [{"frame_id": 7, "fd": 3, "call_n": 1, "dir": "out"}],
+  "handles": [{"fd": 332, "socket_id": "s1", "calls": [{"n": 1, "op": "send"}]}],
+  "frames": [{"frame_id": 7, "fd": 332, "call_n": 1, "dir": "out"}],
   "unmatched_frames": []
 }
 ```
 
 - **实现侧**：协议栈与抓包面板共用一个自增编号（仿真核心）；UI 只读展示。
+- **实现落点（已转正 2026-11-05）**：数据源改为**本机 loopback 真实捕获**（Python socket 起客户端/服务端，客户端 fd=332、服务端 fd=340，send/recv 同一 12 B `68656c6c6f2c20776f726c64`）。原始 10 条调用（含 fd/op/方向/`bytes_hex`）冻结在 `data/labs/ch15_labs.json::socket_api.capture`；`socket_calls` 由捕获归一化（逻辑 `open` = 客户端 `socket`+`connect`，其余 send/recv/close 原样），`src/core/socket_trace.gd::run` 导出 `handles/frames/unmatched_frames`，`_table` 逐项比对；`text_roundtrip` 由捕获的 send/recv 字节现算，不再手写 `true`。ch15 进分母 15→16、全章 pending 1→0；`test_ch15` 89→90（+1 捕获源真实性：字节与 fd 必须对得上）。负例仍为：改 `frame2.call_n` → 10、删一帧 → 10。
 - **影响面**：15.2 A 的「同一编号」转机判；抓包面板需显示 fd 与 call_n。
 - **估时**：5 人日。
 

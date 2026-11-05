@@ -892,9 +892,9 @@ RESULT: 7378 checks, 0 failures
 
 ### 10.5 套件期望数变化溯源（CH15 / CH16 / CH17）
 
-- `test_ch15`：首次入库 **74**（positive 4 / t15_2_interface 3 / negative 8）→ 本会话上一轮 **79**（positive 4 / t15_1_real 3 / t15_2_interface 3 / negative 10）→ 本轮 **89**（positive 4 / t15_1_real 3 / t15_2_interface 3 / t15_3_real 3 / negative 17）。
+- `test_ch15`：首次入库 **74**（positive 4 / t15_2_interface 3 / negative 8）→ 本会话上一轮 **79**（positive 4 / t15_1_real 3 / t15_2_interface 3 / negative 10）→ 本轮 **90**（positive 4 / t15_1_real 3 / t15_2_interface 4 / t15_3_real 3 / negative 17）。
   74→79：+3 = `t15_1_real` 三条真判据；+2 = 两条负例（`T15.1-1` 符号类型写错→7、参数顺序颠倒→7）。
-  79→89：+3 = `t15_3_real` 三条真判据（兼容表逐行对数据、五类 reason 各命中一条、主版本规则拒绝）；+7 = 七条负例（`same_symbol` 声明不一致→10、`abi_ok` 与库导出不符→10、五类 reason 改错各→7）。
+  79→90：+3 = `t15_3_real` 三条真判据（兼容表逐行对数据、五类 reason 各命中一条、主版本规则拒绝）；+7 = 七条负例（`same_symbol` 声明不一致→10、`abi_ok` 与库导出不符→10、五类 reason 改错各→7）；+1 = `t15_2_interface` 的捕获源真实性（客户端 send/recv 字节与 payload 同一串、fd 与 socket_calls 一致）。
 - `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ `4fc45ec` 后 **71**（positive 5 / negative 7，+2 为 `delay` 上限正负探针）→ 本会话 **78**（positive 5 / t16_3_real 3 / negative 11）。
   +3 = `t16_3_real` 三条真判据（逐行对数据、时间戳来自时钟事件、时延逐条由 got−sent 且非固定常数）；
   +4 = 四条新负例（时延改固定 12→9、`got_at` 抄 `sent_at`→9、`req_id` 绑错→7、`client_seq` 绑错→7）。
@@ -903,7 +903,7 @@ RESULT: 7378 checks, 0 failures
 
 ### 10.6 未写入的承诺
 
-`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**8 项已实施**（§2.1 13.1、§2.2 13.2、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3、§2.8 18.4、§2.9 19.3；其中 15.2 只到接口形成、`T15.2-1` 仍 pending；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表，并把 15.3 的 `diff_sig` 接线为 `compat_report`——`T15.3-1` 六行现算、五类 reason 各一条负例，见 §10.1c；13.2 由本会话落成对象图，边语义见 §2.2，`T13.2-1` 现读 `{nodes, edges}` 并给三条负例/两道规模上限实测，见 `8e6164c`/`f8068e0`；18.4 由本会话落成剧本开关与证书结果可指认：`T18.4-1` 表行加 `switch/cert_verify/result/reason/chain[]`，判据 `src/core/cert_script.gd` 在逐格比对前校验两遍相反剧本，失败码只用 3/7/10，下游读 `report.cases[].actual.rows`，见 §2.8 实现落点；19.3 由本会话落成五段采样链路：`T19.3-1` 不再读 `expect_rows`，真值来自 `src/sim/sim_sampling.gd::trace` 真跑链，逐段 `{stage,node,in_raw,out_raw,code,sample_ms}` + `meta`，四条负例实测 10/7/13/10，上限 32 段（当前 5 段，6.4×），满规模 32/32 绿，见 §2.9 实现落点）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。§2.4 里仍未落的是调用点 `call_sites`（`pc/argc`）与 `order`/`from` 三列——提案字段未齐，不代表 15.1/15.3 判据是布尔位。其余 **2 项未批准、未实施**（§2.7 17.1、§2.10 F1）。
+`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**8 项已实施**（§2.1 13.1、§2.2 13.2、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3、§2.8 18.4、§2.9 19.3；其中 15.2 由本会话用本机 loopback 真实捕获转正（Python socket，客户端 fd=332、send/recv 同一 12 B，原始 10 条调用与 `bytes_hex` 冻结在 `socket_api.capture`；ch15 进分母 15→16、全章 pending 1→0，见 §2.5 实现落点）；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表，并把 15.3 的 `diff_sig` 接线为 `compat_report`——`T15.3-1` 六行现算、五类 reason 各一条负例，见 §10.1c；13.2 由本会话落成对象图，边语义见 §2.2，`T13.2-1` 现读 `{nodes, edges}` 并给三条负例/两道规模上限实测，见 `8e6164c`/`f8068e0`；18.4 由本会话落成剧本开关与证书结果可指认：`T18.4-1` 表行加 `switch/cert_verify/result/reason/chain[]`，判据 `src/core/cert_script.gd` 在逐格比对前校验两遍相反剧本，失败码只用 3/7/10，下游读 `report.cases[].actual.rows`，见 §2.8 实现落点；19.3 由本会话落成五段采样链路：`T19.3-1` 不再读 `expect_rows`，真值来自 `src/sim/sim_sampling.gd::trace` 真跑链，逐段 `{stage,node,in_raw,out_raw,code,sample_ms}` + `meta`，四条负例实测 10/7/13/10，上限 32 段（当前 5 段，6.4×），满规模 32/32 绿，见 §2.9 实现落点）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。§2.4 里仍未落的是调用点 `call_sites`（`pc/argc`）与 `order`/`from` 三列——提案字段未齐，不代表 15.1/15.3 判据是布尔位。其余 **2 项未批准、未实施**（§2.7 17.1、§2.10 F1）。
 这 10 项对应 CH13–CH19 与终章里"课文要求玩家能指认、数据侧却只有布尔位/汇总数"的 gate：**课文里有这些要求，判据目前只是布尔位**。任一项落地必须同时给单测（越限/缺失各一例）、一条 `RED-PROBE ... -> code=N` 实测原文，并同步删除对应章降级清单里的该条。
 
 ### 10.7 仍缺四样
