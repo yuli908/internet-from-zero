@@ -2,7 +2,7 @@
   "version": 2,
   "source": "docs/design/11-ch02-content-spec.md",
   "pending_kinds": {
-    "static_current": "L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd"
+    "static_current": "缺口在编辑器：2.2 调色板仅 NOT 门，无法搭出两管同时导通；补模型会让 T2.2-3/T2.4-4 变成恒绿死判据"
   },
   "labs": {
     "transistor": {

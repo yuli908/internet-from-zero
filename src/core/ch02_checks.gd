@@ -7,12 +7,12 @@ extends RefCounted
 ##
 ## 已落地 kind：mosfet_region / quiz / truth / x_propagation / target / equiv /
 ##              delay / area_max / power_calc / power_ratio / build_area / rail_margin
-## pending kind：static_current（需 L1 稳态电流模型）
+## pending kind：static_current（缺口在编辑器，不是仿真；见 docs/design/20）
 ##
 ## 黑盒语义复用 `BlackBox` + `LabChecks`，不复制真值表或仿真器。
 
 const PENDING_REASONS := {
-	"static_current": "L1 仿真层只输出逻辑值，没有稳态电流模型（规格要求 50 tick 平均 Idd）",
+	"static_current": "缺口在编辑器：2.2 调色板仅 NOT 门，无法搭出两管同时导通；补模型会让 T2.2-3/T2.4-4 变成恒绿死判据",
 }
 
 ## 2.5 的板子门数预算：唯一来源（判据与测试都从这里取，不得另写 8）。

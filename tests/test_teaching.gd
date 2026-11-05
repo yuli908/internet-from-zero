@@ -8,15 +8,16 @@ const LabBaseGd = preload("res://src/ui/screens/lab_base.gd")
 const LABS := ["level", "binary", "boolean", "gate", "signal", "half_adder"]
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 46
+const EXPECT := 50
 const EXPECT_GROUPS := {
-	"teaching_nonempty": 6, "rules_in_body": 4, "gate_body": 5, "hint_ladder": 9,
+	"teaching_nonempty": 6, "rules_in_body": 4, "legacy_no_sections": 4, "gate_body": 5, "hint_ladder": 9,
 	"hint_sentences": 15, "misconception": 4, "misconception_codes": 2,
 	"optional_no_misconception": 1,
 }
 const GROUP_DESCRIPTIONS := {
 	"teaching_nonempty": "六个 lab 的教学正文都非空（rules 也走同一通道）",
 	"rules_in_body": "level.rules 存在且逐行进入正文",
+	"legacy_no_sections": "没有 sections 的老数据真的走兜底：section_list 合成单段、fallback_note 出 rules；有 sections 时仍短路",
 	"gate_body": "gate.body 非空、进正文、长度 ≥20，并出现在讲解位实际文本里",
 	"hint_ladder": "attempt=0 无提示、1 出 L1、1 不得等于 L3",
 	"hint_sentences": "attempt=2 不短于 L1、attempt=3 为全文、hint 可切 ≥2 句且 L1/L2 各取半",
@@ -44,6 +45,18 @@ func run(ctx: TestContext) -> void:
 	ctx.check("level.rules 存在", rules.size() > 0, str(rules.size()))
 	for i in rules.size():
 		ctx.check("level.rules[%d] 进入正文" % i, tt.contains(str(rules[i])), str(rules[i]))
+
+	# ---- 老数据兜底：没有 sections 时必须真的走到 fallback_note，而不是永远短路 ----
+	var legacy := {"id": "legacy", "body": "兜底正文", "rules": ["规则甲", "规则乙"]}
+	var legacy_secs := Teach.section_list(legacy)
+	var legacy_note := Teach.fallback_note(legacy)
+	ctx.begin_group("legacy_no_sections")
+	ctx.check("无 sections 时 section_list 兜底成单段", legacy_secs.size() == 1, str(legacy_secs.size()))
+	ctx.check("兜底段落包含 body 与 rules", str((legacy_secs[0] as Dictionary).get("text", "")).contains("兜底正文")
+		and str((legacy_secs[0] as Dictionary).get("text", "")).contains("规则乙"),
+		str(legacy_secs[0]))
+	ctx.check("无 sections 时 fallback_note 出 rules", not legacy_note.is_empty() and legacy_note == Teach.rules_note(legacy), legacy_note)
+	ctx.check("有 sections 时 fallback_note 仍短路为空", Teach.fallback_note(lv).is_empty())
 
 	# ---- gate.body：1.4 此前整段不显示，现在必须进正文且来自数据字段 ----
 	var gt: Dictionary = cfg["gate"]
