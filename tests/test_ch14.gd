@@ -2,7 +2,7 @@ extends RefCounted
 
 ## CH14 结构 + 判据校验（15 段）。
 ## 分母口径：required 且非 pending 的 gate 数，按 Ch14Checks.deferred_gates(cfg) 现算；
-## 14.2 类型标签存放位置未定 → 4 降为 3，测试里单独断言 pending 条数与分母。
+## 14.2 类型标签导出已落地（T14.2-1 转正）→ 全章 12 条进分母，测试里单独断言 pending 条数与分母。
 ## 负例断言给出精确失败码；断言能红，不是恒真。
 
 const LABS := ["interpreter_eval", "dynamic_type", "script_automation"]
@@ -17,9 +17,9 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 const Ch14Checks = preload("res://src/core/ch14_checks.gd")
 const MiniInterp = preload("res://src/core/mini_interp.gd")
 
-const EXPECT := 59
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t14_1_real": 3, "negative": 8}
-const GROUP_DESCRIPTIONS := {"loadable": "ch14_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T14.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（dynamic_type 为 3，因 T14.2-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=11", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计，T14.1-1 由真解释器作答）", "t14_1_real": "T14.1-1 tokens/AST/value 由 mini_interp 实跑导出，逐段与数据期望一致", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/token 改坏/token 删除 均精确判红"}
+const EXPECT := 65
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t14_1_real": 3, "t14_2_real": 3, "negative": 11}
+const GROUP_DESCRIPTIONS := {"loadable": "ch14_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T14.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（三节均为 4，已无 pending）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（T14.1-1 由真解释器作答、T14.2-1 由带标签解释器作答）", "t14_1_real": "T14.1-1 tokens/AST/value 由 mini_interp 实跑导出，逐段与数据期望一致", "t14_2_real": "T14.2-1 逐值标签行/类型错误记录/meta 三判据由 run_typed 实跑导出，逐行一致", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/token 改坏/token 删除/标签漏行/标签多行/标签绑错节点 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch14_labs.json")
@@ -70,7 +70,7 @@ func run(ctx: TestContext) -> void:
 		counted_sum += int(d["counted"])
 		total += secs.size()
 	ctx.begin_group("pending_total")
-	ctx.check("全章 pending=1、进分母=11", pending_sum == 1 and counted_sum == 11,
+	ctx.check("全章 pending=0、进分母=12", pending_sum == 0 and counted_sum == 12,
 		"pending=%d counted=%d" % [pending_sum, counted_sum])
 
 	ctx.begin_group("total_sections")
@@ -84,6 +84,8 @@ func run(ctx: TestContext) -> void:
 			bool(r["ok"]), str(r["report"].first_failure()))
 
 	_t14_1_real(ctx, labs["interpreter_eval"])
+
+	_t14_2_real(ctx, labs["dynamic_type"])
 
 	_negative(ctx, labs)
 
@@ -184,8 +186,8 @@ func _pending_count(cfg: Dictionary) -> int:
 	return n
 
 ## 好答案由数据侧定稿现建：table 抄 expect_rows/meta，skip 复现缺层，
-## derived 抄 expect_values，quiz 取 answer。T14.1-1 例外：由 mini_interp 实跑三段，
-## 不抄 expect_rows（token 序列/AST/值必须是跑出来的）。
+## derived 抄 expect_values，quiz 取 answer。两处例外：T14.1-1 由 mini_interp 实跑三段、
+## T14.2-1 由 run_typed 实跑逐值标签，都不抄 expect_rows（必须是跑出来的）。
 func _good(cfg: Dictionary) -> Dictionary:
 	var out := {}
 	for raw in (cfg.get("gate_cases", []) as Array):
@@ -204,9 +206,8 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = {"values": (g.get("expect_values", {}) as Dictionary).duplicate(true)}
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
-		var sources: Dictionary = cfg.get("case_sources", {})
-		if sources.is_empty():
-			continue
+	var sources: Dictionary = cfg.get("case_sources", {})
+	if not str(sources.get("fib5", "")).is_empty():
 		var rows: Array = []
 		for k in ["fib5", "fib6", "list"]:
 			var toks: Array = MiniInterp.lex(str(sources.get(k, "")))
@@ -219,6 +220,11 @@ func _good(cfg: Dictionary) -> Dictionary:
 				"stages_exported": ["tokens", "ast", "value"],
 			})
 		out["T14.1-1"] = {"rows": rows, "meta": {"p05_grant": true}}
+	var typed := str(sources.get("typed", ""))
+	if not typed.is_empty():
+		var tr: Dictionary = MiniInterp.run_typed(typed)
+		out["T14.2-1"] = {"rows": (tr["tags"] as Array).duplicate(true),
+			"meta": (tr["meta"] as Dictionary).duplicate(true)}
 	return out
 
 func _gate(cfg: Dictionary, cid: String) -> Dictionary:
@@ -248,6 +254,30 @@ func _t14_1_real(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("T14.1-1 token 序列实导并逐条一致（%d 条）" % tok_total, tok_ok, str(sources))
 	ctx.check("T14.1-1 AST 实建并逐层一致（三案）", ast_ok, "")
 	ctx.check("T14.1-1 求值实算 5/8/6", val_ok, "")
+
+## 真判据：一段带赋值与字符串的程序逐值实跑，标签行、类型错误记录、meta 全部由解释器导出。
+## 标签行按 AST 路径（root、root/0、root/1）绑定，漏行/多行/绑错节点都会在比对里判红。
+func _t14_2_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t14_2_real")
+	var src := str((cfg.get("case_sources", {}) as Dictionary).get("typed", ""))
+	var g: Dictionary = _gate(cfg, "T14.2-1")
+	var r: Dictionary = MiniInterp.run_typed(src)
+	var tags: Array = r.get("tags", [])
+	var want: Array = g.get("expect_rows", [])
+	ctx.check("T14.2-1 逐值标签实导 %d 行并逐行一致" % tags.size(),
+		_deep_eq(tags, want), "%s -> %s" % [src, JSON.stringify(tags)])
+	var errs: Array = r.get("errors", [])
+	var readable := errs.size() == 1
+	if readable:
+		var e: Dictionary = errs[0]
+		readable = str(e.get("code", "")) == "TYPE_MISMATCH" \
+			and str(e.get("left", "")) == "INT" and str(e.get("right", "")) == "STR" \
+			and str(e.get("node", "")) == "root" and int(e.get("stmt", 0)) == 3
+	ctx.check("T14.2-1 类型错误点明两边类型（INT/STR @ stmt3）", readable, JSON.stringify(errs))
+	var m: Dictionary = r.get("meta", {})
+	ctx.check("T14.2-1 三判据由实跑得出（标签跟值/错误可读/程序未崩）",
+		bool(m.get("tag_follows_value", false)) and bool(m.get("error_names_both", false)) \
+			and bool(m.get("program_alive", false)), JSON.stringify(m))
 
 func _deep_eq(a: Variant, b: Variant) -> bool:
 	if typeof(a) == TYPE_ARRAY and typeof(b) == TYPE_ARRAY:
@@ -343,3 +373,29 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c8: int = _code(r8["report"], "T14.1-1")
 	print("RED-PROBE CH14 T14.1-1 T14.1-1 删一个 token(i=1) -> code=%d" % c8)
 	ctx.eq("T14.1-1 删 token 判红 E_TABLE_CELL(7)", c8, GateResult.E_TABLE_CELL)
+
+	# 能红证据③：标签集合漏一行（删掉 stmt4 的标签），集合不再逐行覆盖。
+	var a9 := _good(labs["dynamic_type"])
+	(a9["T14.2-1"]["rows"] as Array).remove_at(5)
+	var r9: Dictionary = Ch14Checks.run("dynamic_type", labs["dynamic_type"], {"answers": a9})
+	var c9: int = _code(r9["report"], "T14.2-1")
+	print("RED-PROBE CH14 T14.2-1 逐值标签漏一行(stmt4) -> code=%d" % c9)
+	ctx.eq("T14.2-1 标签漏一行判红 E_COVERAGE(13)", c9, GateResult.E_COVERAGE)
+
+	# 能红证据④：标签集合多一行（复制 stmt1 的标签追加），行数超出即判红。
+	var a10 := _good(labs["dynamic_type"])
+	var rows10: Array = (a10["T14.2-1"]["rows"] as Array)
+	rows10.append((rows10[0] as Dictionary).duplicate(true))
+	var r10: Dictionary = Ch14Checks.run("dynamic_type", labs["dynamic_type"], {"answers": a10})
+	var c10: int = _code(r10["report"], "T14.2-1")
+	print("RED-PROBE CH14 T14.2-1 逐值标签多一行(复制 stmt1) -> code=%d" % c10)
+	ctx.eq("T14.2-1 标签多一行判红 E_COVERAGE(13)", c10, GateResult.E_COVERAGE)
+
+	# 能红证据⑤：标签绑到错误的 AST 节点（stmt3 的 INT 标签改挂 root/1）。
+	var a11 := _good(labs["dynamic_type"])
+	var rows11: Array = (a11["T14.2-1"]["rows"] as Array)
+	(rows11[2] as Dictionary)["node"] = "root/1"
+	var r11: Dictionary = Ch14Checks.run("dynamic_type", labs["dynamic_type"], {"answers": a11})
+	var c11: int = _code(r11["report"], "T14.2-1")
+	print("RED-PROBE CH14 T14.2-1 标签绑错 AST 节点(root/0->root/1) -> code=%d" % c11)
+	ctx.eq("T14.2-1 标签绑错节点判红 E_TABLE_CELL(7)", c11, GateResult.E_TABLE_CELL)
