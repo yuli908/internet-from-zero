@@ -374,6 +374,9 @@
       "id": "load_test",
       "title": "压测 · 8 个请求要真发",
       "body": "压测器逐条发请求、记响应与时延；报告要能复算，不能拿预置图表冒充。",
+      "case_sources": {
+        "load": {"n": 8, "gap_ms": 0, "serve_ms": 10, "jitter_max": 5, "seed": 5, "window_ms": 500}
+      },
       "sections": [
         {
           "order": 1,
@@ -467,74 +470,45 @@
       "gate_cases": [
         {
           "id": "T16.3-1",
-          "title": "8 条请求逐条记录：结果、状态、时延",
+          "title": "8 条请求逐条记录：请求身份、两枚时钟事件、时延",
           "kind": "table",
           "required": true,
           "delay": {
             "key": "latency",
             "max": 30
           },
+          "timing": {
+            "id": "req_id",
+            "seq": "client_seq",
+            "sent": "sent_at",
+            "got": "got_at",
+            "latency": "latency",
+            "gap": 0
+          },
           "keys": [
             "req_id",
+            "client_seq",
+            "sent_at",
+            "got_at",
+            "latency",
             "ok",
-            "status",
-            "latency"
+            "status"
           ],
           "expect_rows": [
-            {
-              "req_id": 1,
-              "ok": true,
-              "status": 200,
-              "latency": 12
-            },
-            {
-              "req_id": 2,
-              "ok": true,
-              "status": 200,
-              "latency": 15
-            },
-            {
-              "req_id": 3,
-              "ok": true,
-              "status": 200,
-              "latency": 11
-            },
-            {
-              "req_id": 4,
-              "ok": true,
-              "status": 200,
-              "latency": 14
-            },
-            {
-              "req_id": 5,
-              "ok": true,
-              "status": 200,
-              "latency": 13
-            },
-            {
-              "req_id": 6,
-              "ok": true,
-              "status": 200,
-              "latency": 12
-            },
-            {
-              "req_id": 7,
-              "ok": true,
-              "status": 200,
-              "latency": 16
-            },
-            {
-              "req_id": 8,
-              "ok": true,
-              "status": 200,
-              "latency": 11
-            }
+            {"req_id": 1, "client_seq": 1, "sent_at": 0, "got_at": 15, "latency": 15, "ok": true, "status": 200},
+            {"req_id": 2, "client_seq": 2, "sent_at": 0, "got_at": 14, "latency": 14, "ok": true, "status": 200},
+            {"req_id": 3, "client_seq": 3, "sent_at": 0, "got_at": 13, "latency": 13, "ok": true, "status": 200},
+            {"req_id": 4, "client_seq": 4, "sent_at": 0, "got_at": 12, "latency": 12, "ok": true, "status": 200},
+            {"req_id": 5, "client_seq": 5, "sent_at": 0, "got_at": 11, "latency": 11, "ok": true, "status": 200},
+            {"req_id": 6, "client_seq": 6, "sent_at": 0, "got_at": 10, "latency": 10, "ok": true, "status": 200},
+            {"req_id": 7, "client_seq": 7, "sent_at": 0, "got_at": 15, "latency": 15, "ok": true, "status": 200},
+            {"req_id": 8, "client_seq": 8, "sent_at": 0, "got_at": 14, "latency": 14, "ok": true, "status": 200}
           ],
           "expect_meta": {
             "real_requests": true,
             "all_ok": true,
             "latency_logged": true,
-            "report": true
+            "events_logged": true
           },
           "codes": [
             "E_UNCONNECTED(3)",

@@ -15,10 +15,11 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch16Checks = preload("res://src/core/ch16_checks.gd")
+const LoadProbe = preload("res://src/core/load_probe.gd")
 
-const EXPECT := 71
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 5, "negative": 7}
-const GROUP_DESCRIPTIONS := {"loadable": "ch16_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T16.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（resident_cleanup 为 3，因 T16.4-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）+ T16.3-1 时延在限内回 0", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/时延越限均精确判红"}
+const EXPECT := 78
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 5, "t16_3_real": 3, "negative": 11}
+const GROUP_DESCRIPTIONS := {"loadable": "ch16_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T16.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（resident_cleanup 为 3，因 T16.4-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）+ T16.3-1 时延在限内回 0", "t16_3_real": "T16.3-1 逐条记录由事件驱动探针实跑（时钟事件时间戳）、T16.3-3 均值/吞吐由同一批实跑记录算出", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/时延越限/时延改常数/got 抄 sent/req_id 与 client_seq 绑错 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch16_labs.json")
@@ -88,6 +89,8 @@ func run(ctx: TestContext) -> void:
 	var cg: int = _code(rg["report"], "T16.3-1")
 	print("PROBE CH16 T16.3-1 时延 12 在限内 -> code=%d" % cg)
 	ctx.eq("T16.3-1 时延未越限回 0", cg, GateResult.OK)
+
+	_t16_3_real(ctx, labs["load_test"])
 
 	_negative(ctx, labs)
 
@@ -188,7 +191,8 @@ func _pending_count(cfg: Dictionary) -> int:
 	return n
 
 ## 好答案由数据侧定稿现建：table 抄 expect_rows/meta，skip 复现缺层，
-## derived 抄 expect_values，quiz 取 answer。pending 不参与。
+## derived 抄 expect_values，quiz 取 answer。两处例外：16.3 的逐条记录与均值/吞吐
+## 由 LoadProbe 实跑得出（时间戳来自事件时钟），不抄 expect_rows。
 func _good(cfg: Dictionary) -> Dictionary:
 	var out := {}
 	for raw in (cfg.get("gate_cases", []) as Array):
@@ -207,7 +211,76 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = {"values": (g.get("expect_values", {}) as Dictionary).duplicate(true)}
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
+	var plan: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("load", {})
+	if not plan.is_empty():
+		var lr: Dictionary = LoadProbe.run(plan)
+		out["T16.3-1"] = {"rows": (lr["rows"] as Array).duplicate(true),
+			"meta": (lr["meta"] as Dictionary).duplicate(true)}
+		out["T16.3-3"] = {"values": (lr["summary"] as Dictionary).duplicate(true)}
 	return out
+
+func _gate(cfg: Dictionary, cid: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == cid:
+			return raw
+	return {}
+
+## 真判据：逐条记录必须是事件驱动探针跑出来的，时间戳来自时钟事件，
+## 时延是两枚事件之差；均值/吞吐由同一批记录算出，供 T16.3-3 下游真读。
+func _t16_3_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t16_3_real")
+	var plan: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("load", {})
+	var lr: Dictionary = LoadProbe.run(plan)
+	var rows: Array = lr.get("rows", [])
+	var want: Array = (_gate(cfg, "T16.3-1").get("expect_rows", []) as Array)
+	ctx.check("T16.3-1 实跑 %d 条与数据期望逐行一致" % rows.size(),
+		_rows_eq(rows, want), JSON.stringify(rows))
+	var events: Array = lr.get("events", [])
+	var n := int(plan.get("n", 0))
+	ctx.check("T16.3-1 时间戳来自时钟事件（%d 条事件、每条 got>sent）" % events.size(),
+		events.size() == 2 * n and _got_after_sent(rows), "%d events" % events.size())
+	ctx.check("T16.3-1 时延逐条由 got−sent 得出且不是固定常数",
+		_latency_consistent(rows), str(_latencies(rows)))
+
+func _rows_eq(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for i in a.size():
+		var ra: Dictionary = a[i]
+		var rb: Dictionary = b[i]
+		for k in rb:
+			if not _same_v(ra.get(k, "<missing>"), rb[k]):
+				return false
+	return true
+
+func _same_v(x: Variant, y: Variant) -> bool:
+	if typeof(x) == TYPE_INT or typeof(x) == TYPE_FLOAT:
+		if typeof(y) == TYPE_INT or typeof(y) == TYPE_FLOAT:
+			return float(x) == float(y)
+	return str(x) == str(y)
+
+func _got_after_sent(rows: Array) -> bool:
+	for raw in rows:
+		var r: Dictionary = raw
+		if int(r.get("got_at", -1)) <= int(r.get("sent_at", -1)):
+			return false
+	return true
+
+func _latencies(rows: Array) -> Array:
+	var out := []
+	for raw in rows:
+		out.append(int((raw as Dictionary).get("latency", -1)))
+	return out
+
+func _latency_consistent(rows: Array) -> bool:
+	var distinct := {}
+	for raw in rows:
+		var r: Dictionary = raw
+		var lat := int(r.get("latency", -1))
+		if lat <= 0 or lat != int(r.get("got_at", 0)) - int(r.get("sent_at", 0)):
+			return false
+		distinct[str(lat)] = true
+	return distinct.size() >= 3
 
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:
@@ -276,3 +349,48 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c7: int = _code(r7["report"], "T16.3-1")
 	print("RED-PROBE CH16 T16.3-1 第 1 行时延 60 超过上限 30 -> code=%d" % c7)
 	ctx.eq("T16.3-1 时延越限判红 E_DELAY_MISMATCH(9)", c7, GateResult.E_DELAY_MISMATCH)
+
+	var a8 := _good(labs["load_test"])
+	var g8: Dictionary = a8["T16.3-1"]
+	var rows8: Array = (g8["rows"] as Array).duplicate(true)
+	rows8[0]["latency"] = 12
+	g8["rows"] = rows8
+	var r8: Dictionary = Ch16Checks.run("load_test", labs["load_test"], {"answers": a8})
+	var c8: int = _code(r8["report"], "T16.3-1")
+	print("RED-PROBE CH16 T16.3-1 第 1 行时延改成固定 12(与 got−sent=15 不符) -> code=%d" % c8)
+	ctx.eq("T16.3-1 时延改常数判红 E_DELAY_MISMATCH(9)", c8, GateResult.E_DELAY_MISMATCH)
+
+	var a9 := _good(labs["load_test"])
+	var g9: Dictionary = a9["T16.3-1"]
+	var rows9: Array = (g9["rows"] as Array).duplicate(true)
+	rows9[0]["got_at"] = rows9[0]["sent_at"]
+	rows9[0]["latency"] = 0
+	g9["rows"] = rows9
+	var r9: Dictionary = Ch16Checks.run("load_test", labs["load_test"], {"answers": a9})
+	var c9: int = _code(r9["report"], "T16.3-1")
+	print("RED-PROBE CH16 T16.3-1 第 1 行 got_at 抄成 sent_at -> code=%d" % c9)
+	ctx.eq("T16.3-1 got 抄 sent 判红 E_DELAY_MISMATCH(9)", c9, GateResult.E_DELAY_MISMATCH)
+
+	var a10 := _good(labs["load_test"])
+	var g10: Dictionary = a10["T16.3-1"]
+	var rows10: Array = (g10["rows"] as Array).duplicate(true)
+	var swap: Variant = rows10[0]["req_id"]
+	rows10[0]["req_id"] = rows10[1]["req_id"]
+	rows10[1]["req_id"] = swap
+	g10["rows"] = rows10
+	var r10: Dictionary = Ch16Checks.run("load_test", labs["load_test"], {"answers": a10})
+	var c10: int = _code(r10["report"], "T16.3-1")
+	print("RED-PROBE CH16 T16.3-1 第 1/2 行 req_id 绑错请求 -> code=%d" % c10)
+	ctx.eq("T16.3-1 请求身份绑错判红 E_TABLE_CELL(7)", c10, GateResult.E_TABLE_CELL)
+
+	var a11 := _good(labs["load_test"])
+	var g11: Dictionary = a11["T16.3-1"]
+	var rows11: Array = (g11["rows"] as Array).duplicate(true)
+	var swap_seq: Variant = rows11[0]["client_seq"]
+	rows11[0]["client_seq"] = rows11[1]["client_seq"]
+	rows11[1]["client_seq"] = swap_seq
+	g11["rows"] = rows11
+	var r11: Dictionary = Ch16Checks.run("load_test", labs["load_test"], {"answers": a11})
+	var c11: int = _code(r11["report"], "T16.3-1")
+	print("RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=%d" % c11)
+	ctx.eq("T16.3-1 client_seq 绑错判红 E_TABLE_CELL(7)", c11, GateResult.E_TABLE_CELL)
