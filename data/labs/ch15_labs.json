@@ -310,7 +310,9 @@
         "pid": 54316,
         "payload_hex": "68656c6c6f2c20776f726c64",
         "server_done": true,
-        "normalization": "逻辑 open = 客户端 socket(n=1,fd=332) + connect(n=2,fd=332)；send/recv/close 原样取客户端 n=3/4/5。帧字节取自已记录的 bytes_hex，不是手写样本。",
+        "script_path": "tools/capture/capture_loopback.py",
+        "source_path": "tools/capture/loopback_capture.json",
+        "normalization": "逻辑 open = 客户端 socket(n=1,fd=332) + connect(n=2,fd=332)；send/recv/close 原样取客户端 n=3/4/5。帧字节取自已记录的 bytes_hex，不是手写样本。重跑脚本后 fd/port/pid 会变，须按脚本头的重跑规则重新冻结。",
         "calls": [
           {"who": "server", "n": 1, "fd": 324, "op": "socket", "dir": "", "bytes_hex": ""},
           {"who": "client", "n": 1, "fd": 332, "op": "socket", "dir": "", "bytes_hex": ""},

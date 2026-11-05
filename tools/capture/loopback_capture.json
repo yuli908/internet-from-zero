@@ -1,0 +1,122 @@
+{
+  "source": "python-loopback",
+  "platform": "nt",
+  "host": "127.0.0.1",
+  "port": 49971,
+  "captured_at": "2026-11-05T19:46:06",
+  "pid": 54316,
+  "payload_hex": "68656c6c6f2c20776f726c64",
+  "calls": [
+    {
+      "who": "server",
+      "n": 1,
+      "fd": 324,
+      "op": "socket",
+      "dir": "",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396062395100,
+      "note": "listen socket"
+    },
+    {
+      "who": "client",
+      "n": 1,
+      "fd": 332,
+      "op": "socket",
+      "dir": "",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396063489800,
+      "note": ""
+    },
+    {
+      "who": "client",
+      "n": 2,
+      "fd": 332,
+      "op": "connect",
+      "dir": "",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396063974300,
+      "note": "to 127.0.0.1:49971"
+    },
+    {
+      "who": "server",
+      "n": 2,
+      "fd": 340,
+      "op": "accept",
+      "dir": "in",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396064073100,
+      "note": "accepted from ('127.0.0.1', 49972)"
+    },
+    {
+      "who": "server",
+      "n": 3,
+      "fd": 340,
+      "op": "recv",
+      "dir": "in",
+      "bytes_hex": "68656c6c6f2c20776f726c64",
+      "bytes_len": 12,
+      "mono_ns": 290396064093100,
+      "note": ""
+    },
+    {
+      "who": "client",
+      "n": 3,
+      "fd": 332,
+      "op": "send",
+      "dir": "out",
+      "bytes_hex": "68656c6c6f2c20776f726c64",
+      "bytes_len": 12,
+      "mono_ns": 290396064101600,
+      "note": ""
+    },
+    {
+      "who": "client",
+      "n": 4,
+      "fd": 332,
+      "op": "recv",
+      "dir": "in",
+      "bytes_hex": "68656c6c6f2c20776f726c64",
+      "bytes_len": 12,
+      "mono_ns": 290396064181500,
+      "note": ""
+    },
+    {
+      "who": "server",
+      "n": 4,
+      "fd": 340,
+      "op": "send",
+      "dir": "out",
+      "bytes_hex": "68656c6c6f2c20776f726c64",
+      "bytes_len": 12,
+      "mono_ns": 290396064207800,
+      "note": ""
+    },
+    {
+      "who": "server",
+      "n": 5,
+      "fd": 340,
+      "op": "close",
+      "dir": "",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396064294100,
+      "note": "conn closed"
+    },
+    {
+      "who": "client",
+      "n": 5,
+      "fd": 332,
+      "op": "close",
+      "dir": "",
+      "bytes_hex": "",
+      "bytes_len": 0,
+      "mono_ns": 290396064349900,
+      "note": ""
+    }
+  ],
+  "server_done": true
+}
