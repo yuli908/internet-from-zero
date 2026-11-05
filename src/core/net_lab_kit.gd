@@ -7,6 +7,7 @@ extends RefCounted
 
 const Kit := preload("res://src/core/lab_gate_kit.gd")
 const ObjectGraph := preload("res://src/core/object_graph.gd")
+const CertScript := preload("res://src/core/cert_script.gd")
 
 static func is_pending(c: Dictionary) -> bool:
 	return str(c.get("content_status", c.get("status", "ready"))) != "ready"
@@ -181,6 +182,17 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 					"第 %d 行时延不是两枚事件之差：%s ≠ %d−%d"
 						% [i + 1, str(tr[t_lat]), got_t, sent])
 				return
+	# 剧本开关与证书结果（19 §2.8）：cfg 声明 `script{phases}` 时，表行必须额外带
+	# switch/cert_verify/reason/chain 四列，且「开关一开结果不能写成通过」、证书校验与
+	# 链上逐级结论必须与剧本一致。仍属 table，不新增 kind。
+	# 必须放在逐格比对之前：否则"开关开着却写 pass"会先被判成普通填错(7)，
+	# 而不是剧本要求拒绝(10)，用户就分不清是填错还是剧本不符。
+	if c.has("script"):
+		var sres: Dictionary = CertScript.validate_rows(rows, c.get("script", {}))
+		if not bool(sres["ok"]):
+			Kit.emit(rep, tracker, int(sres["code"]), c, false, sres["input"],
+				sres["expected"], sres["actual"], str(sres["detail"]))
+			return
 	for i in range(rows.size()):
 		if not (rows[i] is Dictionary):
 			Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, rows[i],
