@@ -2,7 +2,8 @@ extends RefCounted
 
 ## CH15 结构 + 判据校验（20 段）。
 ## 分母口径：required 且非 pending 的 gate 数，按 Ch15Checks.deferred_gates(cfg) 现算；
-## 15.2 socket 句柄编号未定 → 4 降为 3，测试里单独断言 pending 条数与分母。
+## 15.2 句柄/帧同编号接口已具备（handles/frames/unmatched_frames），但缺真实抓包数据源，
+## T15.2-1 仍 pending → 4 降为 3；接口形状与能红单独在 t15_2_interface 组验证。
 ## 负例断言给出精确失败码；断言能红，不是恒真。
 
 const LABS := ["library_abi", "socket_api", "version_compat", "dns_resolve"]
@@ -15,10 +16,12 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch15Checks = preload("res://src/core/ch15_checks.gd")
+const SocketTrace = preload("res://src/core/socket_trace.gd")
+const NetLibKit = preload("res://src/core/net_lab_kit.gd")
 
-const EXPECT := 69
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "negative": 6}
-const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows 均精确判红"}
+const EXPECT := 74
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_2_interface": 3, "negative": 8}
+const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch15_labs.json")
@@ -81,6 +84,8 @@ func run(ctx: TestContext) -> void:
 		ctx.begin_group("positive")
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
+
+	_t15_2_interface(ctx, labs["socket_api"])
 
 	_negative(ctx, labs)
 
@@ -202,6 +207,76 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
 	return out
 
+func _gate(cfg: Dictionary, cid: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == cid:
+			return raw
+	return {}
+
+## T15.2-1 的作答由 socket_trace 实导：rows 照四调用，meta 的 handles/frames 是跑出来的。
+func _answer_15_2(cfg: Dictionary) -> Dictionary:
+	var calls: Array = cfg.get("socket_calls", [])
+	var tr: Dictionary = SocketTrace.run(calls)
+	var rows: Array = []
+	for raw in calls:
+		var c: Dictionary = raw
+		rows.append({"call": str(c.get("op", "")), "stack_layer": str(c.get("stack_layer", "")),
+			"frame": str(c.get("frame", ""))})
+	return {"rows": rows, "meta": {
+		"handles": tr["handles"],
+		"frames": tr["frames"],
+		"unmatched_frames": tr["unmatched_frames"],
+		"text_roundtrip": true,
+		"blueprint": true,
+	}}
+
+func _t15_2_interface(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t15_2_interface")
+	var tr: Dictionary = SocketTrace.run(cfg.get("socket_calls", []))
+	var g: Dictionary = _gate(cfg, "T15.2-1")
+	var want: Dictionary = g.get("expect_meta", {})
+	ctx.check("T15.2-1 接口三字段齐备且实导成功",
+		bool(tr["ok"]) and want.has("handles") and want.has("frames") and want.has("unmatched_frames"),
+		"ok=%s keys=%s" % [str(tr["ok"]), str(want.keys())])
+	var calls: Array = cfg.get("socket_calls", [])
+	var numbered := (tr["frames"] as Array).size() == calls.size()
+	for i in (tr["frames"] as Array).size():
+		var f: Dictionary = (tr["frames"] as Array)[i]
+		var c: Dictionary = calls[i]
+		if int(f.get("frame_id", -1)) != i + 1 or int(f.get("call_n", -2)) != int(c.get("n", -3)) \
+				or int(f.get("fd", -2)) != int(c.get("fd", -3)):
+			numbered = false
+		if str(f.get("dir", "")) != ("in" if str(c.get("op", "")) == "recv" else "out"):
+			numbered = false
+	ctx.check("T15.2-1 抓包与 socket 帧同编号：frame_id/call_n/fd 逐帧对上",
+		numbered and (tr["unmatched_frames"] as Array).is_empty(),
+		"frames=%s unmatched=%s" % [str(tr["frames"]), str(tr["unmatched_frames"])])
+	ctx.check("T15.2-1 实导 handles/frames/unmatched 与 expect_meta 逐项一致",
+		_deep_eq(tr["handles"], want.get("handles", []))
+			and _deep_eq(tr["frames"], want.get("frames", []))
+			and _deep_eq(tr["unmatched_frames"], want.get("unmatched_frames", [])),
+		str(want.get("frames", [])))
+
+func _deep_eq(a: Variant, b: Variant) -> bool:
+	if typeof(a) == TYPE_ARRAY and typeof(b) == TYPE_ARRAY:
+		if (a as Array).size() != (b as Array).size():
+			return false
+		for i in (a as Array).size():
+			if not _deep_eq((a as Array)[i], (b as Array)[i]):
+				return false
+		return true
+	if typeof(a) == TYPE_DICTIONARY and typeof(b) == TYPE_DICTIONARY:
+		if (a as Dictionary).size() != (b as Dictionary).size():
+			return false
+		for k in (a as Dictionary):
+			if not (b as Dictionary).has(k) or not _deep_eq((a as Dictionary)[k], (b as Dictionary)[k]):
+				return false
+		return true
+	if (typeof(a) == TYPE_INT or typeof(a) == TYPE_FLOAT) \
+			and (typeof(b) == TYPE_INT or typeof(b) == TYPE_FLOAT):
+		return absf(float(a) - float(b)) < 1e-9
+	return str(a) == str(b)
+
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:
 		if str(c.get("id", "")) == cid:
@@ -259,3 +334,21 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c6: int = _code(r6["report"], "T15.4-1")
 	print("RED-PROBE CH15 T15.4-1 T15.4-1 缺 rows -> code=%d" % c6)
 	ctx.eq("T15.4-1 缺 rows 判红 E_UNCONNECTED(3)", c6, GateResult.E_UNCONNECTED)
+
+	# 能红证据：T15.2-1 虽 pending，接口判据本身可红。直接走 _table（绕过 pending 跳过）。
+	var g7: Dictionary = _gate(labs["socket_api"], "T15.2-1")
+	var ans7: Dictionary = _answer_15_2(labs["socket_api"])
+	(ans7["meta"]["frames"] as Array)[1]["call_n"] = 9
+	var rep7 := GateReport.new()
+	NetLibKit._table(rep7, null, g7, {"T15.2-1": ans7})
+	var c7: int = _code(rep7, "T15.2-1")
+	print("RED-PROBE CH15 T15.2-1 T15.2-1 frame2 的 call_n 改坏(2→9) -> code=%d" % c7)
+	ctx.eq("T15.2-1 frame call_n 改坏判红 E_OUTPUT_MISMATCH(10)", c7, GateResult.E_OUTPUT_MISMATCH)
+
+	var ans8: Dictionary = _answer_15_2(labs["socket_api"])
+	(ans8["meta"]["frames"] as Array).remove_at(1)
+	var rep8 := GateReport.new()
+	NetLibKit._table(rep8, null, g7, {"T15.2-1": ans8})
+	var c8: int = _code(rep8, "T15.2-1")
+	print("RED-PROBE CH15 T15.2-1 T15.2-1 删一帧(frame2) -> code=%d" % c8)
+	ctx.eq("T15.2-1 删一帧判红 E_OUTPUT_MISMATCH(10)", c8, GateResult.E_OUTPUT_MISMATCH)

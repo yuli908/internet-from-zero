@@ -3,7 +3,7 @@
   "source": "D:\\ai lm\\internet_from_zero\\docs\\curriculum\\26-ch15-lecture-copy.md",
   "source_note": "段落按课件 §1–§4 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：符号表/ABI 照 12.3、版本规则、帧长上限 8 B、TTL 1 s。",
   "pending_kinds": {
-    "table": "15.2 socket 句柄编号与抓包同编号映射未定；T15.2-1 挂 pending 不进分母。"
+    "table": "15.2 句柄编号接口已具备（fd/call_n/frame_id 同编号导出），缺真实抓包数据源；T15.2-1 挂 pending 不进分母。"
   },
   "labs": {
     "library_abi": {
@@ -195,6 +195,12 @@
       "id": "socket_api",
       "title": "socket · 网络折成一个句柄",
       "body": "open/send/recv/close 四个调用，底下仍是 8.1 的帧与 10.x 的可靠传输；句柄只是入口。",
+      "socket_calls": [
+        {"n": 1, "op": "open", "fd": 3, "stack_layer": "8.2", "frame": "SYN"},
+        {"n": 2, "op": "send", "fd": 3, "stack_layer": "8.1", "frame": "DATA"},
+        {"n": 3, "op": "recv", "fd": 3, "stack_layer": "8.1", "frame": "DATA"},
+        {"n": 4, "op": "close", "fd": 3, "stack_layer": "8.2", "frame": "FIN"}
+      ],
       "sections": [
         {
           "order": 1,
@@ -206,7 +212,7 @@
           "order": 2,
           "after": 0,
           "title": "映射 · 四个调用落到哪一层",
-          "text": "open 走到 8.2 的握手，send 把字节装进 8.1 的帧，recv 拆帧还原，close 发断开。句柄编号【假设·未校准】，T15.2-1 挂 pending，本文件不编造 API 名。"
+          "text": "open 走到 8.2 的握手，send 把字节装进 8.1 的帧，recv 拆帧还原，close 发断开。句柄 fd/call_n 与抓包 frame_id 同编号导出；T15.2-1 仍 pending（缺真实抓包）。"
         },
         {
           "order": 3,
@@ -291,12 +297,12 @@
           "kind": "table",
           "required": true,
           "status": "pending",
-          "pending_reason": "socket 句柄编号与抓包同编号映射未定（02 未给）；不以句柄序号冒充逐帧可追溯。",
+          "pending_reason": "接口已具备、缺数据源：handles/frames/unmatched_frames 已导出，但 ecapture 面板尚无真实抓包，T15.2-1 不转正。",
           "thresholds": {
             "handle_map": {
               "status": "pending",
               "initial": "handle=1",
-              "reason": "句柄编号规则与抓包同编号接口未批。"
+              "reason": "fd/call_n/frame_id 三向同编号接口已落地；缺真实抓包数据源，故仍挂 pending。"
             }
           },
           "keys": [
@@ -327,8 +333,26 @@
             }
           ],
           "expect_meta": {
+            "handles": [
+              {
+                "fd": 3,
+                "socket_id": "s1",
+                "calls": [
+                  {"n": 1, "op": "open"},
+                  {"n": 2, "op": "send"},
+                  {"n": 3, "op": "recv"},
+                  {"n": 4, "op": "close"}
+                ]
+              }
+            ],
+            "frames": [
+              {"frame_id": 1, "fd": 3, "call_n": 1, "dir": "out"},
+              {"frame_id": 2, "fd": 3, "call_n": 2, "dir": "out"},
+              {"frame_id": 3, "fd": 3, "call_n": 3, "dir": "in"},
+              {"frame_id": 4, "fd": 3, "call_n": 4, "dir": "out"}
+            ],
+            "unmatched_frames": [],
             "text_roundtrip": true,
-            "frames_match": true,
             "blueprint": true
           },
           "codes": [
