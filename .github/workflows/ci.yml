@@ -23,6 +23,9 @@ jobs:
   windows-headless:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      # 显式告诉脚本引擎在哪：与下面「安装 Godot」步骤的落点保持一致。
+      GODOT_BIN: C:\tools\godot-4.4.1\godot.cmd
 
     steps:
       - name: 检出代码
@@ -45,13 +48,15 @@ jobs:
           $cmd = Join-Path $dest "godot.cmd"
           Set-Content -Path $cmd -Value "@echo off`r`n`"%~dp0Godot_v$version-stable_win64.exe`" %*" -Encoding ASCII
           & $cmd --version
+          if (-not (Test-Path $env:GODOT_BIN)) { throw "安装完成但 GODOT_BIN 指向的 $env:GODOT_BIN 不存在" }
 
       - name: 导入检查（headless --editor --quit）
         shell: powershell
         run: |
           $ErrorActionPreference = "Continue"
           New-Item -ItemType Directory -Force -Path artifacts\logs | Out-Null
-          & "C:\tools\godot-4.4.1\godot.cmd" --headless --path "$env:GITHUB_WORKSPACE" --editor --quit *> artifacts\logs\import.log
+          if (-not (Test-Path $env:GODOT_BIN)) { Write-Host "环境准备失败：GODOT_BIN 指向的 $env:GODOT_BIN 不存在"; exit 1 }
+          & $env:GODOT_BIN --headless --path "$env:GITHUB_WORKSPACE" --editor --quit *> artifacts\logs\import.log
           $code = $LASTEXITCODE
           Get-Content artifacts\logs\import.log | Select-Object -Last 20
           $text = Get-Content -Raw artifacts\logs\import.log
@@ -65,8 +70,8 @@ jobs:
       - name: 全量测试（tests/run_tests.gd）
         shell: powershell
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
-          # 原样透传退出码（1..6 各自对应一种红，见 scripts/run_tests.ps1 头部说明）
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -Godot "$env:GODOT_BIN"
+          # 原样透传退出码（1..9 各自对应一种红，见 scripts/run_tests.ps1 头部说明）
           exit $LASTEXITCODE
 
       - name: 汇总日志

@@ -4,6 +4,13 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -ReplayLog <日志>
 #
+# 引擎发现（优先级从高到低，显式指定失败即报错、绝不静默回退）：
+#   1) -Godot <路径>    显式参数（CI 用这个）
+#   2) $env:GODOT_BIN   环境变量
+#   3) PATH 里的 godot.cmd / godot.exe / godot4.exe / godot4.cmd
+#   4) 本地默认 C:\tools\godot-4.4.1\godot.cmd（仅在本机存在时）
+# 前三项任一给出但路径不存在 → 立即 exit 6，不再往下找。
+#
 # 退出码（CI 只看这个：0=绿，非 0=红）：
 #   0  PASS  终结行「=== ALL PASS ===」、RESULT 0 failures、SUITE_TOTAL expected=actual、引擎返回 0
 #   1  FAIL  「RESULT: N checks, M failures」中 M > 0
@@ -26,7 +33,7 @@
 
 param(
 	[string]$Root = "",
-	[string]$Godot = "C:\tools\godot-4.4.1\godot.cmd",
+	[string]$Godot = "",
 	[string]$LogFile = "",
 	[string]$ReplayLog = "",
 	[int]$TimeoutSec = 240
@@ -40,6 +47,33 @@ function Fail-Exit([string]$Reason, [int]$Code) {
 	Write-Host "[run_tests] 完整日志：$LogFile"
 	Write-Host "[run_tests] exit=$Code" -ForegroundColor Red
 	exit $Code
+}
+
+# 引擎发现。显式来源（-Godot / GODOT_BIN）给了但不存在时立即判红，不静默回退到其它路径。
+function Resolve-Godot([string]$Explicit) {
+	if (-not [string]::IsNullOrWhiteSpace($Explicit)) {
+		if (-not (Test-Path $Explicit)) {
+			Fail-Exit "Godot 启动器不存在：$Explicit（来源：-Godot 显式参数；显式路径不会回退到本地默认）" 6
+		}
+		return @{ path = $Explicit; source = "-Godot 显式参数" }
+	}
+	if (-not [string]::IsNullOrWhiteSpace($env:GODOT_BIN)) {
+		if (-not (Test-Path $env:GODOT_BIN)) {
+			Fail-Exit "Godot 启动器不存在：$($env:GODOT_BIN)（来源：环境变量 GODOT_BIN；不会回退到本地默认）" 6
+		}
+		return @{ path = $env:GODOT_BIN; source = "环境变量 GODOT_BIN" }
+	}
+	foreach ($name in @("godot.cmd", "godot.exe", "godot4.exe", "godot4.cmd")) {
+		$c = Get-Command $name -ErrorAction SilentlyContinue
+		if ($null -ne $c -and -not [string]::IsNullOrWhiteSpace($c.Source)) {
+			return @{ path = $c.Source; source = "PATH（$name）" }
+		}
+	}
+	$fallback = "C:\tools\godot-4.4.1\godot.cmd"
+	if (Test-Path $fallback) {
+		return @{ path = $fallback; source = "本地默认路径" }
+	}
+	Fail-Exit "找不到 Godot 引擎：-Godot 未给、GODOT_BIN 为空、PATH 与本地默认路径都没有。请设置 GODOT_BIN 或传 -Godot <路径>。" 6
 }
 
 $replay = -not [string]::IsNullOrWhiteSpace($ReplayLog)
@@ -61,9 +95,9 @@ if ($replay) {
 	if (-not (Test-Path (Join-Path $Root "project.godot"))) {
 		Fail-Exit "找不到工程：$Root\project.godot" 6
 	}
-	if (-not (Test-Path $Godot)) {
-		Fail-Exit "找不到 Godot 启动器：$Godot" 6
-	}
+	$g = Resolve-Godot $Godot
+	$Godot = $g.path
+	Write-Host "[run_tests] godot: $Godot（来源：$($g.source)）"
 
 	$logDir = Split-Path -Parent $LogFile
 	if (-not (Test-Path $logDir)) {
