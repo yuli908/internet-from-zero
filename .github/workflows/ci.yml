@@ -138,17 +138,17 @@ jobs:
         run: |
           $ErrorActionPreference = "Continue"
           New-Item -ItemType Directory -Force -Path artifacts\logs | Out-Null
-          if (-not (Test-Path $env:GODOT_BIN)) { Write-Host "环境准备失败：GODOT_BIN 指向的 $env:GODOT_BIN 不存在"; exit 1 }
+          if (-not (Test-Path $env:GODOT_BIN)) { Write-Host "env prep failed: GODOT_BIN points to missing $env:GODOT_BIN"; exit 1 }
           & $env:GODOT_BIN --headless --path "$env:GITHUB_WORKSPACE" --editor --quit *> artifacts\logs\import.log
           $code = $LASTEXITCODE
           Get-Content artifacts\logs\import.log | Select-Object -Last 20
           $text = Get-Content -Raw artifacts\logs\import.log
-          if ($code -ne 0) { Write-Host "导入检查失败：返回码 $code"; exit 1 }
+          if ($code -ne 0) { Write-Host "import check failed: exit code $code"; exit 1 }
           if ($text -match "ERROR:" -or $text -match "Parse Error" -or $text -match "SCRIPT ERROR") {
-            Write-Host "导入检查失败：日志出现 ERROR / Parse Error"
+            Write-Host "import check failed: ERROR / Parse Error found in log"
             exit 1
           }
-          Write-Host "导入检查通过"
+          Write-Host "import check passed"
 
       - name: 全量测试（tests/run_tests.gd）
         shell: powershell
@@ -159,12 +159,15 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -Godot "$env:GODOT_BIN" -TimeoutSec 600 2>&1 | Tee-Object -FilePath $stepLog
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            Write-Host "::group::测试失败摘要（exit=$code）"
+            $meanings = @{ 1 = "test assertions failed"; 2 = "no RESULT line (tests did not run)"; 3 = "no ALL PASS line (crash/aborted)"; 4 = "SUITE_TOTAL expected != actual"; 5 = "engine exit code nonzero"; 6 = "engine or project missing"; 7 = "timeout"; 8 = "account not closed"; 9 = "account script did not run" }
+            $meaning = $meanings[$code]
+            if (-not $meaning) { $meaning = "unknown" }
+            $asciiKey = (Get-Content $stepLog | Select-String -Pattern "^RESULT:|SUITE_TOTAL|VERDICT:" | Select-Object -Last 3 | ForEach-Object { $_.Line }) -join " | "
+            Write-Host "::group::test failure summary (exit=$code)"
             Get-Content $stepLog | Select-String -Pattern "\[run_tests\] FAIL|RESULT:|SUITE_TOTAL|=== FAILED|^  FAIL " | Select-Object -Last 12 | ForEach-Object { Write-Host $_.Line }
             Write-Host "::endgroup::"
-            $why = (Get-Content $stepLog | Select-String -Pattern "\[run_tests\] FAIL" | Select-Object -Last 1).Line
-            if ([string]::IsNullOrWhiteSpace($why)) { $why = (Get-Content $stepLog | Select-Object -Last 5) -join " | " }
-            Write-Host "::error::全量测试失败（exit=$code）：$why"
+            Write-Host "::error::Full test suite failed (exit=$code: $meaning). ASCII key lines: $asciiKey"
+            Write-Host "See uploaded artifact 'logs' -> tests-step.log / tests.log"
             exit $code
           }
 

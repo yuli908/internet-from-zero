@@ -20,7 +20,7 @@
        必须单独比。
   任一项不成立，脚本以退出码 1 结束，不许把数字抄进文档。
   没有 levels 文件的章（如 final_labs.json）不静默跳过，打印「该章无声明、跳过」。
-  调用方（scripts/run_tests.ps1）据此映射：有 TOTAL 且“验算：闭合”才放行；
+  调用方（scripts/run_tests.ps1）据此映射：有 TOTAL 且「VERDICT: CLOSED」才放行；
   正常退出码 0，账目不闭合 1（入口映射为 8），脚本没跑起来/无 TOTAL 行为 9。
 
 用法：python tools/lab_account.py
@@ -213,6 +213,8 @@ def main():
             print("  %s" % p)
     ok = total["gates"] == total["counted"] + total["pending"] + excluded and not problems
     print("验算：%s" % ("闭合" if ok else "不闭合"))
+    # ASCII 判据行：CI 的控制台代码页不一定是 UTF-8，调用方据此判断，不依赖中文字形。
+    print("VERDICT: %s" % ("CLOSED" if ok else "OPEN"))
     if not ok:
         sys.exit(1)
 

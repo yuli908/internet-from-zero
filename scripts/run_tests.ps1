@@ -177,23 +177,37 @@ foreach ($line in $lines) {
 # 8 = 账不闭合（恒等式、逐条完整性、或与 levels 的 gate 声明不符）
 # 9 = 总账没跑起来（无 python / 脚本缺失 / 无 TOTAL 行）；与测试红（1）分开。
 $accountScript = Join-Path $Root "tools\lab_account.py"
+$accountText = ""
+$accountCode = 1
 if ($null -eq (Get-Command python -ErrorAction SilentlyContinue)) {
 	Fail-Exit "总账没跑起来：找不到 python（无法执行 tools/lab_account.py）" 9
 }
 if (-not (Test-Path $accountScript)) {
 	Fail-Exit "总账没跑起来：找不到 $accountScript" 9
 }
+# CI（windows-latest）的控制台代码页不一定是 UTF-8：python 输出中文会抛
+# UnicodeEncodeError，导致总账被误判成「不闭合」（实测 cp1252 可复现）。
+# 这里强制 python 走 UTF-8，并让 PowerShell 也按 UTF-8 解码；判据同时改成 ASCII 的 VERDICT 行。
+$prevPyIo = $env:PYTHONIOENCODING
+$prevPyUtf8 = $env:PYTHONUTF8
+$prevConsole = $null
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
+try { $prevConsole = [Console]::OutputEncoding; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 $accountText = (& python $accountScript 2>&1 | Out-String)
 $accountCode = $LASTEXITCODE
+if ($null -ne $prevConsole) { try { [Console]::OutputEncoding = $prevConsole } catch { } }
+$env:PYTHONIOENCODING = $prevPyIo
+$env:PYTHONUTF8 = $prevPyUtf8
 foreach ($line in ($accountText -split "`r?`n")) {
-	if ($line -match "TOTAL|恒等式|验算|原因=|账目完整性|完整性：|与 levels|levels 声明|无 levels") {
+	if ($line -match "TOTAL|恒等式|验算|VERDICT|原因=|账目完整性|完整性：|与 levels|levels 声明|无 levels") {
 		Write-Host $line
 	}
 }
 if ($accountText -notmatch "TOTAL") {
 	Fail-Exit "总账脚本没有输出 TOTAL 行（脚本没跑起来或输出被截断）" 9
 }
-if ($accountCode -ne 0 -or $accountText -notmatch "验算：闭合") {
+if ($accountCode -ne 0 -or $accountText -notmatch "VERDICT: CLOSED") {
 	Fail-Exit "账不闭合（恒等式或逐条完整性校验失败；详见上方总账输出）" 8
 }
 Write-Host "[run_tests] 总账：闭合" -ForegroundColor Green
