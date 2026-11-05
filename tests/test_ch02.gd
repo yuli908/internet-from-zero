@@ -87,7 +87,7 @@ func run(ctx: TestContext) -> void:
 	# ---- manifest 登记：8 → 10 → 11（CH01 练习题库）----
 	var files: Array = TestUtil.read_json("res://data/manifest.json").get("files", [])
 	ctx.begin_group("manifest")
-	ctx.eq("manifest 24 文件", files.size(), 24)
+	ctx.eq("manifest 25 文件", files.size(), 25)
 	ctx.check("manifest 含 ch02_levels", "res://data/chapters/ch02_levels.json" in files)
 	ctx.check("manifest 含 ch02_labs", "res://data/labs/ch02_labs.json" in files)
 

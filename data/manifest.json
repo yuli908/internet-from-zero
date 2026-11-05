@@ -24,6 +24,7 @@
     "res://data/labs/ch08_labs.json",
     "res://data/sim/delays.json",
     "res://data/questions/ch01_exercises.json",
-    "res://data/questions/ch02_exercises.json"
+    "res://data/questions/ch02_exercises.json",
+    "res://data/questions/ch03_exercises.json"
   ]
 }
