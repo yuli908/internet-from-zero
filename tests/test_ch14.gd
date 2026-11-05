@@ -15,10 +15,11 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch14Checks = preload("res://src/core/ch14_checks.gd")
+const MiniInterp = preload("res://src/core/mini_interp.gd")
 
-const EXPECT := 54
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "negative": 6}
-const GROUP_DESCRIPTIONS := {"loadable": "ch14_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T14.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（dynamic_type 为 3，因 T14.2-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=11", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计）", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows 均精确判红"}
+const EXPECT := 59
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t14_1_real": 3, "negative": 8}
+const GROUP_DESCRIPTIONS := {"loadable": "ch14_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T14.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（dynamic_type 为 3，因 T14.2-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=11", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计，T14.1-1 由真解释器作答）", "t14_1_real": "T14.1-1 tokens/AST/value 由 mini_interp 实跑导出，逐段与数据期望一致", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/token 改坏/token 删除 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch14_labs.json")
@@ -81,6 +82,8 @@ func run(ctx: TestContext) -> void:
 		ctx.begin_group("positive")
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
+
+	_t14_1_real(ctx, labs["interpreter_eval"])
 
 	_negative(ctx, labs)
 
@@ -181,7 +184,8 @@ func _pending_count(cfg: Dictionary) -> int:
 	return n
 
 ## 好答案由数据侧定稿现建：table 抄 expect_rows/meta，skip 复现缺层，
-## derived 抄 expect_values，quiz 取 answer。pending 不参与。
+## derived 抄 expect_values，quiz 取 answer。T14.1-1 例外：由 mini_interp 实跑三段，
+## 不抄 expect_rows（token 序列/AST/值必须是跑出来的）。
 func _good(cfg: Dictionary) -> Dictionary:
 	var out := {}
 	for raw in (cfg.get("gate_cases", []) as Array):
@@ -200,7 +204,70 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = {"values": (g.get("expect_values", {}) as Dictionary).duplicate(true)}
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
+		var sources: Dictionary = cfg.get("case_sources", {})
+		if sources.is_empty():
+			continue
+		var rows: Array = []
+		for k in ["fib5", "fib6", "list"]:
+			var toks: Array = MiniInterp.lex(str(sources.get(k, "")))
+			var ast: Dictionary = MiniInterp.parse(toks)
+			rows.append({
+				"case": k,
+				"tokens": toks,
+				"ast": ast,
+				"value": int(MiniInterp.eval(ast)),
+				"stages_exported": ["tokens", "ast", "value"],
+			})
+		out["T14.1-1"] = {"rows": rows, "meta": {"p05_grant": true}}
 	return out
+
+func _gate(cfg: Dictionary, cid: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == cid:
+			return raw
+	return {}
+
+## 真判据：三案源码逐段实跑，tokens 逐条、AST 逐层、value 逐个与数据期望比。
+func _t14_1_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t14_1_real")
+	var sources: Dictionary = cfg.get("case_sources", {})
+	var g: Dictionary = _gate(cfg, "T14.1-1")
+	var want_rows: Array = g.get("expect_rows", [])
+	var tok_ok := true
+	var ast_ok := true
+	var val_ok := true
+	var tok_total := 0
+	for i in want_rows.size():
+		var src := str(sources.get(str((want_rows[i] as Dictionary).get("case", "")), ""))
+		var toks: Array = MiniInterp.lex(src)
+		var ast: Dictionary = MiniInterp.parse(toks)
+		tok_total += toks.size()
+		tok_ok = tok_ok and _deep_eq(toks, (want_rows[i] as Dictionary).get("tokens", []))
+		ast_ok = ast_ok and _deep_eq(ast, (want_rows[i] as Dictionary).get("ast", {}))
+		val_ok = val_ok and int(MiniInterp.eval(ast)) == int((want_rows[i] as Dictionary).get("value", -1))
+	ctx.check("T14.1-1 token 序列实导并逐条一致（%d 条）" % tok_total, tok_ok, str(sources))
+	ctx.check("T14.1-1 AST 实建并逐层一致（三案）", ast_ok, "")
+	ctx.check("T14.1-1 求值实算 5/8/6", val_ok, "")
+
+func _deep_eq(a: Variant, b: Variant) -> bool:
+	if typeof(a) == TYPE_ARRAY and typeof(b) == TYPE_ARRAY:
+		if (a as Array).size() != (b as Array).size():
+			return false
+		for i in (a as Array).size():
+			if not _deep_eq((a as Array)[i], (b as Array)[i]):
+				return false
+		return true
+	if typeof(a) == TYPE_DICTIONARY and typeof(b) == TYPE_DICTIONARY:
+		if (a as Dictionary).size() != (b as Dictionary).size():
+			return false
+		for k in (a as Dictionary):
+			if not (b as Dictionary).has(k) or not _deep_eq((a as Dictionary)[k], (b as Dictionary)[k]):
+				return false
+		return true
+	if (typeof(a) == TYPE_INT or typeof(a) == TYPE_FLOAT) \
+			and (typeof(b) == TYPE_INT or typeof(b) == TYPE_FLOAT):
+		return absf(float(a) - float(b)) < 1e-9
+	return str(a) == str(b)
 
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:
@@ -259,3 +326,20 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c6: int = _code(r6["report"], "T14.3-1")
 	print("RED-PROBE CH14 T14.3-1 T14.3-1 缺 rows -> code=%d" % c6)
 	ctx.eq("T14.3-1 缺 rows 判红 E_UNCONNECTED(3)", c6, GateResult.E_UNCONNECTED)
+
+	# 能红证据①：改坏 fib5 第 3 个 token 的字面量（5→9）。
+	var a7 := _good(labs["interpreter_eval"])
+	var rows7: Array = (a7["T14.1-1"]["rows"] as Array)
+	(rows7[0]["tokens"] as Array)[2]["text"] = "9"
+	var r7: Dictionary = Ch14Checks.run("interpreter_eval", labs["interpreter_eval"], {"answers": a7})
+	var c7: int = _code(r7["report"], "T14.1-1")
+	print("RED-PROBE CH14 T14.1-1 T14.1-1 token 字面量改坏(5→9) -> code=%d" % c7)
+	ctx.eq("T14.1-1 token 改坏判红 E_TABLE_CELL(7)", c7, GateResult.E_TABLE_CELL)
+
+	# 能红证据②：删掉一个 token（i=1 的左括号），序列不再逐条对齐。
+	var a8 := _good(labs["interpreter_eval"])
+	((a8["T14.1-1"]["rows"] as Array)[0]["tokens"] as Array).remove_at(1)
+	var r8: Dictionary = Ch14Checks.run("interpreter_eval", labs["interpreter_eval"], {"answers": a8})
+	var c8: int = _code(r8["report"], "T14.1-1")
+	print("RED-PROBE CH14 T14.1-1 T14.1-1 删一个 token(i=1) -> code=%d" % c8)
+	ctx.eq("T14.1-1 删 token 判红 E_TABLE_CELL(7)", c8, GateResult.E_TABLE_CELL)

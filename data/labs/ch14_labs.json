@@ -10,6 +10,11 @@
       "id": "interpreter_eval",
       "title": "解释器 · 词法→语法→求值",
       "body": "解释器把源码三段走穿：切 token、建 AST、按节点求值；每段产物都能单独导出。",
+      "case_sources": {
+        "fib5": "fib(5)+fib(5)-fib(5)",
+        "fib6": "fib(6)+fib(6)-fib(6)",
+        "list": "([4,5,6])[2]"
+      },
       "sections": [
         {
           "order": 1,
@@ -102,39 +107,120 @@
       "gate_cases": [
         {
           "id": "T14.1-1",
-          "title": "三段产物逐段对上：token 数、AST 节点数、求值结果",
+          "title": "三段产物逐段对上：token 序列、AST 结构与求值结果",
           "kind": "table",
           "required": true,
           "keys": [
             "case",
             "tokens",
-            "ast_nodes",
-            "value"
+            "ast",
+            "value",
+            "stages_exported"
           ],
           "expect_rows": [
             {
               "case": "fib5",
-              "tokens": 13,
-              "ast_nodes": 8,
-              "value": 5
+              "tokens": [
+                {"i": 0, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 1, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 2, "kind": "num", "line": 1, "text": "5"},
+                {"i": 3, "kind": "rparen", "line": 1, "text": ")"},
+                {"i": 4, "kind": "op", "line": 1, "text": "+"},
+                {"i": 5, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 6, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 7, "kind": "num", "line": 1, "text": "5"},
+                {"i": 8, "kind": "rparen", "line": 1, "text": ")"},
+                {"i": 9, "kind": "op", "line": 1, "text": "-"},
+                {"i": 10, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 11, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 12, "kind": "num", "line": 1, "text": "5"},
+                {"i": 13, "kind": "rparen", "line": 1, "text": ")"}
+              ],
+              "ast": {
+                "kind": "sub",
+                "children": [
+                  {
+                    "kind": "add",
+                    "children": [
+                      {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 5}]},
+                      {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 5}]}
+                    ]
+                  },
+                  {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 5}]}
+                ]
+              },
+              "value": 5,
+              "stages_exported": ["tokens", "ast", "value"]
             },
             {
               "case": "fib6",
-              "tokens": 13,
-              "ast_nodes": 8,
-              "value": 8
+              "tokens": [
+                {"i": 0, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 1, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 2, "kind": "num", "line": 1, "text": "6"},
+                {"i": 3, "kind": "rparen", "line": 1, "text": ")"},
+                {"i": 4, "kind": "op", "line": 1, "text": "+"},
+                {"i": 5, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 6, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 7, "kind": "num", "line": 1, "text": "6"},
+                {"i": 8, "kind": "rparen", "line": 1, "text": ")"},
+                {"i": 9, "kind": "op", "line": 1, "text": "-"},
+                {"i": 10, "kind": "ident", "line": 1, "text": "fib"},
+                {"i": 11, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 12, "kind": "num", "line": 1, "text": "6"},
+                {"i": 13, "kind": "rparen", "line": 1, "text": ")"}
+              ],
+              "ast": {
+                "kind": "sub",
+                "children": [
+                  {
+                    "kind": "add",
+                    "children": [
+                      {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 6}]},
+                      {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 6}]}
+                    ]
+                  },
+                  {"kind": "call", "name": "fib", "children": [{"kind": "num", "value": 6}]}
+                ]
+              },
+              "value": 8,
+              "stages_exported": ["tokens", "ast", "value"]
             },
             {
               "case": "list",
-              "tokens": 11,
-              "ast_nodes": 6,
-              "value": 6
+              "tokens": [
+                {"i": 0, "kind": "lparen", "line": 1, "text": "("},
+                {"i": 1, "kind": "lbracket", "line": 1, "text": "["},
+                {"i": 2, "kind": "num", "line": 1, "text": "4"},
+                {"i": 3, "kind": "comma", "line": 1, "text": ","},
+                {"i": 4, "kind": "num", "line": 1, "text": "5"},
+                {"i": 5, "kind": "comma", "line": 1, "text": ","},
+                {"i": 6, "kind": "num", "line": 1, "text": "6"},
+                {"i": 7, "kind": "rbracket", "line": 1, "text": "]"},
+                {"i": 8, "kind": "rparen", "line": 1, "text": ")"},
+                {"i": 9, "kind": "lbracket", "line": 1, "text": "["},
+                {"i": 10, "kind": "num", "line": 1, "text": "2"},
+                {"i": 11, "kind": "rbracket", "line": 1, "text": "]"}
+              ],
+              "ast": {
+                "kind": "index",
+                "children": [
+                  {
+                    "kind": "list",
+                    "children": [
+                      {"kind": "num", "value": 4},
+                      {"kind": "num", "value": 5},
+                      {"kind": "num", "value": 6}
+                    ]
+                  },
+                  {"kind": "num", "value": 2}
+                ]
+              },
+              "value": 6,
+              "stages_exported": ["tokens", "ast", "value"]
             }
           ],
           "expect_meta": {
-            "tokens_match": true,
-            "ast_ok": true,
-            "values_ok": true,
             "p05_grant": true
           },
           "codes": [
