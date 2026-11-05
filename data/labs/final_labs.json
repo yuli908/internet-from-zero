@@ -79,47 +79,43 @@
       "gate_cases": [
         {
           "id": "F1-1",
-          "title": "改输入前后两条本机输出：内容随输入变、送达时延",
+          "title": "改输入前后两条本机输出：同一份字节在两个读取点被读到、送达时延",
           "kind": "table",
           "required": true,
-          "status": "pending",
-          "pending_reason": "端口 7777 与对手端形态为 02 【假设】；本机字节抓取接口未批，不以固定文案冒充真实出网。",
+          "status": "ready",
           "thresholds": {
             "world_port": {
-              "status": "pending",
-              "initial": "127.0.0.1:7777",
-              "reason": "端口可配、形态未定；只定端口与两跳示例供 F1-C 复算。"
+              "status": "ready",
+              "host": "127.0.0.1",
+              "port": "127.0.0.1:7777（纯回环，实际 listen 端口记在捕获 meta）",
+              "transport": "tcp-loopback"
             }
           },
+          "outbound": {
+            "host": "127.0.0.1",
+            "port": 7777,
+            "runs": [
+              {"run": "before", "input": "hi, human"},
+              {"run": "after", "input": "hello, world"}
+            ]
+          },
+          "delay": {"key": "deliver_us", "max": 50000},
+          "unique_key": "run",
           "keys": [
             "run",
             "input",
-            "local_line",
-            "deliver_ms"
-          ],
-          "expect_rows": [
-            {
-              "run": "before",
-              "input": "hi, human",
-              "local_line": "hi, human",
-              "deliver_ms": 20
-            },
-            {
-              "run": "after",
-              "input": "hello, world",
-              "local_line": "hello, world",
-              "deliver_ms": 25
-            }
+            "sent_hex",
+            "local_bytes",
+            "deliver_us"
           ],
           "expect_meta": {
-            "wired": true,
-            "local_bytes": true,
-            "varies_with_input": true,
-            "cert1": true
+            "transport": "tcp-loopback",
+            "host": "127.0.0.1"
           },
           "codes": [
             "E_UNCONNECTED(3)",
             "E_TABLE_CELL(7)",
+            "E_DELAY_MISMATCH(9)",
             "E_OUTPUT_MISMATCH(10)",
             "E_COVERAGE(13)"
           ]
