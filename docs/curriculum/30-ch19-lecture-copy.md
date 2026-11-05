@@ -9,8 +9,8 @@
       docs/design/17-practice-first-policy.md（P0–P5 分级与 H1–H5；19.2/19.3 必须 P3）
       docs/curriculum/29-ch18-lecture-copy.md（格式基准：JSON 段 + 实践表 + 校验表）
 边界: 只写 docs/curriculum/**；未动 src/**、data/**、tests/**、docs/design/**、project.godot
-说明: CH19 的 gate 尚未落库（data/labs 仅有 ch01/ch02/ch05/ch06，src/core 无 ch19_checks.gd），`lab` 名与 `T19.x-n` 均为提案
-      `after` 按每节 4 条 required 推定；最终以数据侧 gate 列表为准；若数据侧落成 3 条，末段改为 after=2
+说明: CH19 的 gate 已落库（data/labs/ch19_labs.json、src/core/ch19_checks.gd、tests/test_ch19.gd，EXPECT 85）
+      `lab` 名与 `T19.x-n` 与数据一致；T19.2-1 因 ADC/功耗阈值未定挂 pending（分母 20→19），末段 after=3
 ```
 
 ## 0. 口径
@@ -191,10 +191,10 @@
 
 ## 7. 待办与接缝状态
 
-1. **gate 未落库**：`data/labs` 只有 ch01/ch02/ch05/ch06，`src/core` 无 `ch19_checks.gd`；`lab` 名（`shared_medium` / `embedded_budget` / `sensor_loop` / `firmware_rollback` / `multi_terminal_alarm`）与 `T19.1-1..4` 等均为提案。`after` 按 4 条 required 推定，数据侧定稿后只改 `after`，段数与文案不动；**若为 3 条，末段 `after=2`**。
+1. **gate 已落库**：`data/labs/ch19_labs.json` 与 `src/core/ch19_checks.gd` 已按 `shared_medium` / `embedded_budget` / `sensor_loop` / `firmware_rollback` / `multi_terminal_alarm` 落 5×4 条，`tests/test_ch19.gd` EXPECT 85；`after` 按 4 条 required 定稿（末段 `after=3`）。`T19.2-1` 因 ADC/功耗阈值未定挂 pending，不进分母（20→19）。
 2. **5 项扩接口未批**：见 §6 末条。批之前对应 A 条只能按「最小替代」判，**不得**降级成纯问答或「看图表」。
 3. **12 不采用**：`E_ENCAPSULATION`(12) 不在白名单，语义仅到「尚未封装」，与「未接线 / 量化误差超标 / 回滚失败」不同；本文件按 3 + 10 拆报，未新开码。
-4. **参数未定**：02 CH19 只给「无线信道、CSMA 退避、低功耗预算、远程升级回滚、基站调度」；信道参数、ADC 位数与量程、功耗阈值、分区方式、告警字段均写「以数据侧为准」，**未编造数值与 API 名**。
+4. **参数由数据侧定稿**：02 CH19 只给「无线信道、CSMA 退避、低功耗预算、远程升级回滚、基站调度」；数据侧定 4 终端/20 次尝试、冲突率按百分数、预算 32 KB/8 KB/8 mA、0–2 V 8 位 ADC、32 KB 镜像 8 KB/s、告警阈值 40、调度上限 50 ms。这些是**数据侧假设值**，接口提案通过前不得当成 02 原文。
 5. **P3 不可降级**：大纲与 17 §2 明确 19.2「必须烧录并实测」、19.3「采样/量化必须真跑」；A 条按 P3 写，**不是**填表或知识卡单独过关。
 6. **与既有机制的接缝**：冲突不是锁（接缝 1），数据只走 17.1 负载（接缝 2），升级走 10.x 且不另开明文通道（接缝 3）。本文件**没有**新造消息头、传输层或信任模型，也**没有**抢写终章 F1–F3。
 7. **B08 未写**：B08 是 CH19 的选修分支（中断/定时器/看门狗/进阶固件），本文件只覆盖主线 19.1–19.5，**未把 B08 内容并进来**。

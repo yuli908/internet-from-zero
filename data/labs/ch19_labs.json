@@ -1,0 +1,988 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/30-ch19-lecture-copy.md",
+  "source_note": "段落按课件 §1–§5 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：4 终端 20 次尝试、冲突率百分数、预算 32 KB/8 KB/8 mA、0–2 V 8 位 ADC、32 KB 镜像 8 KB/s、阈值 40、调度上限 50 ms。",
+  "pending_kinds": {
+    "table": "19.2 ADC 位数/量程与功耗阈值未定；T19.2-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "shared_medium": {
+      "id": "shared_medium",
+      "title": "共享介质 · 空气是一根共用的线",
+      "body": "同一片空气同一时刻只能一个终终端在发；撞了就随机退避，冲突率必须降到 10% 以下。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 空气是一根大家共用的线",
+          "text": "无线没有私线：所有终端把信号发进同一片空气，同一时刻只能有一个在发。两个人同时开口，接收端听到的是叠加，不是两句话。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "冲突 · 先听后发，撞了就退避",
+          "text": "先听后发、空闲才发；撞上就随机等一段再重试，这叫 CSMA 与退避。等多久必须随机，否则两个终端会一直同步撞下去。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 多终端同发，统计冲突率",
+          "text": "做一遍：接上天线，让多个终端在同一信道同发，记录成功、冲突与重试次数。加上退避后再跑一遍，冲突率必须降到 10% 以下。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 退避固定，冲突记成丢包",
+          "text": "负例：退避固定等同一段时间，终端永远同步撞；或把冲突记成丢包，冲突率永远是 0。图表好看，介质仍不可用——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 冲突率 <10%",
+          "text": "验收：冲突率 <10%。四条同时——①同一信道确实发生冲突；②退避后冲突率达标；③冲突与重试可查；④W07 天线落袋。只跑单个终端，不给过。"
+        }
+      ],
+      "p1": "多终端同发，统计无退避与有退避两轮的冲突与重试",
+      "p1_gates": [
+        "T19.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "多个终端接天线同发，记录成功/冲突/重试；开退避再跑一遍",
+          "judge": "四条同时：①同信道确有冲突；②退避后冲突率 <10%；③冲突与重试可查；④W07 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T19.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "退避时长写死；冲突统计口径改成「丢包」",
+          "judge": "两轮冲突率不变或恒为 0，且无冲突记录；detail 写「退避不随机 / 冲突未计入」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T19.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧终端数与发送概率，算一次同发的期望冲突数",
+          "judge": "与机器统计一致；不算 P1；detail 写「终端数或概率代错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T19.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「共享介质同时发送会叠加，必须 CSMA + 随机退避」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T19.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T19.1-1",
+          "title": "两轮冲突统计逐条对上：尝试、冲突、重试、冲突率",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "phase",
+            "terminals",
+            "attempts",
+            "collisions",
+            "retries",
+            "rate_pct"
+          ],
+          "expect_rows": [
+            {
+              "phase": "no_backoff",
+              "terminals": 4,
+              "attempts": 20,
+              "collisions": 12,
+              "retries": 12,
+              "rate_pct": 60
+            },
+            {
+              "phase": "backoff",
+              "terminals": 4,
+              "attempts": 20,
+              "collisions": 1,
+              "retries": 1,
+              "rate_pct": 5
+            }
+          ],
+          "expect_meta": {
+            "conflict_observed": true,
+            "rate_under_10": true,
+            "log_ok": true,
+            "w07_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T19.1-2",
+          "title": "负例：退避固定，冲突记成丢包",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "backoff_random",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T19.1-3",
+          "title": "按 4 终端 × 2 次发送算同发期望冲突数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "terminals": 4,
+            "sends_per": 2,
+            "total_sends": 8,
+            "expected_collisions": 2
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T19.1-4",
+          "title": "无线为什么要先听后发",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "无线为什么要先听后发？",
+            "options": [
+              "共享介质同时发送会叠加，必须 CSMA + 随机退避",
+              "先听后发只是为了省电",
+              "无线信号不会被别人听到，冲突不会发生",
+              "固定退避比随机退避更可靠"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记每台的发送与重试，再分「未退避/退避」两栏算冲突率；率按百分数记。",
+      "misconception": "把「图表显示了退避」当成「冲突降了」；冲突计 0 或两轮不变就是没接。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "embedded_budget": {
+      "id": "embedded_budget",
+      "title": "嵌入式约束 · 内存、功耗、升级都要落表",
+      "body": "单片机按 KB 与毫安算账；无屏不能靠日志调试，远程升级必须是设计的一部分。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 小设备的三条硬约束",
+          "text": "单片机不是缩小的电脑：内存按 KB 算、电按毫安算、常常没有屏幕。程序不是「写出来就行」，要裁到装得下、跑得动。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "预算 · 内存、功耗、升级都要落表",
+          "text": "三条预算要落表：内存占用、功耗预算、升级窗口。无屏意味着不能靠日志调试，远程升级必须是设计的一部分；阈值以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 裁固件、烧录、测功耗",
+          "text": "做一遍：把固件裁到预算内，烧进 W04，测一段时间的电流与唤醒次数，把实测值填回预算表。设备要能运行，表要能对上。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 预算表只填理想值",
+          "text": "负例：预算表填的是理论值，没烧录也没测；或固件超预算仍判通过。表很漂亮，设备跑不起来——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 预算表通过 + 设备可运行",
+          "text": "验收：预算表通过 + 设备可运行。四条同时——①固件装得下；②实测功耗在预算内；③设备完成一次任务；④W04 单片机落袋。只填表不烧录，不给过。"
+        }
+      ],
+      "p1": "裁固件、烧进 W04、测电流与唤醒，把实测值回填预算表",
+      "p1_gates": [
+        "T19.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "裁剪固件，烧进单片机，跑一段时间，测电流/唤醒次数并回填",
+          "judge": "四条同时：①装得下；②实测功耗在预算内；③完成一次任务；④W04 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T19.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "预算表填理论值；固件未烧录或超预算仍判通过",
+          "judge": "无烧录记录、无实测电流；设备无任务输出；detail 写「预算表为理论值，未烧录/未实测」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T19.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧电压、电流与占空比算平均功耗",
+          "judge": "与机器测量在容差内；不算 P1；detail 写「电压/电流/占空比代错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T19.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「不能靠本机日志调试，必须预留远程升级与低功耗预算」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T19.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T19.2-1",
+          "title": "预算表与实测对上：镜像大小、内存、平均电流、任务",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "ADC 位数、量程与功耗阈值未定（02 CH19 只给预算方向）；不以假设阈值冒充实测预算表。",
+          "thresholds": {
+            "power_budget": {
+              "status": "pending",
+              "initial": "budget_ma=8,flash_kb=32,ram_kb=8",
+              "reason": "预算阈值与采样窗口未定；只定 3 个上限供 19.2-C 复算。"
+            }
+          },
+          "keys": [
+            "image",
+            "flash_kb",
+            "ram_kb",
+            "avg_ma",
+            "task_ok"
+          ],
+          "expect_rows": [
+            {
+              "image": "fw1",
+              "flash_kb": 28,
+              "ram_kb": 6,
+              "avg_ma": 6.8,
+              "task_ok": true
+            }
+          ],
+          "expect_meta": {
+            "fits": true,
+            "power_in_budget": true,
+            "task_done": true,
+            "w04_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T19.2-2",
+          "title": "负例：只填理论值，不烧录",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "flash_image",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T19.2-3",
+          "title": "按 10 ms@50 mA + 90 ms@2 mA 算平均电流",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "on_ms": 10,
+            "on_ma": 50,
+            "off_ms": 90,
+            "off_ma": 2,
+            "avg_ma": 6.8
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T19.2-4",
+          "title": "无屏与低功耗改了什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "无屏与低功耗改了什么？",
+            "options": [
+              "不能靠本机日志调试，必须预留远程升级与低功耗预算",
+              "只是屏幕变小，其他开发方式不变",
+              "无屏设备不需要测试，反正看不到",
+              "低功耗只影响电池型号，不影响程序结构"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记镜像大小与实测电流，再按占空比复算平均；表里只留实测值。",
+      "misconception": "把「预算表填满」当成「设备能跑」；没有烧录记录与电流采样，就是没测。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "sensor_loop": {
+      "id": "sensor_loop",
+      "title": "传感→基站闭环 · 五段少一段就断",
+      "body": "传感器→ADC→单片机→无线→基站→服务器；量化误差 ≤1 LSB，三段对照才叫入库。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 五段链路，少一段就断",
+          "text": "一条数据要走五段：传感器 → ADC → 单片机 → 无线 → 基站 → 服务器。少一段，数据就停在半路；每段都要能单独看到输入与输出。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "采样 · 连续量变数字，误差 ≤1 LSB",
+          "text": "传感器给的是连续电压，ADC 按固定间隔采样、按位数量化。量化误差不超过 1 个最小刻度（1 LSB）；位数与量程以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 接五段，发一条数据入库",
+          "text": "做一遍：接上 W02 传感器与 W01/W06，采样后经 MCU 发到基站，落进服务器。导出原始电压、量化值与入库记录三者对照。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 跳过 ADC，写死数值",
+          "text": "负例：跳过 ADC，直接把写死的数字发出去；或量化后不校对，误差超 1 LSB 仍判「入库成功」。链路像通了，数据是假的——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 量化 ≤1 LSB + 数据入库",
+          "text": "验收：量化误差 ≤1 LSB + 数据入库。四条同时——①五段都有输入输出；②量化误差达标；③数据真进了库；④W01/W02/W03/W05/W06 落袋。只发一条固定值，不给过。"
+        }
+      ],
+      "p1": "接五段链路，采一条数据，导出原始电压、量化值与入库记录",
+      "p1_gates": [
+        "T19.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "接传感器、ADC、MCU、无线、基站到服务器，采一条数据并入库",
+          "judge": "四条同时：①五段都有输入输出；②量化误差 ≤1 LSB；③入库记录存在；④W01/W02/W03/W05/W06 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T19.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "不采样，直接把常量当采样值发出；或不校验误差",
+          "judge": "原始电压与量化值对不上，误差超 1 LSB 仍判入库；detail 写「未采样/量化误差未校验」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T19.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧量程与 ADC 位数，算 1 LSB 和期望码值",
+          "judge": "与机器结果一致；不算 P1；detail 写「量程或位数代错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T19.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「连续量按间隔采样、按位数量化，误差上限 1 LSB」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T19.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T19.3-1",
+          "title": "五段链路的输入输出与采样时延逐段对上",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "sample_ms",
+            "max": 50
+          },
+          "keys": [
+            "stage",
+            "in",
+            "out",
+            "sample_ms"
+          ],
+          "expect_rows": [
+            {
+              "stage": "sensor",
+              "in": "0.5 V",
+              "out": "0.5 V",
+              "sample_ms": 20
+            },
+            {
+              "stage": "adc",
+              "in": "0.5 V",
+              "out": 64,
+              "sample_ms": 20
+            },
+            {
+              "stage": "mcu",
+              "in": 64,
+              "out": 64,
+              "sample_ms": 20
+            },
+            {
+              "stage": "radio",
+              "in": 64,
+              "out": 64,
+              "sample_ms": 20
+            },
+            {
+              "stage": "server",
+              "in": 64,
+              "out": "stored",
+              "sample_ms": 20
+            }
+          ],
+          "expect_meta": {
+            "all_stages_io": true,
+            "lsb_ok": true,
+            "stored_ok": true,
+            "w01_w06_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T19.3-2",
+          "title": "负例：跳过 ADC，写死数值",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "adc_convert",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T19.3-3",
+          "title": "按 0–2 V、8 位算 1 LSB 与 0.5 V 的量化码",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "lsb": 0.0078125,
+            "adc_code": 64,
+            "error_lsb": 0
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T19.3-4",
+          "title": "采样与量化为什么有误差",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "采样与量化为什么有误差？",
+            "options": [
+              "连续量按间隔采样、按位数量化，误差上限 1 LSB",
+              "传感器精度不够，与采样方式无关",
+              "只要位数足够，采样就没有误差",
+              "量化误差可以靠软件完全消除"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先把原始电压、量化码、入库记录三样并排记下，再逐段对输入输出；采样超 50 ms 记 9。",
+      "misconception": "把「服务器收到一条消息」当成「闭环通了」；常量值或跳过 ADC，三段都对不上。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "firmware_rollback": {
+      "id": "firmware_rollback",
+      "title": "固件升级 · 失败要能回去",
+      "body": "远程升级最怕断电变砖：旧镜像不覆盖，校验通过才切换；失败或断电仍从旧版启动。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 升级失败要能回去",
+          "text": "远程升级最怕的不是升不上去，是升到一半断电，设备变成砖。设计目标不是「升级成功」，是「失败也能回到旧版」。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "机制 · 旧版留着，启动时再选",
+          "text": "做法是旧固件不被覆盖：新镜像写入另一块区域，校验通过才切换；失败或断电则仍从旧版启动。分区与校验方式以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 升级到一半拔电，重启",
+          "text": "做一遍：正常升级一次，再在写入中途断电，重新上电。两次都要能启动；断电那次必须回到旧版，并记录回滚原因。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 直接覆盖唯一副本",
+          "text": "负例：新固件直接覆盖唯一副本，断电后两头都没有；或校验失败仍切换。升级按钮点了，设备起不来——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 回滚到旧版并可用",
+          "text": "验收：回滚到旧版并可用。四条同时——①正常升级成功；②中途断电后能启动；③回到旧版且功能可用；④P12 固件落袋。只跑成功路径，不给过。"
+        }
+      ],
+      "p1": "正常升级一次，再在写入中途断电，重新上电比对版本与启动日志",
+      "p1_gates": [
+        "T19.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P3",
+          "produce": "烧新固件正常启动；再在写入中途断电，重新上电观察版本",
+          "judge": "四条同时：①正常升级成功；②断电后能启动；③版本回到旧版且可用；④P12 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T19.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "新镜像直接覆盖旧镜像；或校验不通过仍切换启动",
+          "judge": "断电后设备无法启动，或版本显示新但功能损坏；detail 写「旧副本被覆盖/校验失败仍切换」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T19.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按镜像大小与写入速率，算写入耗时",
+          "judge": "与机器记录一致；不算 P1；detail 写「镜像大小或写入速率代错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T19.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「升级可能中断，必须保留可启动的旧版本用于回滚」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T19.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T19.4-1",
+          "title": "两次上电逐条对上：版本、启动时延、可用性、回滚原因",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "boot_ms",
+            "max": 50
+          },
+          "keys": [
+            "run",
+            "boot_version",
+            "boot_ms",
+            "usable",
+            "rollback_reason"
+          ],
+          "expect_rows": [
+            {
+              "run": "normal",
+              "boot_version": "2.0.0",
+              "boot_ms": 20,
+              "usable": true,
+              "rollback_reason": ""
+            },
+            {
+              "run": "cut",
+              "boot_version": "1.0.0",
+              "boot_ms": 25,
+              "usable": true,
+              "rollback_reason": "verify_fail"
+            }
+          ],
+          "expect_meta": {
+            "normal_ok": true,
+            "cut_boots": true,
+            "rolled_back": true,
+            "p12_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T19.4-2",
+          "title": "负例：覆盖唯一副本，校验失败也切换",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "image_swap",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T19.4-3",
+          "title": "按 32 KB 镜像与 8 KB/s 写入速率算写入耗时",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "image_kb": 32,
+            "write_kbps": 8,
+            "write_ms": 4000
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T19.4-4",
+          "title": "为什么旧副本不能覆盖",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么旧副本不能覆盖？",
+            "options": [
+              "升级可能中断，必须保留可启动的旧版本用于回滚",
+              "旧版本占空间，覆盖后能省闪存",
+              "新版本一定比旧版本稳定，不需要回滚",
+              "覆盖旧副本不影响启动，只影响功能"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记升级前后的版本与启动日志，再比对断电那次的回滚原因；启动超 50 ms 记 9。",
+      "misconception": "把「升级按钮返回成功」当成「回滚可用」；断电后起不来，就是旧副本被覆盖。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "multi_terminal_alarm": {
+      "id": "multi_terminal_alarm",
+      "title": "多终端与告警 · 全部入库，只报一次",
+      "body": "一个基站服务多个终端：退避变调度，入库变多路；越限触发一次告警并落到服务器。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一个基站要同时听多个终端",
+          "text": "一个基站要同时服务多个终端：谁先发、谁等、谁掉线，都要有秩序。19.1 的退避在这里变成调度，19.3 的入库在这里变成多路。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "阈值 · 超了要告警，不是记一笔",
+          "text": "每个终端带阈值：采样值越过阈值就触发一次告警，告警要送到服务器并被记录。阈值与告警字段以数据侧为准，不写死。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 加终端、设阈值、触发一次",
+          "text": "做一遍：接 3 个终端到 1 个基站，逐台设阈值，让其中一台越限，确认 3 路数据都入库且只触发 1 次告警。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 告警只弹在本地",
+          "text": "负例：告警只弹在本地界面，服务器没有记录；或 3 个终端只入库 1 路。界面闪了一下，闭环没走通——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 全部入库 + 1 次告警",
+          "text": "验收：全部入库 + 1 次告警。四条同时——①3 路都入库；②越限触发告警；③告警被服务器记录且只有 1 次；④W08 无线终端落袋。只接 1 个终端，不给过。"
+        }
+      ],
+      "p1": "3 终端 1 基站，逐台设阈值，让一台越限，核对 3 路入库与 1 次告警",
+      "p1_gates": [
+        "T19.5-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "接 3 个无线终端到 1 个基站，设阈值，让一台越限",
+          "judge": "四条同时：①3 路都入库；②越限触发告警；③服务器记录且仅 1 次；④W08 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T19.5-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "越限只弹本地提示，服务器无记录；或只入库一路",
+          "judge": "服务器日志无告警；入库条数少于 3；detail 写「告警未上服务器/多路未入库」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T19.5-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按阈值与采样值，算是否越限、应触发几次",
+          "judge": "与机器记录一致；不算 P1；detail 写「阈值或采样值代错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T19.5-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「本地弹窗无人复核，告警必须入库才有闭环」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T19.5-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T19.5-1",
+          "title": "3 路入库与告警逐台对上：采样值、入库、告警、调度时延",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "sched_ms",
+            "max": 50
+          },
+          "keys": [
+            "terminal",
+            "stored",
+            "value",
+            "alarm",
+            "sched_ms"
+          ],
+          "expect_rows": [
+            {
+              "terminal": 1,
+              "stored": true,
+              "value": 21,
+              "alarm": false,
+              "sched_ms": 30
+            },
+            {
+              "terminal": 2,
+              "stored": true,
+              "value": 47,
+              "alarm": true,
+              "sched_ms": 35
+            },
+            {
+              "terminal": 3,
+              "stored": true,
+              "value": 30,
+              "alarm": false,
+              "sched_ms": 40
+            }
+          ],
+          "expect_meta": {
+            "all_stored": true,
+            "alarm_once": true,
+            "server_logged": true,
+            "w08_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T19.5-2",
+          "title": "负例：告警只在本地弹窗",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "server_log",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T19.5-3",
+          "title": "按阈值 40 与 3 个采样值算越限数与告警次数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "threshold": 40,
+            "above": 1,
+            "alarm_count": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T19.5-4",
+          "title": "告警为什么要落到服务器",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "告警为什么要落到服务器？",
+            "options": [
+              "本地弹窗无人复核，告警必须入库才有闭环",
+              "服务器存储空间大，弹窗太小",
+              "本地弹窗比入库更可靠，不需要服务器",
+              "告警只要触发一次，记不记录无所谓"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记 3 台的采样值与入库条数，再对服务器告警条数；调度超 50 ms 记 9。",
+      "misconception": "把「界面弹了告警」当成「告警闭环」；服务器无记录或 >1 次，都不算。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
