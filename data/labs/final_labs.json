@@ -1,0 +1,476 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/31-final-chapter-lecture-copy.md",
+  "source_note": "段落按课件 §1–§3 的 segments 原样抽取（未改义）；终章不套 after 序列，数据侧按 order-1 落 after（0/1/2），每子目标 3 段、3 条 required。数据侧定稿：端口 7777、两跳示例、15 路棋盘、3 项凭证字段。",
+  "pending_kinds": {
+    "table": "F1 端口/出口形态为 02 【假设】、本机字节抓取接口未批；F1-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "f1_outbound": {
+      "id": "f1_outbound",
+      "title": "F1 出网 · 最后一跳到本机",
+      "body": "把自制网络接到世界出口，让本机终端真的收到一行字；内容必须由程序生成。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 最后一跳",
+          "text": "终章第一件事不是加功能，是出网：把自制网络接到世界出口，让本机终端真的收到一行字。内容必须由你的程序生成，不是游戏写死的文案。"
+        },
+        {
+          "order": 2,
+          "after": 1,
+          "title": "接法 · 出口只做最后一跳",
+          "text": "接法沿用 19.5 的基站与 17.3 的链路：基站把数据送到出口，出口落到本机 127.0.0.1:7777；端口可配，按 02 【假设】，具体值以数据侧为准。没有显式接线，就不产生真实流量。"
+        },
+        {
+          "order": 3,
+          "after": 2,
+          "title": "验收 · 本机收到，且随输入变",
+          "text": "怎么算成：本机收到 `hi, human`；把程序里的输入改一处再跑，收到的内容要跟着变。只收到固定文案，说明中间有人替它念了台词。"
+        }
+      ],
+      "p1": "接线到 World Port，运行程序，改输入再跑，导出本机收到的两行",
+      "p1_gates": [
+        "F1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "在游戏里显式接线到世界出口，运行自己的程序，本机终端读取输出",
+          "judge": "四条同时：①有显式接线；②本机收到 hi, human；③改输入后内容随之变化；④凭证①落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "F1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "在游戏里直接打印 hi, human，或把字符串写死",
+          "judge": "本机终端无真实字节；改输入后输出不变；detail 写「固定文案/未产生真实流量」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "F1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧拓扑与 6.1 编码算跳数与字节数",
+          "judge": "与机器抓包一致；不算 P1；detail 写「跳数或字节数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "F1-3"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "F1-1",
+          "title": "改输入前后两条本机输出：内容随输入变、送达时延",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "端口 7777 与对手端形态为 02 【假设】；本机字节抓取接口未批，不以固定文案冒充真实出网。",
+          "thresholds": {
+            "world_port": {
+              "status": "pending",
+              "initial": "127.0.0.1:7777",
+              "reason": "端口可配、形态未定；只定端口与两跳示例供 F1-C 复算。"
+            }
+          },
+          "keys": [
+            "run",
+            "input",
+            "local_line",
+            "deliver_ms"
+          ],
+          "expect_rows": [
+            {
+              "run": "before",
+              "input": "hi, human",
+              "local_line": "hi, human",
+              "deliver_ms": 20
+            },
+            {
+              "run": "after",
+              "input": "hello, world",
+              "local_line": "hello, world",
+              "deliver_ms": 25
+            }
+          ],
+          "expect_meta": {
+            "wired": true,
+            "local_bytes": true,
+            "varies_with_input": true,
+            "cert1": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "F1-2",
+          "title": "负例：游戏内假打印，未产生真实流量",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "world_bridge",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "F1-3",
+          "title": "按拓扑与 6.1 编码算跳数与总字节",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "hops": 4,
+            "header_bytes": 6,
+            "total_bytes": 12
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        }
+      ],
+      "hint": "先跑一遍「hi, human」，再改输入跑第二遍；两行都要在本机终端里，时延上限 50 ms。",
+      "misconception": "把「游戏里显示了 hi, human」当成「出网成功」；本机终端没有字节，就是假打印。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "f2_gomoku": {
+      "id": "f2_gomoku",
+      "title": "F2 五子棋 · 在自己的协议上下盘棋",
+      "body": "黑白交替、五连判胜、悔棋回退、断线续局；棋子是负载，传输仍走 17.1 的消息格式。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 在自己的协议上下盘棋",
+          "text": "第二件事是在自己的协议上下一盘棋：黑白交替落子，五连判胜，悔棋要能退回上一步。棋子是负载，规则在你的程序里，传输仍走 17.1 的消息格式。"
+        },
+        {
+          "order": 2,
+          "after": 1,
+          "title": "对手 · 极简客户端，只负责应答",
+          "text": "对手可以是本机上的极简客户端（02 【假设】：随游戏导出的 HTML 或小程序）。你负责规则与协议，对手只负责应答；不要求它聪明，要求它能陪你把一盘走完。"
+        },
+        {
+          "order": 3,
+          "after": 2,
+          "title": "验收 · 一盘完整结束，非法着法被拒",
+          "text": "怎么算成：一盘棋完整结束并判出胜负；非法落子（重复点、越界、非本方回合）被拒；悔棋后局面回到上一步；断线重连能续局。"
+        }
+      ],
+      "p1": "连对手端下完一盘：合法落子、五连判胜、悔棋、断线续局",
+      "p1_gates": [
+        "F2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "实现落子、胜负、悔棋，连接对手端下完一盘，中途断线再续",
+          "judge": "五条同时：①落子合法；②五连判胜；③悔棋生效；④断线能续局；⑤凭证②落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "F2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "按固定剧本判胜负；悔棋只回退界面，不回退棋盘状态",
+          "judge": "走完剧本即「赢」；悔棋后服务端棋局未变；detail 写「胜负写死/悔棋未回退状态」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "F2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧棋盘坐标与规则，算该点是否可落、是否成五连",
+          "judge": "与机器判定一致；不算 P1；detail 写「坐标或五连判定算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "F2-3"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "F2-1",
+          "title": "着法逐条记录：落点、合法性、回合时延",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "turn_ms",
+            "max": 50
+          },
+          "keys": [
+            "move",
+            "color",
+            "x",
+            "y",
+            "legal",
+            "turn_ms"
+          ],
+          "expect_rows": [
+            {
+              "move": 1,
+              "color": "B",
+              "x": 8,
+              "y": 8,
+              "legal": true,
+              "turn_ms": 30
+            },
+            {
+              "move": 2,
+              "color": "W",
+              "x": 8,
+              "y": 9,
+              "legal": true,
+              "turn_ms": 35
+            },
+            {
+              "move": 3,
+              "color": "B",
+              "x": 9,
+              "y": 9,
+              "legal": true,
+              "turn_ms": 30
+            },
+            {
+              "move": 4,
+              "color": "W",
+              "x": 9,
+              "y": 10,
+              "legal": true,
+              "turn_ms": 40
+            },
+            {
+              "move": 5,
+              "color": "B",
+              "x": 10,
+              "y": 10,
+              "legal": true,
+              "turn_ms": 45
+            }
+          ],
+          "expect_meta": {
+            "full_game": true,
+            "illegal_rejected": true,
+            "undo_ok": true,
+            "resumed": true,
+            "cert2": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "F2-2",
+          "title": "负例：胜负靠剧本，悔棋只改显示",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "rule_judge",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "F2-3",
+          "title": "按 15 路棋盘与五连规则算终局判定",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "required_in_row": 5,
+            "board_size": 15,
+            "max_moves_one_turn": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        }
+      ],
+      "hint": "先记着法序列与合法性，再对胜负与悔棋；续局超 50 ms 单独记 9。",
+      "misconception": "把「棋盘上出现五个子」当成「判胜对了」；剧本胜负与只改显示的悔棋都不算。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "f3_certificate": {
+      "id": "f3_certificate",
+      "title": "F3 凭证 · 时间、拓扑、程序哈希",
+      "body": "凭证不是奖状，是能被别人复核的记录：三项字段、可打开、哈希可复算、改一处就变。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 把这一路留下证据",
+          "text": "第三件事是把这一路留下证据：一张通关凭证，含时间、拓扑与程序哈希。它不是奖状，是能被别人复核的记录。"
+        },
+        {
+          "order": 2,
+          "after": 1,
+          "title": "复算 · 同一内容同一摘要",
+          "text": "哈希沿用 18.3：对同一份内容重算，摘要必须一致；改一个字节，摘要必须变。凭证要能打开，字段要能读出，哈希要能复算。"
+        },
+        {
+          "order": 3,
+          "after": 2,
+          "title": "验收 · 一键生成，可打开可复算",
+          "text": "怎么算成：一键生成，截图可分享；把凭证内容重新喂给哈希函数，结果与凭证上写的一致；改一处再算，结果不同。"
+        }
+      ],
+      "p1": "一键生成凭证，打开读三项字段，复算摘要并篡改一处再算",
+      "p1_gates": [
+        "F3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "一键生成凭证，打开查看字段，重算摘要并比对；再篡改一处复算",
+          "judge": "五条同时：①含三项字段；②文件可打开；③哈希复算一致；④篡改后不一致；⑤凭证③落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "F3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "凭证上的哈希是常量，不随内容计算",
+          "judge": "改内容后哈希不变；复算值与凭证值无关；detail 写「哈希为写死字符串」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "F3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧字段与 18.3 的哈希，算凭证内容摘要",
+          "judge": "与机器复算一致；不算 P1；detail 写「字段顺序或摘要算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "F3-3"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "F3-1",
+          "title": "凭证三项字段逐项对上：时间、拓扑、程序哈希",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "field",
+            "value"
+          ],
+          "expect_rows": [
+            {
+              "field": "issued_at",
+              "value": "2026-11-05T10:00:00"
+            },
+            {
+              "field": "topology",
+              "value": "a-b-server"
+            },
+            {
+              "field": "program_hash",
+              "value": "9f2c"
+            }
+          ],
+          "expect_meta": {
+            "three_fields": true,
+            "opens": true,
+            "recompute_ok": true,
+            "tamper_changes": true,
+            "cert3": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "F3-2",
+          "title": "负例：凭证哈希写死，不随内容计算",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "cert_issue",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "F3-3",
+          "title": "按 3 个字段与 8 位摘要算凭证内容摘要输入",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "field_count": 3,
+            "digest_len": 8,
+            "tamper_bytes": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        }
+      ],
+      "hint": "先读出三项字段，再复算一次；改一个字节再算，两次结果必须不同。",
+      "misconception": "把「截图看起来完整」当成「凭证可核」；哈希写死，改内容也不会变。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}

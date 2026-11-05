@@ -10,7 +10,8 @@
       docs/curriculum/30-ch19-lecture-copy.md（格式基准：JSON 段 + 实践表 + 校验表）
 边界: 只写 docs/curriculum/**；未动 src/**、data/**、tests/**、docs/design/**、project.godot
 说明: 终章不是 lab 页，结构为三个可独立验收的子目标，不按「5 段 × N 节 + after」编排
-      端口 7777、对手端形态为 02 【假设】；gate 未落库，F1-1..3 等均为提案，最终以数据侧 gate 列表为准
+      端口 7777、对手端形态为 02 【假设】；gate 已落库（data/labs/final_labs.json，F1-1/2/3 各 3 条，test_final.gd EXPECT 54）
+      F1-1 因出口形态与本机字节抓取接口未批挂 pending（分母 9→8），数据侧按 order-1 落 after（末段 after=2）
 ```
 
 ## 0. 口径
@@ -133,7 +134,7 @@
 
 ## 6. 待办与接缝状态
 
-1. **终章不是 lab 页**：本文件按 02 §4 的三子目标写，未套 `after` 与 5 段节；若后续要上 lab 页，需数据侧先定 gate 列表与分段，再另写 lab 版，**不得**把本文件直接当 lab 配置。
+1. **终章已按 3 子目标落数据**：`data/labs/final_labs.json`、`src/core/final_checks.gd`、`tests/test_final.gd`（EXPECT 54）；每子目标 3 段、3 条 required（table / skip_layer / derived_number，无 quiz），`after` 由数据侧按 order-1 落（0/1/2）。`F1-1` 挂 pending 不进分母（9→8）。
 2. **端口为【假设】**：`127.0.0.1:7777` 来自 02 §4，端口可配；实际端口以数据侧为准，未实测。
 3. **对手端形态为【假设】**：02 只写「随游戏导出的 HTML 或可执行小程序」，具体形态以程序实现为准，本文件不指定。
 4. **凭证字段未定稿**：02 只写「时间 / 拓扑 / 程序哈希」，字段顺序、编码与文件格式以数据侧为准；本文件**未编造**凭证模板。
