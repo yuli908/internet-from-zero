@@ -2,7 +2,7 @@ extends RefCounted
 
 ## CH13 结构 + 判据校验（15 段）。
 ## 分母口径：required 且非 pending 的 gate 数，按 Ch13Checks.deferred_gates(cfg) 现算；
-## 13.1 字节码编码与行映射未定稿 → 4 降为 3，测试里单独断言 pending 条数与分母。
+## 13.1 源码行映射已按 interface 19 §2.1 落地 → 4 条全进分母，pending=0。
 ## 负例断言给出精确失败码；断言能红，不是恒真。
 
 const LABS := ["bytecode_vm", "object_ref", "gc_reclaim"]
@@ -15,10 +15,11 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch13Checks = preload("res://src/core/ch13_checks.gd")
+const BytecodeTrace = preload("res://src/core/bytecode_trace.gd")
 
-const EXPECT := 54
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "negative": 6}
-const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（bytecode_vm 为 3，因 T13.1-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=11", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（pending 不计）", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows 均精确判红"}
+const EXPECT := 59
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t13_1_real": 3, "negative": 8}
+const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（13.1 行映射落地后 bytecode_vm 为 4）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（含 T13.1-1 实跑作答）", "t13_1_real": "T13.1-1 行映射/覆盖/输出由 bytecode_trace 实跑导出并与数据期望逐项一致", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/行映射改坏/映射项删除 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch13_labs.json")
@@ -69,7 +70,7 @@ func run(ctx: TestContext) -> void:
 		counted_sum += int(d["counted"])
 		total += secs.size()
 	ctx.begin_group("pending_total")
-	ctx.check("全章 pending=1、进分母=11", pending_sum == 1 and counted_sum == 11,
+	ctx.check("全章 pending=0、进分母=12", pending_sum == 0 and counted_sum == 12,
 		"pending=%d counted=%d" % [pending_sum, counted_sum])
 
 	ctx.begin_group("total_sections")
@@ -81,6 +82,8 @@ func run(ctx: TestContext) -> void:
 		ctx.begin_group("positive")
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
+
+	_t13_1_real(ctx, labs["bytecode_vm"])
 
 	_negative(ctx, labs)
 
@@ -181,7 +184,8 @@ func _pending_count(cfg: Dictionary) -> int:
 	return n
 
 ## 好答案由数据侧定稿现建：table 抄 expect_rows/meta，skip 复现缺层，
-## derived 抄 expect_values，quiz 取 answer。pending 不参与。
+## derived 抄 expect_values，quiz 取 answer。T13.1-1 例外：由 bytecode_trace 实跑导出，
+## 不抄 expect_meta（行映射/覆盖/输出必须是跑出来的）。
 func _good(cfg: Dictionary) -> Dictionary:
 	var out := {}
 	for raw in (cfg.get("gate_cases", []) as Array):
@@ -200,7 +204,62 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = {"values": (g.get("expect_values", {}) as Dictionary).duplicate(true)}
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
+	if not cfg.has("program"):
+		return out
+	var tr: Dictionary = BytecodeTrace.run(cfg.get("program", []))
+	out["T13.1-1"] = {
+		"rows": tr["rows"],
+		"meta": {
+			"line_map": tr["line_map"],
+			"lines_covered": tr["lines_covered"],
+			"unmapped_pc": tr["unmapped_pc"],
+			"output": tr["output"],
+			"p04_grant": true,
+		},
+	}
 	return out
+
+func _gate(cfg: Dictionary, cid: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == cid:
+			return raw
+	return {}
+
+## 真判据：行映射不是抄 expect_meta，而是把 lab 级 program 交给参考执行器跑出来的。
+func _t13_1_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t13_1_real")
+	var tr: Dictionary = BytecodeTrace.run(cfg.get("program", []))
+	var g: Dictionary = _gate(cfg, "T13.1-1")
+	var want: Dictionary = g.get("expect_meta", {})
+	ctx.check("T13.1-1 行映射由 program 实跑导出，逐 pc 一致",
+		_deep_eq(tr["line_map"], want.get("line_map", [])) and bool(tr["ok"]),
+		"实跑 %s / 期望 %s" % [str(tr["line_map"]), str(want.get("line_map", []))])
+	ctx.check("T13.1-1 全 pc 有行号、覆盖 1..3、无 unmapped",
+		tr["unmapped_pc"].is_empty() and _deep_eq(tr["lines_covered"], [1, 2, 3])
+			and (tr["line_map"] as Array).size() == (cfg.get("program", []) as Array).size(),
+		"unmapped=%s covered=%s" % [str(tr["unmapped_pc"]), str(tr["lines_covered"])])
+	ctx.check("T13.1-1 输出由栈机实算 [5]",
+		_deep_eq(tr["output"], want.get("output", [])), str(tr["output"]))
+
+func _deep_eq(a: Variant, b: Variant) -> bool:
+	if typeof(a) == TYPE_ARRAY and typeof(b) == TYPE_ARRAY:
+		if (a as Array).size() != (b as Array).size():
+			return false
+		for i in (a as Array).size():
+			if not _deep_eq((a as Array)[i], (b as Array)[i]):
+				return false
+		return true
+	if typeof(a) == TYPE_DICTIONARY and typeof(b) == TYPE_DICTIONARY:
+		if (a as Dictionary).size() != (b as Dictionary).size():
+			return false
+		for k in (a as Dictionary):
+			if not (b as Dictionary).has(k) or not _deep_eq((a as Dictionary)[k], (b as Dictionary)[k]):
+				return false
+		return true
+	if (typeof(a) == TYPE_INT or typeof(a) == TYPE_FLOAT) \
+			and (typeof(b) == TYPE_INT or typeof(b) == TYPE_FLOAT):
+		return absf(float(a) - float(b)) < 1e-9
+	return str(a) == str(b)
 
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:
@@ -259,3 +318,27 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c6: int = _code(r6["report"], "T13.3-1")
 	print("RED-PROBE CH13 T13.3-1 T13.3-1 缺 rows -> code=%d" % c6)
 	ctx.eq("T13.3-1 缺 rows 判红 E_UNCONNECTED(3)", c6, GateResult.E_UNCONNECTED)
+
+	# 能红证据①：改坏行映射里一个 src_line（pc2 由 1 改成 9）。
+	var a7 := _good(labs["bytecode_vm"])
+	var m7: Dictionary = (a7["T13.1-1"]["meta"] as Dictionary).duplicate(true)
+	var lm7: Array = (m7["line_map"] as Array).duplicate(true)
+	lm7[2]["src_line"] = 9
+	m7["line_map"] = lm7
+	a7["T13.1-1"]["meta"] = m7
+	var r7: Dictionary = Ch13Checks.run("bytecode_vm", labs["bytecode_vm"], {"answers": a7})
+	var c7: int = _code(r7["report"], "T13.1-1")
+	print("RED-PROBE CH13 T13.1-1 T13.1-1 行映射 pc2 来源行改坏(1→9) -> code=%d" % c7)
+	ctx.eq("T13.1-1 行映射改坏判红 E_OUTPUT_MISMATCH(10)", c7, GateResult.E_OUTPUT_MISMATCH)
+
+	# 能红证据②：删掉一条 pc→行映射项（pc2），不是布尔位能盖住的。
+	var a8 := _good(labs["bytecode_vm"])
+	var m8: Dictionary = (a8["T13.1-1"]["meta"] as Dictionary).duplicate(true)
+	var lm8: Array = (m8["line_map"] as Array).duplicate(true)
+	lm8.remove_at(2)
+	m8["line_map"] = lm8
+	a8["T13.1-1"]["meta"] = m8
+	var r8: Dictionary = Ch13Checks.run("bytecode_vm", labs["bytecode_vm"], {"answers": a8})
+	var c8: int = _code(r8["report"], "T13.1-1")
+	print("RED-PROBE CH13 T13.1-1 T13.1-1 删一条 pc2 行映射项 -> code=%d" % c8)
+	ctx.eq("T13.1-1 删映射项判红 E_OUTPUT_MISMATCH(10)", c8, GateResult.E_OUTPUT_MISMATCH)

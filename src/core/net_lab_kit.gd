@@ -15,6 +15,24 @@ static func _same(a: Variant, b: Variant) -> bool:
 	var tb := typeof(b)
 	if (ta == TYPE_INT or ta == TYPE_FLOAT) and (tb == TYPE_INT or tb == TYPE_FLOAT):
 		return absf(float(a) - float(b)) < 1e-9
+	# 嵌套形状（token 序列 / AST / 帧表）：逐元素、逐键比；
+	# 字典按键集合比，不依赖 JSON 里的键顺序。数组顺序有意义。
+	if ta == TYPE_ARRAY and tb == TYPE_ARRAY:
+		if (a as Array).size() != (b as Array).size():
+			return false
+		for i in (a as Array).size():
+			if not _same((a as Array)[i], (b as Array)[i]):
+				return false
+		return true
+	if ta == TYPE_DICTIONARY and tb == TYPE_DICTIONARY:
+		if (a as Dictionary).size() != (b as Dictionary).size():
+			return false
+		for k in (a as Dictionary):
+			if not (b as Dictionary).has(k):
+				return false
+			if not _same((a as Dictionary)[k], (b as Dictionary)[k]):
+				return false
+		return true
 	return str(a) == str(b)
 
 static func run(lab_id: String, cfg: Dictionary, inputs: Dictionary = {},

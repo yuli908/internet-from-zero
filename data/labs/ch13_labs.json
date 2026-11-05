@@ -2,14 +2,49 @@
   "version": 2,
   "source": "D:\\ai lm\\internet_from_zero\\docs\\curriculum\\24-ch13-lecture-copy.md",
   "source_note": "段落按课件 §1–§3 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：栈效应表、对象头 2 B + 字段各 1 B、GC 选引用计数、对象 4 B/个、堆 64 B。",
-  "pending_kinds": {
-    "table": "13.1 字节码编码与源码行映射未定（02 无操作码表，扩接口未批）；T13.1-1 挂 pending 不进分母。"
-  },
+  "pending_kinds": {},
   "labs": {
     "bytecode_vm": {
       "id": "bytecode_vm",
       "title": "字节码 VM · 一条指令一步，栈顶看得见",
       "body": "源码编译成字节码，VM 逐条执行：压值、运算、弹结果，每步只改栈顶。",
+      "source_lines": [
+        "x = 2 + 3",
+        "print x",
+        "halt"
+      ],
+      "program": [
+        {
+          "pc": 0,
+          "opcode": "PUSH",
+          "operand": 2,
+          "src_line": 1
+        },
+        {
+          "pc": 1,
+          "opcode": "PUSH",
+          "operand": 3,
+          "src_line": 1
+        },
+        {
+          "pc": 2,
+          "opcode": "ADD",
+          "operand": null,
+          "src_line": 1
+        },
+        {
+          "pc": 3,
+          "opcode": "PRINT",
+          "operand": null,
+          "src_line": 2
+        },
+        {
+          "pc": 4,
+          "opcode": "HALT",
+          "operand": null,
+          "src_line": 3
+        }
+      ],
       "sections": [
         {
           "order": 1,
@@ -105,15 +140,6 @@
           "title": "单步栈快照逐格对上、行映射可追溯、输出正确",
           "kind": "table",
           "required": true,
-          "status": "pending",
-          "pending_reason": "字节码编码未定稿（02 CH13 无操作码表），源码↔字节码行映射接口未批；不以假设编码冒充逐行可追溯。",
-          "thresholds": {
-            "bytecode_encode": {
-              "status": "pending",
-              "initial": "PUSH/ADD/MUL/PRINT/HALT 仅栈效应表",
-              "reason": "操作码表与行号接口未给；只给压/弹数表供 13.1-C 复算。"
-            }
-          },
           "keys": [
             "pc",
             "opcode",
@@ -147,9 +173,37 @@
             }
           ],
           "expect_meta": {
-            "line_map_ok": true,
-            "stack_ok": true,
-            "output_ok": true,
+            "line_map": [
+              {
+                "pc": 0,
+                "src_line": 1
+              },
+              {
+                "pc": 1,
+                "src_line": 1
+              },
+              {
+                "pc": 2,
+                "src_line": 1
+              },
+              {
+                "pc": 3,
+                "src_line": 2
+              },
+              {
+                "pc": 4,
+                "src_line": 3
+              }
+            ],
+            "lines_covered": [
+              1,
+              2,
+              3
+            ],
+            "unmapped_pc": [],
+            "output": [
+              5
+            ],
             "p04_grant": true
           },
           "codes": [
