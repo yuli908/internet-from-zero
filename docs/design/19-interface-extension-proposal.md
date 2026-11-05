@@ -71,6 +71,14 @@
 - **影响面**：13.2 A 的「逐对象/逐边」从布尔位转机判；`table` 需新增 `nodes`/`edges` 形状的读取约定（仍属 table）。
 - **估时**：6 人日。
 
+**已落成的边语义（2026-11-05；`src/core/object_graph.gd` 与数据 `T13.2-1` 同文，改一侧必须同步另一侧）**：
+
+> 节点和边端点只用同一套编号 `obj_addr`（对象起始地址字符串，如 `"0x40"`），不引入第二套 id；边是有向四元组 `{kind, from, to, field}`，`from` = 持有者/子类/实现者，`to` = 被引用者/父类/接口表；`kind` 只允许 `parent`（子→父）、`iface`（实现者→接口表）、`field`（字段引用，必须带 `field` 名且该名必须是 `from` 节点 `fields[]` 里的字段，非 `field` 边不得带字段名）；边**无序**（按 `kind|from|to|field` 多重集比对），**禁重边、禁自环**；硬上限 **节点 64 / 边 128**，超限直接判红（`E_TABLE_CELL(7)`），不截断、不静默丢边。
+
+- 判据落点：`net_lab_kit` 的 `table` 分支在表行/`meta` 全对后，若 gate 声明了 `graph`，再走 `ObjectGraph.validate`；失败码点名：端点不存在 → `E_UNCONNECTED(3)`、`kind` 非法/自环/重边/超限 → `E_TABLE_CELL(7)`、节点或边与机器期望不符（含 `from`/`to` 颠倒）→ `E_OUTPUT_MISMATCH(10)`。
+- 下游真读点：`GateReport.cases[]` 的 `T13.2-1.actual.graph` 携带解析后的 `{nodes, edges}`（成功与失败都有），不是只有 `ok:true`；`tests/test_ch13.gd` 的 `t13_2_graph` 组直接读这个点。
+- 数据现状：`ch13_labs` 的 `object_ref` 已声明 3 节点 / 3 边（A `0x40`、B `0x48`、接口表 `0x18`；`parent 0x48→0x40`、`iface 0x48→0x18`、`field 0x40→0x48 field="y"`），`A.y` 的值改存引用地址 `"0x48"`。
+
 ### 2.3 14.1 tokens / ast 序列（`T14.1-1`）
 
 - **课文原话**：「需技术侧扩接口：三段产物判据（`{tokens[], ast, value}` + 逐段导出） / 最小替代：要求每段都能单独导出并与源码比对，任一段缺失即红。」
