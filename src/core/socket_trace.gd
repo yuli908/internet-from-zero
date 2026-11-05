@@ -5,7 +5,9 @@ extends RefCounted
 ## 生产：`run(calls)`（本文件）。
 ## 消费：`tests/test_ch15.gd` 用它生成 T15.2-1 的接口产物；
 ## gate 侧比对仍走 `src/core/net_lab_kit.gd::_table`（:82-165）。
-## 注意：本文件是模型，不是真实抓包；T15.2-1 仍挂 pending，缺真实数据源。
+## 数据源：2026-11-05 本机 loopback 真实捕获（Python socket，客户端 fd=332、12 B 原样
+## 回环），原始调用与字节冻结在 `data/labs/ch15_labs.json::socket_api.capture`；
+## 本文件只做「捕获 → 四调用归一化 → handles/frames」的编号，不再是无源模型。
 
 const INBOUND_OPS := ["recv"]
 
