@@ -78,6 +78,8 @@
 - 判据落点：`net_lab_kit` 的 `table` 分支在表行/`meta` 全对后，若 gate 声明了 `graph`，再走 `ObjectGraph.validate`；失败码点名：端点不存在 → `E_UNCONNECTED(3)`、`kind` 非法/自环/重边/超限 → `E_TABLE_CELL(7)`、节点或边与机器期望不符（含 `from`/`to` 颠倒）→ `E_OUTPUT_MISMATCH(10)`。
 - 下游真读点：`GateReport.cases[]` 的 `T13.2-1.actual.graph` 携带解析后的 `{nodes, edges}`（成功与失败都有），不是只有 `ok:true`；`tests/test_ch13.gd` 的 `t13_2_graph` 组直接读这个点。
 - 数据现状：`ch13_labs` 的 `object_ref` 已声明 3 节点 / 3 边（A `0x40`、B `0x48`、接口表 `0x18`；`parent 0x48→0x40`、`iface 0x48→0x18`、`field 0x40→0x48 field="y"`），`A.y` 的值改存引用地址 `"0x48"`。
+- 上限依据：当前真实最大图 **3 节点 / 3 边**，64/128 分别是它的 **21.3× / 42.7×**；取 2 的幂是为了序列化/分页对齐，且 64 个对象已超过单节 UI 一屏可指认的规模。合法大图（60 节点 / 120 边、含 `field` 边）实测通过（`GREEN-PROBE`），不会误红。
+- 扩容规则：后续章节自然需要超过 64 节点/128 边时，由制作人（内容侧）与维护者在本文 §2.2 提出，**同一次提交**改 `object_graph.gd` 常量、`test_ch13.gd` 的上限/合法大图用例、`failure_contract.md §11–§12`，并附该章真实最大图与余量证明；禁止只改常量、只改数据或临时截断。
 
 ### 2.3 14.1 tokens / ast 序列（`T14.1-1`）
 
@@ -245,6 +247,13 @@ RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=7
 - **实现侧**：剧本开关直连验证器（仿真核心）；证书链结果由 18.3 的导出复用。
 - **影响面**：18.4 A 的「开关是否真接」转机判；同时给 18.3 提供逐级原因。
 - **估时**：6 人日。
+- **实现落点（已落地）**：
+  - 判据模块 `src/core/cert_script.gd`（`CertScript.validate_rows`）；由 `src/core/net_lab_kit.gd` 的 `_table` 在逐格比对**之前**调用（cfg 有 `script` 时），仍属既有 kind `table`，不新增 kind。
+  - 表行新增四列：`switch`（on/off）、`cert_verify`（bool）、`result`（intercepted/rejected/pass）、`reason`，外加 `chain[]{node,sig_ok,reason}`；剧本真值声明在 `data/labs/ch18_labs.json` 的 `labs.mitm_lab.gate_cases[T18.4-1].script{row_key,phases}`，两遍 `verify_off/verify_on` 的开关与应有结果相反。
+  - 判据：`intercepted/rejected` 两个布尔必须能组合出 `result`；`switch=on` 却写 `pass` 或结果与 `expect` 相反 → 10；`cert_verify` 或链上逐级 `sig_ok/reason` 与剧本不符 → 10（detail 点名第几级）；开关关闭时 `intercepted/rejected/result` 缺失、留空或非布尔 → 7；开关本身不在 on/off、`result` 非法、两个布尔同时为 true → 7。
+  - 下游读取点：成功时整份表行进 `report.cases[].actual.rows`，下游逐行可读 `switch/cert_verify/result/reason/chain[]`，不只有 `ok:true`。
+  - 失败码只用白名单既有码：3（整件 rows 未提交，沿用 `E_UNCONNECTED`）、7（`E_TABLE_CELL`）、10（`E_OUTPUT_MISMATCH`）；不为本项新开码。
+  - 测试证据：`tests/test_ch18.gd` 组 `t18_4_script` 7 项——两遍相反、好答案全绿、下游可读、①开关开启写通过→10、②证书校验不符→10、③关开关结果缺失→7、④链上 sig_ok 不符→10。
 
 ### 2.9 19.3 采样链路（`T19.3-1`）
 
