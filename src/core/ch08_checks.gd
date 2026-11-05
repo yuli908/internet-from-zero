@@ -6,9 +6,8 @@ extends RefCounted
 
 const Kit := preload("res://src/core/lab_gate_kit.gd")
 
-const PENDING_REASONS := {
-	"field_start_spec": "8.1 字段位宽 field_spec 未定，无法给出机器起始位真值；先挂 pending 不进分母，不猜数补 gate。"
-}
+## 8.1 字段位宽已定稿：真值在 labs.protocol_editor.field_spec。
+## 缺真值才挂 pending（不再按 kind 短路），有真值就必须真判。
 
 static func deferred_gates(cfg: Dictionary) -> Dictionary:
 	return Kit.deferred_gates(cfg, "res://data/chapters/ch08_levels.json")
@@ -25,11 +24,13 @@ static func run(lab_id: String, cfg: Dictionary, inputs: Dictionary = {},
 		var c: Dictionary = raw
 		var cid := str(c.get("id", ""))
 		var kind := str(c.get("kind", ""))
-		if PENDING_REASONS.has(kind):
-			var reason := str(c.get("pending_reason", PENDING_REASONS[kind]))
-			pending.append({"id": cid, "kind": kind, "title": str(c.get("title", "")), "reason": reason})
-			Kit.add_pending(rep, c, reason)
-			continue
+		if kind == "field_start_spec":
+			var spec_v: Variant = cfg.get("field_spec", null)
+			if not (spec_v is Dictionary) or (spec_v as Dictionary).is_empty():
+				var reason := "8.1 缺 field_spec 真值：无法给出字段起始位，不猜数补 gate"
+				pending.append({"id": cid, "kind": kind, "title": str(c.get("title", "")), "reason": reason})
+				Kit.add_pending(rep, c, reason)
+				continue
 		match kind:
 			"protocol_replay":
 				_protocol_replay(rep, tracker, c, answers)
@@ -47,6 +48,8 @@ static func run(lab_id: String, cfg: Dictionary, inputs: Dictionary = {},
 				_single_snapshot(rep, tracker, c, answers)
 			"capture_start":
 				_capture_start(rep, tracker, c, answers)
+			"field_start_spec":
+				_field_start_spec(rep, tracker, c, answers, cfg)
 			"quiz":
 				Kit.judge_quiz(rep, tracker, c, answers)
 			_:
@@ -340,6 +343,242 @@ static func _capture_start(rep: GateReport, tracker: GateAttemptTracker, c: Dict
 		cursor += width
 	Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, got,
 		"各字段 start = 前面位宽之和", got, "起始位复算与抓包字段表一致")
+
+## 8.1 字段起始位：与 cfg 的 field_spec 逐字段比（字段名、位宽、起始位、保留位），
+## 不是只验「start = 前面位宽之和」的自洽——后者会让自洽但位宽错的表蒙过关。
+static func _field_start_spec(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
+		answers: Dictionary, cfg: Dictionary) -> void:
+	var spec: Dictionary = cfg.get("field_spec", {})
+	var truth := _spec_truth(spec)
+	if not bool(truth["ok"]):
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, spec, "field_spec 自洽",
+			truth["detail"], str(truth["detail"]))
+		return
+	var cross := _ch17_spec_agrees(spec)
+	if not bool(cross["ok"]):
+		Kit.emit(rep, tracker, GateResult.E_OUTPUT_MISMATCH, c, false, spec, "与 17.1 一致",
+			cross["detail"], str(cross["detail"]))
+		return
+	var got := Kit.answer_dict(answers, str(c.get("id", "")))
+	var rows_v: Variant = got.get("fields", null)
+	if not (rows_v is Array) or (rows_v as Array).is_empty():
+		Kit.emit(rep, tracker, GateResult.E_UNCONNECTED, c, false, got, "fields 8 行", "missing",
+			"未提交字段起始位表")
+		return
+	var rows: Array = rows_v
+	var fields: Array = (spec.get("packet", {}) as Dictionary).get("fields", [])
+	if rows.size() != fields.size():
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, {"rows": rows.size()},
+			{"rows": fields.size()}, {"rows": rows.size()},
+			"字段行数不符：应为 %d 行，交 %d 行" % [fields.size(), rows.size()])
+		return
+	for i in fields.size():
+		var f: Dictionary = fields[i]
+		var rv: Variant = rows[i]
+		if not (rv is Dictionary):
+			Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, rv,
+				"字段行 {layer,field,start_bit,width_bit}", "missing", "第 %d 行不是对象" % (i + 1))
+			return
+		var r: Dictionary = rv
+		var col := ""
+		if str(r.get("layer", "")) != str(f.get("layer", "")):
+			col = "layer"
+		elif str(r.get("field", "")) != str(f.get("field", "")):
+			col = "field"
+		elif str(r.get("start_bit", "")) != str(f.get("start_bit", "")):
+			col = "start_bit"
+		elif not _width_eq(r.get("width_bit", null), f.get("width_bit", null)):
+			col = "width_bit"
+		if col != "":
+			Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false,
+				{"row": i + 1, "field": str(f.get("field", ""))},
+				{"column": col, "expect": f.get(col, null)}, {"column": col, "actual": r.get(col, null)},
+				"第 %d 行（%s）%s 与 field_spec 不符：应为 %s，交 %s" % [i + 1, str(f.get("field", "")), col,
+					str(f.get(col, null)), str(r.get(col, null))])
+			return
+	var samples: Array = spec.get("samples", [])
+	if samples.is_empty():
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, spec, "samples 非空", "empty",
+			"field_spec 缺样例")
+		return
+	for raw in samples:
+		var s: Dictionary = raw
+		var dec := _decode_sample(str(s.get("hex", "")), spec)
+		if bool(s.get("accepted", false)) != bool(dec["accepted"]) \
+				or str(s.get("reason", "")) != str(dec["reason"]):
+			Kit.emit(rep, tracker, GateResult.E_OUTPUT_MISMATCH, c, false, s,
+				{"accepted": dec["accepted"], "reason": dec["reason"]},
+				{"accepted": bool(s.get("accepted", false)), "reason": str(s.get("reason", ""))},
+				"样例 %s 结论与解码不符：应为 accepted=%s reason=%s，写 accepted=%s reason=%s" % [
+					str(s.get("id", "")), str(dec["accepted"]), str(dec["reason"]),
+					str(s.get("accepted", false)), str(s.get("reason", ""))])
+			return
+	Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, got,
+		"字段名/位宽/起始位逐格与 field_spec 相同；样例解码结论一致", got,
+		"%d 行逐字段一致；%d 条样例结论一致" % [rows.size(), samples.size()])
+
+static func _spec_truth(spec: Dictionary) -> Dictionary:
+	if str(spec.get("unit", "")) != "bit":
+		return {"ok": false, "detail": "field_spec.unit 必须是 bit（位宽口径，不是字节）"}
+	if str(spec.get("byte_order", "")) != "big_endian":
+		return {"ok": false, "detail": "多字节必须大端：byte_order=big_endian"}
+	var fr: Dictionary = spec.get("frame", {})
+	var ff: Array = fr.get("fields", [])
+	if ff.size() != 4:
+		return {"ok": false, "detail": "物理帧字段应为 4 个，数据 %d 个" % ff.size()}
+	var cursor := 0
+	for raw in ff:
+		var x: Dictionary = raw
+		if int(x.get("start", -1)) != cursor:
+			return {"ok": false, "detail": "物理帧 %s 起始位应为 %d" % [str(x.get("name", "")), cursor]}
+		var w := int(x.get("width", 0))
+		if w <= 0:
+			return {"ok": false, "detail": "物理帧 %s 位宽必须为正" % str(x.get("name", ""))}
+		cursor += w
+	if cursor != 7 or int(fr.get("bits", 0)) != 7:
+		return {"ok": false, "detail": "物理帧应为 7 bit（4 数据位 + 1 校验 + 起止各 1），数据合计 %d" % cursor}
+	if int(fr.get("frames_per_byte", 0)) != 2:
+		return {"ok": false, "detail": "4 数据位口径下每字节 2 帧，数据写 %s" % str(fr.get("frames_per_byte", 0))}
+	var f0: Dictionary = ff[0]
+	var f1: Dictionary = ff[1]
+	var f2: Dictionary = ff[2]
+	var f3: Dictionary = ff[3]
+	if int(f0.get("must", -1)) != 0 or int(f3.get("must", -1)) != 1:
+		return {"ok": false, "detail": "起始位必须为 0、停止位必须为 1"}
+	if str(f2.get("rule", "")) != "xor(data)" or str(f1.get("order", "")) != "lsb_first":
+		return {"ok": false, "detail": "校验规则应为 xor(data)、数据低位先发"}
+	var pk: Dictionary = spec.get("packet", {})
+	var pf: Array = pk.get("fields", [])
+	if pf.size() != 8:
+		return {"ok": false, "detail": "包字段应为 8 个（dst/rsv/src/rsv/type/len/ts/payload），数据 %d 个" % pf.size()}
+	var by := _field_by_name(pf)
+	for nm in ["dst_node", "dst_rsv", "src_node", "src_rsv", "type", "len", "ts", "payload"]:
+		if not by.has(nm):
+			return {"ok": false, "detail": "包字段缺 %s" % nm}
+	var pos := 0
+	for raw in pf:
+		var x: Dictionary = raw
+		if int(x.get("start_bit", -1)) != pos:
+			return {"ok": false, "detail": "包字段 %s 起始位应为 %d（前缀和）" % [str(x.get("field", "")), pos]}
+		var wv: Variant = x.get("width_bit", null)
+		if wv is String:
+			if str(wv) != "8*len" or str(x.get("field", "")) != "payload":
+				return {"ok": false, "detail": "只有 payload 可以是可变位宽 8*len"}
+		else:
+			pos += int(wv)
+	if pos != 64:
+		return {"ok": false, "detail": "头 8 B 的固定位宽之和应为 64 bit，数据 %d" % pos}
+	if int(pk.get("header_bytes", 0)) != 8 or int(pk.get("header_bytes", 0)) * 8 != pos:
+		return {"ok": false, "detail": "header_bytes 应与固定位宽之和一致（8 B = 64 bit）"}
+	if int(pk.get("max_payload", 0)) != 256:
+		return {"ok": false, "detail": "负载上限应为 256 B"}
+	if int(pk.get("max_packet_bytes", 0)) != 264 \
+			or int(pk.get("max_packet_bytes", 0)) != int(pk.get("header_bytes", 0)) + int(pk.get("max_payload", 0)):
+		return {"ok": false, "detail": "整包上限应为 8 + 256 = 264 B"}
+	var dst: Dictionary = by["dst_node"]
+	var src: Dictionary = by["src_node"]
+	var dr: Dictionary = by["dst_rsv"]
+	var sr: Dictionary = by["src_rsv"]
+	if int(dst.get("width_bit", 0)) != 2 or int(src.get("width_bit", 0)) != 2:
+		return {"ok": false, "detail": "dst_node/src_node 位宽应为 2"}
+	if int(dr.get("width_bit", 0)) != 6 or int(dr.get("must", -1)) != 0 \
+			or int(sr.get("width_bit", 0)) != 6 or int(sr.get("must", -1)) != 0:
+		return {"ok": false, "detail": "保留位应为 6 bit 且必须为 0"}
+	var ty: Dictionary = by["type"]
+	var ln: Dictionary = by["len"]
+	var ts: Dictionary = by["ts"]
+	var pl: Dictionary = by["payload"]
+	if int(ty.get("width_bit", 0)) != 8 or int(ln.get("width_bit", 0)) != 16 or int(ts.get("width_bit", 0)) != 24:
+		return {"ok": false, "detail": "应用头应为 type 8 / len 16 / ts 24"}
+	if int(ty.get("start_bit", -1)) != 16 or int(ln.get("start_bit", -1)) != 24 \
+			or int(ts.get("start_bit", -1)) != 40 or int(pl.get("start_bit", -1)) != 64:
+		return {"ok": false, "detail": "起始位应为 type 16 / len 24 / ts 40 / payload 64"}
+	if str(pl.get("width_bit", "")) != "8*len":
+		return {"ok": false, "detail": "payload 位宽应为 8*len"}
+	return {"ok": true, "detail": ""}
+
+## 跨文件：8.1 应用头必须沿用 17.1 的 type/len/ts 与负载上限，不另造一套。
+static func _ch17_spec_agrees(spec: Dictionary) -> Dictionary:
+	var raw := FileAccess.get_file_as_string("res://data/labs/ch17_labs.json")
+	if raw.is_empty():
+		return {"ok": false, "detail": "读不到 17.1 数据：res://data/labs/ch17_labs.json"}
+	var d: Variant = JSON.parse_string(raw)
+	if not (d is Dictionary):
+		return {"ok": false, "detail": "17.1 数据不是对象"}
+	var labs: Dictionary = (d as Dictionary).get("labs", {})
+	var msg: Dictionary = labs.get("msg_format", {})
+	var gs: Array = msg.get("gate_cases", [])
+	var f17 := {}
+	for rawg in gs:
+		var g: Dictionary = rawg
+		if (g.get("fields") is Dictionary) and not (g.get("fields") as Dictionary).is_empty():
+			f17 = g["fields"]
+			break
+	if f17.is_empty():
+		return {"ok": false, "detail": "17.1 没有 fields 真值块"}
+	var by := _field_by_name((spec.get("packet", {}) as Dictionary).get("fields", []))
+	var ty: Dictionary = by.get("type", {})
+	var ln: Dictionary = by.get("len", {})
+	var ts: Dictionary = by.get("ts", {})
+	var tdom: Array = ty.get("domain", [])
+	var allowed: Array = f17.get("allowed_types", [])
+	if allowed.size() != tdom.size():
+		return {"ok": false, "detail": "type 取值域与 17.1 allowed_types 不一致"}
+	for i in allowed.size():
+		if int(allowed[i]) != int(tdom[i]):
+			return {"ok": false, "detail": "type 取值域与 17.1 allowed_types 不一致"}
+	if int(f17.get("len_bits", 0)) != int(ln.get("width_bit", 0)) \
+			or int(f17.get("ts_bits", 0)) != int(ts.get("width_bit", 0)):
+		return {"ok": false, "detail": "len/ts 位宽与 17.1 不一致（8.1 必须沿用 17.1）"}
+	if int(f17.get("max_payload", 0)) != int((spec.get("packet", {}) as Dictionary).get("max_payload", 0)):
+		return {"ok": false, "detail": "负载上限与 17.1 不一致"}
+	return {"ok": true, "detail": ""}
+
+## 样例按 field_spec 解码：保留位优先，再看节点号、类型、长度上限与长度自洽。
+static func _decode_sample(hex: String, spec: Dictionary) -> Dictionary:
+	var bytes := hex.hex_decode()
+	var total := bytes.size()
+	if total < 8:
+		return {"accepted": false, "reason": "bad_length"}
+	var b0 := int(bytes[0])
+	var b1 := int(bytes[1])
+	if (b0 >> 2) != 0 or (b1 >> 2) != 0:
+		return {"accepted": false, "reason": "bad_reserved"}
+	if (b0 & 3) < 1 or (b0 & 3) > 3 or (b1 & 3) < 1 or (b1 & 3) > 3:
+		return {"accepted": false, "reason": "bad_addr"}
+	var by := _field_by_name((spec.get("packet", {}) as Dictionary).get("fields", []))
+	var ty: Dictionary = by.get("type", {})
+	var tdom: Array = ty.get("domain", [])
+	var t := int(bytes[2])
+	if not _in_domain(t, tdom):
+		return {"accepted": false, "reason": "bad_type"}
+	var ln := (int(bytes[3]) << 8) | int(bytes[4])
+	var cap := int((spec.get("packet", {}) as Dictionary).get("max_payload", 0))
+	if ln > cap:
+		return {"accepted": false, "reason": "too_long"}
+	if total - 8 != ln:
+		return {"accepted": false, "reason": "bad_length"}
+	return {"accepted": true, "reason": ""}
+
+static func _field_by_name(fields: Array) -> Dictionary:
+	var out := {}
+	for raw in fields:
+		if raw is Dictionary:
+			out[str((raw as Dictionary).get("field", ""))] = raw
+	return out
+
+static func _in_domain(v: int, domain: Array) -> bool:
+	for a in domain:
+		if int(a) == v:
+			return true
+	return false
+
+static func _width_eq(a: Variant, b: Variant) -> bool:
+	if a == null or b == null:
+		return false
+	if (a is String) or (b is String):
+		return str(a).strip_edges() == str(b).strip_edges()
+	return float(a) == float(b)
 
 static func _layers_ok(snapshot: Variant, layers: Array) -> bool:
 	if not (snapshot is Dictionary):

@@ -1,10 +1,8 @@
 {
   "version": 2,
   "source": "docs/curriculum/19-ch08-lecture-copy.md",
-  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T8.x-n 与 after 按课文提案落库；字段位宽 field_spec 未定，对应 gate 挂 pending。",
-  "pending_kinds": {
-    "field_start_spec": "19 §0/§6-6：8.1 具体字段位宽以数据侧 field_spec 为准，尚未定；没有机器起始位真值，不猜数补 gate。"
-  },
+  "source_note": "课文为唯一事实源；段落原样搬运，未改写。lab 名、T8.x-n 与 after 按课文提案落库；字段位宽按 field_spec 定稿：寻址头 2 B + 应用头 6 B = 8 B，负载 ≤256 B，整包 ≤264 B。",
+  "pending_kinds": {},
   "labs": {
     "protocol_editor": {
       "id": "protocol_editor",
@@ -31,10 +29,20 @@
          "codes": ["E_UNCONNECTED(3)", "E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)", "E_COVERAGE(13)"]},
         {"id": "T8.1-2", "title": "跳过寻址层直接封装：中间节点无字段可读", "kind": "skip_layer", "required": true,
          "codes": ["E_UNCONNECTED(3)", "E_OUTPUT_MISMATCH(10)"]},
-        {"id": "T8.1-3", "title": "算字段起始位：前面各字段位宽之和", "kind": "field_start_spec", "required": true, "status": "pending",
-         "thresholds": {"field_spec": {"status": "pending", "initial": null, "reason": "19 §6-6：8.1 具体字段位宽以数据侧 field_spec 为准，尚未定"}},
-         "pending_reason": "8.1 字段位宽 field_spec 未定，无法给出机器起始位真值；先挂 pending 不进分母，不猜数补 gate。",
-         "codes": ["E_TABLE_CELL(7)"]},
+        {"id": "T8.1-3", "title": "算字段起始位：前面各字段位宽之和", "kind": "field_start_spec", "required": true, "status": "ready",
+         "keys": ["layer", "field", "start_bit", "width_bit"],
+         "expect_rows": [
+           {"layer": "address", "field": "dst_node", "start_bit": 0, "width_bit": 2},
+           {"layer": "address", "field": "dst_rsv", "start_bit": 2, "width_bit": 6},
+           {"layer": "address", "field": "src_node", "start_bit": 8, "width_bit": 2},
+           {"layer": "address", "field": "src_rsv", "start_bit": 10, "width_bit": 6},
+           {"layer": "application", "field": "type", "start_bit": 16, "width_bit": 8},
+           {"layer": "application", "field": "len", "start_bit": 24, "width_bit": 16},
+           {"layer": "application", "field": "ts", "start_bit": 40, "width_bit": 24},
+           {"layer": "application", "field": "payload", "start_bit": 64, "width_bit": "8*len"}
+         ],
+         "expect_values": {"header_bytes": 8, "app_start_bit": 16, "payload_start_bit": 64, "max_payload": 256, "max_packet_bytes": 264},
+         "codes": ["E_TABLE_CELL(7)", "E_OUTPUT_MISMATCH(10)"]},
         {"id": "T8.1-4", "title": "为什么每层只解决一件事", "kind": "quiz", "required": true,
          "quiz": {"question": "协议为什么按层划分，每层只解决一件事？", "options": ["上层换实现不必改下层，下层出错不必改上层", "层数越多传输越快", "每层都必须重新编码整条消息", "这样就不需要校验了"], "answer": 0},
          "codes": ["E_QUIZ(14)"]}
@@ -42,7 +50,42 @@
       "hint": "先看有没有把应用消息直接塞进物理帧：缺寻址字段时中间节点读不到去向，转发就会落空。",
       "misconception": "只测两端、不回放步骤；没有逐层快照就证明不了转发没改字段。",
       "grants": {"items": {"P07": 1}, "blueprint": ["KN-PROTO-01"]},
-      "grants_note": "P07 协议编辑器初版与知识卡随 gate 发放"
+      "grants_note": "P07 协议编辑器初版与知识卡随 gate 发放",
+      "field_spec": {
+        "unit": "bit",
+        "byte_order": "big_endian",
+        "source": "8.1 定稿：寻址头 dst/src 各 2 bit 节点号 + 6 bit 保留必须为 0；应用头沿用 17.1 的 type 8 / len 16 / ts 24；负载 ≤256 B；整包 ≤264 B。物理层取 7.2 口径（4 数据位 + 1 校验），不用 8N1。",
+        "frame": {
+          "bits": 7,
+          "frames_per_byte": 2,
+          "fields": [
+            {"name": "start", "start": 0, "width": 1, "must": 0},
+            {"name": "data", "start": 1, "width": 4, "order": "lsb_first"},
+            {"name": "check", "start": 5, "width": 1, "rule": "xor(data)"},
+            {"name": "stop", "start": 6, "width": 1, "must": 1}
+          ]
+        },
+        "packet": {
+          "header_bytes": 8,
+          "max_payload": 256,
+          "max_packet_bytes": 264,
+          "fields": [
+            {"layer": "address", "field": "dst_node", "start_bit": 0, "width_bit": 2, "domain": [1, 2, 3]},
+            {"layer": "address", "field": "dst_rsv", "start_bit": 2, "width_bit": 6, "must": 0},
+            {"layer": "address", "field": "src_node", "start_bit": 8, "width_bit": 2, "domain": [1, 2, 3]},
+            {"layer": "address", "field": "src_rsv", "start_bit": 10, "width_bit": 6, "must": 0},
+            {"layer": "application", "field": "type", "start_bit": 16, "width_bit": 8, "domain": [1, 2, 3]},
+            {"layer": "application", "field": "len", "start_bit": 24, "width_bit": 16, "domain": [0, 256]},
+            {"layer": "application", "field": "ts", "start_bit": 40, "width_bit": 24, "domain": [0, 16777215]},
+            {"layer": "application", "field": "payload", "start_bit": 64, "width_bit": "8*len", "domain": [0, 256]}
+          ]
+        },
+        "samples": [
+          {"id": "EX-1", "hex": "01020100060003e9e4bda3e5a5bd", "accepted": true, "reason": ""},
+          {"id": "EX-2", "hex": "05020100060003e9e4bda3e5a5bd", "accepted": false, "reason": "bad_reserved"},
+          {"id": "EX-3", "hex": "01020100060003e9e4bda3", "accepted": false, "reason": "bad_length"}
+        ]
+      }
     },
     "handshake": {
       "id": "handshake",

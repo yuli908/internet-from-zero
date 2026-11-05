@@ -925,6 +925,7 @@ RESULT: 7433 checks, 0 failures
 |---|---|---|---|---|
 | `docs/simulation/**` | 「硬件与系统仿真」工作流（另一会话；其约定写入范围仅 `docs/simulation/`） | 已跟踪改动 12 文件（+565/−106）：`01_model_layers.md`、`02_determinism.md`、`03_components.md`、`06_performance.md`、`07_api_contract.md`、`08_testing.md`、`09_feasibility_risks.md`、`README.md`、`ref/run_all.py`、`ref/simcore/components.py`、`ref/verify_report.md`、`ref/simcore/__pycache__/components.cpython-313.pyc`；另有未跟踪 7 项：`10_l3_timing.md`、`ref/event_counts.json`、`ref/export_vectors.py`、`ref/measure_events.py`、`ref/tests/test_devices.py`、`ref/tests/__pycache__/test_devices.cpython-313.pyc`、`ref/vectors/` | 不是失效代码，是该工作流的文档与参考实现增量；**本会话没有该工作流的验收口径，未复跑** | 不入库，登记为**未完成/待续**；由该工作流会话复跑 `docs/simulation/ref/run_all.py` 后自行提交（提交信息需说明范围） |
 | `docs/simulation/ref/simcore/__pycache__/components.cpython-313.pyc` | 同上 | 二进制 | 误入版本库的生成物（该文件已被跟踪） | 待该工作流决定是否从库中清出；本轮不动 |
+| **跨文档矛盾：物理帧位数（8N1 vs 4 数据位）** | 内容侧 8.1 定稿与本会话核对时发现 | 两处定义：`docs/simulation/03_components.md` L286 写「起始位 0 + 8 数据位（LSB 先）+ 停止位 1（8N1）」；`data/labs/ch07_labs.json` L50 写「1 起始 + 4 数据 + 1 校验 + 1 停止的 7 位帧」 | **8.1 取 7.2 的 4 位口径**（`ch08_labs.json::labs.protocol_editor.field_spec.frame` = 7 bit / 每字节 2 帧 / `check=xor(data)`）；若取 8N1，14 B 包会从 28 帧变 14 帧，与 7.2 已落库的 7 位帧冲突 | `docs/simulation/**` 属另一工作流且自身有未提交改动，本会话不改；待该文件作者把 L286 更正为 4 数据位口径后再撤掉本条 |
 | `artifacts/shots/selfcheck.png` | 某会话自检工具输出 | 1 图 | 与本轮无关 | 保留，不入库 |
 | `artifacts/probe_{en,framing,period,snap}.gd`(+`.uid`) | 某会话临时取证脚本 | 8 个未跟踪文件 | 临时探针，工程文件不删 | 保留，登记为待续 |
 
