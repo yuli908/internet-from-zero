@@ -14,8 +14,48 @@
         "symbols": {
           "lib": "libmath",
           "programs": [
-            "P1",
-            "P2"
+            {
+              "id": "P1",
+              "declares": [
+                {
+                  "name": "area",
+                  "params": [
+                    "int",
+                    "char"
+                  ],
+                  "ret": "A"
+                },
+                {
+                  "name": "scale",
+                  "params": [
+                    "char",
+                    "int"
+                  ],
+                  "ret": "int"
+                }
+              ]
+            },
+            {
+              "id": "P2",
+              "declares": [
+                {
+                  "name": "area",
+                  "params": [
+                    "int",
+                    "char"
+                  ],
+                  "ret": "A"
+                },
+                {
+                  "name": "scale",
+                  "params": [
+                    "char",
+                    "int"
+                  ],
+                  "ret": "int"
+                }
+              ]
+            }
           ],
           "symbols": [
             {
@@ -35,6 +75,16 @@
               "ret": "int"
             }
           ],
+          "abi_types": {
+            "params": [
+              "int",
+              "char"
+            ],
+            "ret": [
+              "int",
+              "A"
+            ]
+          },
           "blueprint": true
         }
       },
@@ -469,6 +519,39 @@
       "id": "version_compat",
       "title": "版本兼容 · 改接口不能悄悄坏",
       "body": "版本号是承诺：主版本变即拒绝，次版本变兼容；兼容检查靠符号表与 ABI 签名。",
+      "case_sources": {
+        "version_pairs": {
+          "lib": "libmath",
+          "req_version": "1.0",
+          "lib_version": "2.0",
+          "pairs": [
+            {
+              "old": {"name": "area", "params": ["int", "char"], "ret": "A"},
+              "new": {"name": "area", "params": ["int", "char"], "ret": "int"}
+            },
+            {
+              "old": {"name": "scale", "params": ["char", "int"], "ret": "int"},
+              "new": {"name": "scale", "params": ["int", "char"], "ret": "int"}
+            },
+            {
+              "old": {"name": "sum", "params": ["int", "int"], "ret": "int"},
+              "new": {"name": "sum", "params": ["int", "int", "int"], "ret": "int"}
+            },
+            {
+              "old": {"name": "peek", "params": ["int"], "ret": "char"},
+              "new": {"name": "peek2", "params": ["int"], "ret": "char"}
+            },
+            {
+              "old": {"name": "emit", "params": ["char"], "ret": "int"},
+              "new": {"name": "emit", "params": ["int"], "ret": "int"}
+            },
+            {
+              "old": {"name": "tick", "params": ["int"], "ret": "int"},
+              "new": {"name": "tick", "params": ["int"], "ret": "int"}
+            }
+          ]
+        }
+      },
       "sections": [
         {
           "order": 1,
@@ -561,35 +644,71 @@
       "gate_cases": [
         {
           "id": "T15.3-1",
-          "title": "新旧程序对同一库的链接结果与错误可读",
+          "title": "新旧符号表逐符号比签名差异，按版本规则给链接结果",
           "kind": "table",
           "required": true,
           "keys": [
-            "prog",
-            "lib_version",
-            "req_version",
-            "result",
-            "symbol"
+            "symbol",
+            "old_sig",
+            "new_sig",
+            "reason",
+            "compatible",
+            "result"
           ],
           "expect_rows": [
             {
-              "prog": "old",
-              "lib_version": "2.0",
-              "req_version": "1.0",
-              "result": "rejected",
-              "symbol": "area"
+              "symbol": "area",
+              "old_sig": "area(int,char)->A",
+              "new_sig": "area(int,char)->int",
+              "reason": "ret_changed",
+              "compatible": false,
+              "result": "rejected"
             },
             {
-              "prog": "new",
-              "lib_version": "2.0",
-              "req_version": "2.0",
-              "result": "linked",
-              "symbol": "area"
+              "symbol": "scale",
+              "old_sig": "scale(char,int)->int",
+              "new_sig": "scale(int,char)->int",
+              "reason": "order_changed",
+              "compatible": false,
+              "result": "rejected"
+            },
+            {
+              "symbol": "sum",
+              "old_sig": "sum(int,int)->int",
+              "new_sig": "sum(int,int,int)->int",
+              "reason": "arity_changed",
+              "compatible": false,
+              "result": "rejected"
+            },
+            {
+              "symbol": "peek",
+              "old_sig": "peek(int)->char",
+              "new_sig": "peek2(int)->char",
+              "reason": "name_changed",
+              "compatible": false,
+              "result": "rejected"
+            },
+            {
+              "symbol": "emit",
+              "old_sig": "emit(char)->int",
+              "new_sig": "emit(int)->int",
+              "reason": "type_changed",
+              "compatible": false,
+              "result": "rejected"
+            },
+            {
+              "symbol": "tick",
+              "old_sig": "tick(int)->int",
+              "new_sig": "tick(int)->int",
+              "reason": "",
+              "compatible": true,
+              "result": "rejected"
             }
           ],
           "expect_meta": {
-            "version_rule_ok": true,
-            "sig_diff_detected": true,
+            "version_major_changed": true,
+            "changed": 5,
+            "unchanged": 1,
             "readable": true,
             "report": true
           },

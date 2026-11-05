@@ -20,9 +20,9 @@ const SocketTrace = preload("res://src/core/socket_trace.gd")
 const NetLibKit = preload("res://src/core/net_lab_kit.gd")
 const SymbolTable = preload("res://src/core/symbol_table.gd")
 
-const EXPECT := 79
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_1_real": 3, "t15_2_interface": 3, "negative": 10}
-const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_1_real": "T15.1-1 符号签名由 SymbolTable 实导：逐行对数据、签名含有序参数类型、同符号跨程序一致", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧/符号类型写错/参数顺序颠倒 均精确判红"}
+const EXPECT := 89
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_1_real": 3, "t15_2_interface": 3, "t15_3_real": 3, "negative": 17}
+const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_1_real": "T15.1-1 符号签名由 SymbolTable 实导：逐行对数据、签名含有序参数类型、程序声明与库导出跨源一致", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "t15_3_real": "T15.3-1 兼容表由新旧符号对实导：五类 reason 各命中一条，主版本变更按规则拒绝", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧/符号类型写错/参数顺序颠倒/同符号声明不一致/abi_ok 不符/五类 reason 改错 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch15_labs.json")
@@ -88,6 +88,7 @@ func run(ctx: TestContext) -> void:
 
 	_t15_1_real(ctx, labs["library_abi"])
 	_t15_2_interface(ctx, labs["socket_api"])
+	_t15_3_real(ctx, labs["version_compat"])
 
 	_negative(ctx, labs)
 
@@ -212,6 +213,11 @@ func _good(cfg: Dictionary) -> Dictionary:
 		var st: Dictionary = SymbolTable.run(sym)
 		out["T15.1-1"] = {"rows": (st["rows"] as Array).duplicate(true),
 			"meta": (st["meta"] as Dictionary).duplicate(true)}
+	var vp: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("version_pairs", {})
+	if not vp.is_empty():
+		var cr: Dictionary = SymbolTable.compat_report(vp)
+		out["T15.3-1"] = {"rows": (cr["rows"] as Array).duplicate(true),
+			"meta": (cr["meta"] as Dictionary).duplicate(true)}
 	return out
 
 func _gate(cfg: Dictionary, cid: String) -> Dictionary:
@@ -280,15 +286,57 @@ func _t15_1_real(ctx: TestContext, cfg: Dictionary) -> void:
 		if str(r.get("sig", "")) != want or int(r.get("params", -1)) != _type_count(r):
 			sigs_ok = false
 	ctx.check("T15.1-1 每行签名含有序参数类型（可逐符号比）", sigs_ok, _sig_list(rows))
-	var across: Dictionary = {}
-	var same := true
+	var exports_sig := {}
+	for raw in (src.get("symbols", []) as Array):
+		var s: Dictionary = raw
+		var nm := str(s.get("name", ""))
+		exports_sig[nm] = SymbolTable.signature(nm, s.get("params", []), str(s.get("ret", "")))
+	var declares_ok := true
+	for raw_p in (src.get("programs", []) as Array):
+		var p: Dictionary = raw_p
+		var seen := {}
+		for raw_d in (p.get("declares", []) as Array):
+			var d: Dictionary = raw_d
+			var nm := str(d.get("name", ""))
+			seen[nm] = true
+			if not exports_sig.has(nm) \
+					or str(exports_sig[nm]) != SymbolTable.signature(nm, d.get("params", []), str(d.get("ret", ""))):
+				declares_ok = false
+		for nm in exports_sig:
+			if not seen.has(str(nm)):
+				declares_ok = false
+	ctx.check("T15.1-1 程序声明与库导出逐符号一致（跨源核对，非本行自比）",
+		declares_ok and bool(st["meta"].get("same_symbol", false)) and bool(st["meta"].get("abi_ok", false)),
+		"same_symbol=%s abi_ok=%s" % [str(st["meta"].get("same_symbol")), str(st["meta"].get("abi_ok"))])
+
+func _t15_3_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t15_3_real")
+	var g: Dictionary = _gate(cfg, "T15.3-1")
+	var vp: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("version_pairs", {})
+	var cr: Dictionary = SymbolTable.compat_report(vp)
+	var rows: Array = cr["rows"]
+	ctx.check("T15.3-1 兼容表由新旧符号对实导且逐行对上数据",
+		_deep_eq(rows, g.get("expect_rows", [])), str(rows))
+	var want := {"area": "ret_changed", "scale": "order_changed", "sum": "arity_changed",
+		"peek": "name_changed", "emit": "type_changed", "tick": ""}
+	var dist := {}
+	var hit := true
 	for raw in rows:
 		var r: Dictionary = raw
-		var k := str(r.get("symbol", ""))
-		if across.has(k) and str(across[k]) != str(r.get("sig", "")):
-			same = false
-		across[k] = str(r.get("sig", ""))
-	ctx.check("T15.1-1 同符号跨程序（P1/P2）签名逐字一致", same, str(across))
+		var nm := str(r.get("symbol", ""))
+		var reason := str(r.get("reason", ""))
+		dist[nm] = reason
+		if not want.has(nm) or str(want[nm]) != reason:
+			hit = false
+	ctx.check("T15.3-1 五类 reason 各命中一条（顺序敏感：scale 报 order 不报 type）",
+		hit, str(dist))
+	var meta: Dictionary = cr["meta"]
+	var tick: Dictionary = rows[5]
+	ctx.check("T15.3-1 主版本 1.0→2.0：6 条全 rejected，ABI 未变的 tick 也拒绝",
+		bool(meta.get("version_major_changed", false)) and int(meta.get("changed", -1)) == 5 \
+			and int(meta.get("unchanged", -1)) == 1 \
+			and str(tick.get("result", "")) == "rejected" and bool(tick.get("compatible", false)),
+		str(meta))
 
 func _type_count(row: Dictionary) -> int:
 	var t := str(row.get("param_types", ""))
@@ -417,3 +465,52 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c10: int = _code(r10["report"], "T15.1-1")
 	print("RED-PROBE CH15 T15.1-1 第 2 行 scale 参数顺序颠倒(char,int→int,char) -> code=%d" % c10)
 	ctx.eq("T15.1-1 参数顺序颠倒判红 E_TABLE_CELL(7)", c10, GateResult.E_TABLE_CELL)
+
+	# same_symbol 不是恒真：库导出与行都不动，只把 P2 的 area 声明改成 (int,char,int) → same_symbol=false。
+	var src11: Dictionary = ((labs["library_abi"].get("case_sources", {}) as Dictionary).get("symbols", {}) as Dictionary).duplicate(true)
+	var progs11: Array = src11.get("programs", [])
+	var area11: Dictionary = ((progs11[1] as Dictionary).get("declares", []) as Array)[0]
+	(area11.get("params", []) as Array).append("int")
+	var st11: Dictionary = SymbolTable.run(src11)
+	print("RED-PROBE CH15 T15.1-1 P2 声明 area(int,char,int)（库导出/行不变）-> same_symbol=%s abi_ok=%s"
+		% [str(st11["meta"]["same_symbol"]), str(st11["meta"]["abi_ok"])])
+	var r11: Dictionary = Ch15Checks.run("library_abi", labs["library_abi"], {"answers": {
+		"T15.1-1": {"rows": (st11["rows"] as Array).duplicate(true), "meta": (st11["meta"] as Dictionary).duplicate(true)}}})
+	var c11: int = _code(r11["report"], "T15.1-1")
+	print("RED-PROBE CH15 T15.1-1 同符号声明不一致 -> code=%d" % c11)
+	ctx.check("T15.1-1 同符号声明不一致（行不变）也判红",
+		not bool(st11["meta"]["same_symbol"]) and c11 == GateResult.E_OUTPUT_MISMATCH,
+		"same_symbol=%s code=%d" % [str(st11["meta"]["same_symbol"]), c11])
+
+	# abi_ok 也不是恒真：P1/P2 都声明 area 返回 B（彼此一致 → same_symbol=true），但与库导出 A 不符。
+	var src12: Dictionary = ((labs["library_abi"].get("case_sources", {}) as Dictionary).get("symbols", {}) as Dictionary).duplicate(true)
+	for raw_p in (src12.get("programs", []) as Array):
+		for raw_d in ((raw_p as Dictionary).get("declares", []) as Array):
+			if str((raw_d as Dictionary).get("name", "")) == "area":
+				(raw_d as Dictionary)["ret"] = "B"
+	var st12: Dictionary = SymbolTable.run(src12)
+	print("RED-PROBE CH15 T15.1-1 P1/P2 都声明 area(...)->B（与库导出 A 不符）-> same_symbol=%s abi_ok=%s"
+		% [str(st12["meta"]["same_symbol"]), str(st12["meta"]["abi_ok"])])
+	var r12: Dictionary = Ch15Checks.run("library_abi", labs["library_abi"], {"answers": {
+		"T15.1-1": {"rows": (st12["rows"] as Array).duplicate(true), "meta": (st12["meta"] as Dictionary).duplicate(true)}}})
+	var c12: int = _code(r12["report"], "T15.1-1")
+	print("RED-PROBE CH15 T15.1-1 abi_ok 不符 -> code=%d" % c12)
+	ctx.check("T15.1-1 abi_ok 不符（同符号仍一致）也判红",
+		bool(st12["meta"]["same_symbol"]) and not bool(st12["meta"]["abi_ok"]) and c12 == GateResult.E_OUTPUT_MISMATCH,
+		"same_symbol=%s abi_ok=%s code=%d" % [str(st12["meta"]["same_symbol"]), str(st12["meta"]["abi_ok"]), c12])
+
+	# 15.3 五类 reason 各一条负例：把对应行的 reason 改错 → 逐格判红。
+	var classes := ["ret_changed", "order_changed", "arity_changed", "name_changed", "type_changed"]
+	var wrong_reason := ["type_changed", "type_changed", "type_changed", "type_changed", "ret_changed"]
+	for i in 5:
+		var av: Dictionary = _good(labs["version_compat"])
+		var gv: Dictionary = av["T15.3-1"]
+		var rv: Array = (gv["rows"] as Array).duplicate(true)
+		var sym_name := str((rv[i] as Dictionary).get("symbol", ""))
+		(rv[i] as Dictionary)["reason"] = wrong_reason[i]
+		gv["rows"] = rv
+		var rr: Dictionary = Ch15Checks.run("version_compat", labs["version_compat"], {"answers": av})
+		var cv: int = _code(rr["report"], "T15.3-1")
+		print("RED-PROBE CH15 T15.3-1 %s 行 reason 改错(%s→%s) -> code=%d"
+			% [sym_name, classes[i], wrong_reason[i], cv])
+		ctx.eq("T15.3-1 %s/%s 的 reason 改错判红 E_TABLE_CELL(7)" % [sym_name, classes[i]], cv, GateResult.E_TABLE_CELL)
