@@ -1,0 +1,764 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/29-ch18-lecture-copy.md",
+  "source_note": "段落按课件 §1–§4 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：异或流 6 B 示例、会话密钥指纹、8 位摘要与雪崩 4 位、16 B 指纹、握手上限 50 ms。",
+  "pending_kinds": {
+    "table": "18.1 密钥流生成与逐字节导出未批；T18.1-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "xor_cipher": {
+      "id": "xor_cipher",
+      "title": "对称与密钥分发 · 一把钥匙，加解密同一把",
+      "body": "对称加密只用一个密钥：加密与解密同一把；异或流是最小模型，无密钥不可还原。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 一把钥匙，加解密同一把",
+          "text": "对称加密只用一个密钥：加密和解密同一把。异或流是最小模型——明文与密钥流逐字节异或得密文，再异或一次还原。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "难点 · 难在分发，不在算法",
+          "text": "难处不在算法，在分发：密钥怎么到对方手里而不被看见。18.1 先只做「有密钥能还原、无密钥不能」，分发留给 18.2。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 加密，再用错密钥与无密钥解",
+          "text": "做一遍：写异或流加密，用密钥加密一段文本；再用错密钥与无密钥各解一次，两次都必须失败。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 密文等于明文，密钥写死",
+          "text": "负例：加密函数是恒等变换，密文等于明文；或密钥写死在代码里，谁都能拿。无密钥也能还原——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 无密钥不可还原",
+          "text": "验收：无密钥不可还原。四条同时——①同密钥往返一致；②错密钥解不出原文；③无密钥解不出；④知识卡落袋。只证明「能加密」，不给过。"
+        }
+      ],
+      "p1": "写异或流加密，用同密钥、错密钥、无密钥各解一次，导出三次结果",
+      "p1_gates": [
+        "T18.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "用密钥加密一段文本，再用同密钥、错密钥、无密钥各解一次",
+          "judge": "四条同时：①同密钥往返一致；②错密钥解不出；③无密钥解不出；④P10 加密库落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T18.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "加密函数原样返回明文，或密钥硬编码在源码",
+          "judge": "无密钥也能读出原文，密文与明文逐字节相同；detail 写「加密为恒等变换，无密钥可还原」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T18.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧密钥流，算明文字节异或后的值",
+          "judge": "与机器密文一致；不算 P1；detail 写「异或结果或密钥流取错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T18.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「密钥分发：怎么让对方拿到密钥而不被看见」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T18.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T18.1-1",
+          "title": "四次解密逐条对上：同密钥还原、错密钥与无密钥失败",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "密钥流生成规则与逐字节导出未批（02 CH18 无算法与位宽）；不以假设密钥流冒充密文逐字节可核。",
+          "thresholds": {
+            "key_stream": {
+              "status": "pending",
+              "initial": "stream=xor(plain,key)",
+              "reason": "密钥流生成与位宽未定；只定 6 B 示例供 18.1-C 复算。"
+            }
+          },
+          "keys": [
+            "case",
+            "cipher",
+            "restored",
+            "key_used"
+          ],
+          "expect_rows": [
+            {
+              "case": "same_key",
+              "cipher": "0x1b",
+              "restored": true,
+              "key_used": "k1"
+            },
+            {
+              "case": "wrong_key",
+              "cipher": "0x1b",
+              "restored": false,
+              "key_used": "k2"
+            },
+            {
+              "case": "no_key",
+              "cipher": "0x1b",
+              "restored": false,
+              "key_used": ""
+            }
+          ],
+          "expect_meta": {
+            "roundtrip_ok": true,
+            "wrong_key_fails": true,
+            "no_key_fails": true,
+            "p10_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T18.1-2",
+          "title": "负例：加密是恒等变换，密钥写死",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "cipher_apply",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T18.1-3",
+          "title": "按 6 B 明文与 6 B 密钥流算异或后的字节数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "plain_bytes": 6,
+            "key_bytes": 6,
+            "cipher_bytes": 6
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T18.1-4",
+          "title": "对称加密真正的难题",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "对称加密真正的难题是什么？",
+            "options": [
+              "密钥分发：怎么让对方拿到密钥而不被看见",
+              "算法太慢，传不动大文件",
+              "密文比明文长，浪费带宽",
+              "同一密钥不能加密两次"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先把密文逐字节记下，再用三把钥匙各解一次；无密钥解不出才算过。",
+      "misconception": "把「能加密」当成「安全」；密文等于明文或固定密钥，都是没加密。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "key_exchange": {
+      "id": "key_exchange",
+      "title": "非对称 · 两把钥匙，只换会话密钥",
+      "body": "公钥可公开、私钥自己留；非对称慢，只用来换会话密钥，之后回 18.1 的对称通道。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 两把钥匙，公钥可以公开",
+          "text": "非对称有两把钥匙：公钥可以公开，私钥自己留着。它慢，所以不用来加密 20 条消息，只用来换一把对称的会话密钥。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "流程 · 换完就回对称通道",
+          "text": "流程：双方各给公钥，各自用对方公钥加密会话密钥，对方用私钥解出。两边算出的会话密钥必须相同，之后回到 18.1 的对称通道。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 交换公钥，比对会话密钥",
+          "text": "做一遍：交换公钥，加密并解出会话密钥，再用它加密一条消息；导出两边的会话密钥指纹做比对。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 公钥只展示，仍用固定密钥",
+          "text": "负例：公钥只展示，实际仍用写死的固定密钥；或私钥被公开。交换像做了，安全性没变——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 密钥交换成功",
+          "text": "验收：密钥交换成功。四条同时——①公钥真参与加密；②私钥解出会话密钥；③两边密钥一致；④P10 加密库落袋。只展示公钥，不给过。"
+        }
+      ],
+      "p1": "交换公钥、解出会话密钥，导出两端指纹比对",
+      "p1_gates": [
+        "T18.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "两端生成密钥对，交换公钥，用对方公钥加密会话密钥，私钥解出",
+          "judge": "四条同时：①公钥参与加密；②私钥解出；③两边密钥一致；④P10 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T18.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "公钥只做展示，会话密钥仍取写死值",
+          "judge": "两端密钥虽一致，但与公钥无关；换一对密钥仍能通；detail 写「公钥未参与，会话密钥为固定值」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T18.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧给定的小参数，算一次模幂",
+          "judge": "与机器结果一致；不算 P1；detail 写「模幂中间值算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T18.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「非对称慢，只换会话密钥，大数据走对称」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T18.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T18.2-1",
+          "title": "两端会话密钥指纹一致，且由对方公钥算出",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "side",
+            "pub",
+            "session_fp",
+            "from_pub"
+          ],
+          "expect_rows": [
+            {
+              "side": "A",
+              "pub": "0x1d",
+              "session_fp": "9f2c",
+              "from_pub": true
+            },
+            {
+              "side": "B",
+              "pub": "0x2f",
+              "session_fp": "9f2c",
+              "from_pub": true
+            }
+          ],
+          "expect_meta": {
+            "pub_participates": true,
+            "session_match": true,
+            "p10_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T18.2-2",
+          "title": "负例：公钥只展示，仍用固定会话密钥",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "key_exchange",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T18.2-3",
+          "title": "按小参数算一次模幂 3^5",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "mod_base": 3,
+            "mod_exp": 5,
+            "mod_value": 243
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T18.2-4",
+          "title": "非对称为什么只换密钥",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "非对称为什么只换密钥？",
+            "options": [
+              "非对称运算慢，只换会话密钥，大数据仍走对称",
+              "非对称不能加密数据，只能签名",
+              "非对称每次都要重新生成密钥对，太麻烦",
+              "对称密钥不需要交换，所以非对称是多余的"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记两端的公钥与会话密钥指纹，再换一对密钥复跑；指纹应随公钥变。",
+      "misconception": "把「两端一致」当成「密钥交换成功」；固定密钥也会一致，换密钥仍通就是没换。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "hash_cert": {
+      "id": "hash_cert",
+      "title": "哈希与证书 · 改 1 bit 就得大改",
+      "body": "哈希单向，改 1 bit 摘要大改；证书把公钥与人绑起来，验证是根→中间→终端逐级验。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 哈希单向，签名不是加密",
+          "text": "哈希是单向摘要：改 1 个 bit，摘要应当大改，这叫雪崩。签名不是加密，是用私钥对摘要做运算，别人用公钥验。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "证书 · 公钥属于谁，由上级签",
+          "text": "证书把「公钥属于谁」绑起来，再由上级签。验证是一条链：根 → 中间 → 终端，逐级验签名与有效期；链与字段以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 改 1 bit，再验一条证书链",
+          "text": "做一遍：改 1 bit 看摘要变化，记录变了多少位；再验一条证书链，确认逐级签名通过。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 哈希只比长度，证书链不验",
+          "text": "负例：哈希只比长度，改内容也判「一致」；证书链摆着不验，随便一张自签也放行。摘要与签名都没接——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 雪崩 + 证书链通过",
+          "text": "验收：雪崩 + 证书链通过。四条同时——①改 1 bit 摘要大改；②签名验得过、篡改验不过；③证书链逐级通过；④P11 证书落袋。只比长度，不给过。"
+        }
+      ],
+      "p1": "改 1 bit 看摘要变化，再逐级验一条证书链",
+      "p1_gates": [
+        "T18.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P2",
+          "produce": "对同一输入改 1 bit 比较摘要，再逐级验证证书链",
+          "judge": "四条同时：①摘要大改；②签名验得过、篡改验不过；③链逐级通过；④P11 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T18.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "哈希只比字节长度；证书链不验签名，任意自签通过",
+          "judge": "改内容摘要仍「一致」，自签证书被判有效；detail 写「仅比长度/未验证书链」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T18.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按数据侧摘要位数与雪崩比例算期望变化位数",
+          "judge": "与机器统计在容差内；不算 P1；detail 写「摘要位数或期望变化算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T18.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「哈希单向摘要，签名用私钥对摘要运算、公钥验」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T18.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T18.3-1",
+          "title": "证书链逐级签名与有效期对得上",
+          "kind": "table",
+          "required": true,
+          "keys": [
+            "node",
+            "sig_ok",
+            "valid"
+          ],
+          "expect_rows": [
+            {
+              "node": "root",
+              "sig_ok": true,
+              "valid": true
+            },
+            {
+              "node": "inter",
+              "sig_ok": true,
+              "valid": true
+            },
+            {
+              "node": "leaf",
+              "sig_ok": true,
+              "valid": true
+            }
+          ],
+          "expect_meta": {
+            "avalanche_ok": true,
+            "tamper_fails": true,
+            "chain_ok": true,
+            "p11_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T18.3-2",
+          "title": "负例：哈希只比长度，证书链不验",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "cert_verify",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T18.3-3",
+          "title": "按 8 位摘要与雪崩比例算期望改变位数",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "digest_bits": 8,
+            "expected_changed_bits": 4,
+            "flip_bits": 1
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T18.3-4",
+          "title": "哈希与签名的区别",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "哈希与签名的区别是什么？",
+            "options": [
+              "哈希是单向摘要，签名用私钥对摘要运算、公钥验",
+              "哈希用私钥，签名用公钥，方向相反",
+              "两者都要密钥，只是长度不同",
+              "哈希能还原原文，签名不能"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先改 1 bit 记摘要差异，再按 root→inter→leaf 逐级对签名与有效期。",
+      "misconception": "把「验证返回 true」当成「链验过了」；只验终端、不验上级，自签也能过。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "mitm_lab": {
+      "id": "mitm_lab",
+      "title": "中间人 · 验不过就拒绝",
+      "body": "中间人各换一次密钥；阻断靠证书校验，验不过就拒绝并给可读原因，不是继续加密自欺。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 两端以为在和对方说话",
+          "text": "中间人站在两端中间：各自以为在和对方说话，其实都在和中间人说话。没有证书时，两边的密钥交换可以被它各换一次。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "阻断 · 验不过就拒绝",
+          "text": "阻断靠证书校验：客户端验证对方公钥是否由可信链签出。验不过就拒绝连接并给可读原因，不是继续加密然后自欺。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 重放剧本，开关证书",
+          "text": "做一遍：重放中间人剧本，先关证书验证，看到消息被中间人读出；再开验证，连接被拒、剧本走不通。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 开关只是标签，剧本照旧",
+          "text": "负例：证书开关只是界面标签，开关拨了剧本结果不变；或验不过仍继续连接。安全报告写着「已阻断」，实际没拦——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 开启证书后阻断",
+          "text": "验收：开启证书后阻断。四条同时——①关验证时中间人确实读到消息；②开验证后连接被拒；③拒绝原因可读；④安全报告落袋。只拨开关不看结果，不给过。"
+        }
+      ],
+      "p1": "重放中间人剧本，关/开证书验证各跑一遍，比对拒绝原因",
+      "p1_gates": [
+        "T18.4-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "重放中间人剧本：关验证看读取，开验证看拒绝",
+          "judge": "四条同时：①关验证时消息被读出；②开验证后连接被拒；③拒绝原因可读；④安全报告落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T18.4-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "拨动开关但验证逻辑不变，剧本两种状态结果相同",
+          "judge": "开/关验证都放行，中间人始终读到消息；detail 写「开关未接验证逻辑，剧本结果不变」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T18.4-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按证书指纹算中间人证书与原证书不同的字节数",
+          "judge": "与机器比对一致；不算 P1；detail 写「指纹差异字节数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T18.4-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「无证书无法确认归属；有可信链时验签失败即拒绝」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T18.4-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T18.4-1",
+          "title": "同一剧本两遍：关验证被读、开验证被拒、握手时延",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "handshake_ms",
+            "max": 50
+          },
+          "keys": [
+            "phase",
+            "intercepted",
+            "rejected",
+            "handshake_ms"
+          ],
+          "expect_rows": [
+            {
+              "phase": "verify_off",
+              "intercepted": true,
+              "rejected": false,
+              "handshake_ms": 30
+            },
+            {
+              "phase": "verify_on",
+              "intercepted": false,
+              "rejected": true,
+              "handshake_ms": 40
+            }
+          ],
+          "expect_meta": {
+            "off_reads": true,
+            "on_blocks": true,
+            "reason_readable": true,
+            "report": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T18.4-2",
+          "title": "负例：证书开关只是界面标签",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "cert_toggle",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T18.4-3",
+          "title": "按 16 B 指纹算中间人证书与原证书的差异字节",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "fingerprint_bytes": 16,
+            "diff_bytes": 12,
+            "same_bytes": 4
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T18.4-4",
+          "title": "中间人为什么能成功/被阻断",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "中间人为什么能成功或被阻断？",
+            "options": [
+              "无证书时两端无法确认公钥归属；有可信链时验签失败即拒绝",
+              "中间人只在物理层接线，软件层无法发现",
+              "只要加密强度够高，中间人就读不到",
+              "证书开启后中间人自动断开，不需要验证"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记两遍剧本的拦截与拒绝，再对指纹差异；握手超 50 ms 单独记 9。",
+      "misconception": "把「安全报告写了已阻断」当成「真阻断」；开关只改标签，结果不会变。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}

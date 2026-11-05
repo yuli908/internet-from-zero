@@ -60,6 +60,7 @@ const SUITES := [
 	"res://tests/test_ch15.gd",
 	"res://tests/test_ch16.gd",
 	"res://tests/test_ch17.gd",
+	"res://tests/test_ch18.gd",
 ]
 
 # 期望数已全部下沉到各套件自己的 `const EXPECT`；本文件不再维护任何数字表。

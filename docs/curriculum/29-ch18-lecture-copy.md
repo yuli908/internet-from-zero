@@ -9,8 +9,8 @@
       docs/design/17-practice-first-policy.md（P0–P5 分级与 H1–H5；18.1 待补 P2）
       docs/curriculum/28-ch17-lecture-copy.md（格式基准：JSON 段 + 实践表 + 校验表）
 边界: 只写 docs/curriculum/**；未动 src/**、data/**、tests/**、docs/design/**、project.godot
-说明: CH18 的 gate 尚未落库（data/labs 仅有 ch01/ch02/ch05/ch06，src/core 无 ch18_checks.gd），`lab` 名与 `T18.x-n` 均为提案
-      `after` 按每节 4 条 required 推定；最终以数据侧 gate 列表为准；若数据侧落成 3 条，末段改为 after=2
+说明: CH18 的 gate 已落库（data/labs/ch18_labs.json、src/core/ch18_checks.gd、tests/test_ch18.gd，EXPECT 70）
+      `lab` 名与 `T18.x-n` 与数据一致；T18.1-1 因密钥流未批挂 pending（分母 16→15），末段 after=3
 ```
 
 ## 0. 口径
@@ -162,10 +162,10 @@
 
 ## 6. 待办与接缝状态
 
-1. **gate 未落库**：`data/labs` 只有 ch01/ch02/ch05/ch06，`src/core` 无 `ch18_checks.gd`；`lab` 名（`xor_cipher` / `key_exchange` / `hash_cert` / `mitm_lab`）与 `T18.1-1..4` 等均为提案。`after` 按 4 条 required 推定，数据侧定稿后只改 `after`，段数与文案不动；**若为 3 条，末段 `after=2`**。
+1. **gate 已落库**：`data/labs/ch18_labs.json` 与 `src/core/ch18_checks.gd` 已按 `xor_cipher` / `key_exchange` / `hash_cert` / `mitm_lab` 落 4×4 条，`tests/test_ch18.gd` EXPECT 70；`after` 按 4 条 required 定稿（末段 `after=3`）。`T18.1-1` 因密钥流未批挂 pending，不进分母（16→15）。
 2. **4 项扩接口未批**：见 §5 末条。批之前对应 A 条只能按「最小替代」判，**不得**降级成纯问答或「看报告」。
 3. **12 不采用**：`E_ENCAPSULATION`(12) 不在白名单，语义仅到「尚未封装」，与「加密恒等变换 / 证书链没验」不同；本文件按 3 + 10 拆报，未新开码。
-4. **算法与参数未定**：02 CH18 只给「异或流、公钥交换、哈希雪崩、证书链、中间人剧本」，没有密钥长度、摘要位数、证书字段、信任根；本文件写「以数据侧为准」，**未编造算法名与数值**。C 条的模幂只按数据侧给的参数算，**不引入大数库**。
+4. **算法与参数由数据侧定稿**：02 CH18 只给「异或流、公钥交换、哈希雪崩、证书链、中间人剧本」；数据侧定 6 B 异或示例、8 位摘要与雪崩 4 位、16 B 指纹、握手上限 50 ms，模幂只取 3^5 小参数（**不引入大数库**）。这些是**数据侧假设值**，接口提案通过前不得当成 02 原文。
 5. **18.1 的 P2 待补项**：17 §0 与大纲「待补实践」列都要求 18.1「必须写加密并验证无密钥失败」，A 条按 P2 写，**不是**知识卡单独过关。
 6. **02 章验收对齐**：02 CH18 的「无密钥不可还原 / 中间人剧本开启证书后被阻断 / 篡改 1 bit 哈希全变」三条，分别落在 18.1 A、18.4 A、18.3 A；本文件**没有**把它们合并成一条总验收。
 7. **与既有机制的接缝**：密文只做 17.1 负载（接缝 1），非对称只换会话密钥（接缝 2），证书与剧本挂 17.3/18.2（接缝 3）。本文件**没有**新造消息头、传输层或信任模型，也**没有**抢写 CH19 的无线与固件。
