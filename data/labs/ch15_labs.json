@@ -10,6 +10,34 @@
       "id": "library_abi",
       "title": "库与 ABI · 调用先对齐约定",
       "body": "库是一组带符号的函数；调用前按 ABI 传参、取返回值，符号表说清每个符号怎么调。",
+      "case_sources": {
+        "symbols": {
+          "lib": "libmath",
+          "programs": [
+            "P1",
+            "P2"
+          ],
+          "symbols": [
+            {
+              "name": "area",
+              "params": [
+                "int",
+                "char"
+              ],
+              "ret": "A"
+            },
+            {
+              "name": "scale",
+              "params": [
+                "char",
+                "int"
+              ],
+              "ret": "int"
+            }
+          ],
+          "blueprint": true
+        }
+      },
       "sections": [
         {
           "order": 1,
@@ -102,30 +130,54 @@
       "gate_cases": [
         {
           "id": "T15.1-1",
-          "title": "符号表与两次调用逐字段对上：参数数、返回、库",
+          "title": "符号表逐符号导出：参数类型与顺序、返回、库",
           "kind": "table",
           "required": true,
           "keys": [
             "prog",
             "symbol",
             "params",
+            "param_types",
             "ret",
-            "lib"
+            "lib",
+            "sig"
           ],
           "expect_rows": [
             {
               "prog": "P1",
               "symbol": "area",
               "params": 2,
+              "param_types": "int,char",
               "ret": "A",
-              "lib": "libmath"
+              "lib": "libmath",
+              "sig": "area(int,char)->A"
+            },
+            {
+              "prog": "P1",
+              "symbol": "scale",
+              "params": 2,
+              "param_types": "char,int",
+              "ret": "int",
+              "lib": "libmath",
+              "sig": "scale(char,int)->int"
             },
             {
               "prog": "P2",
               "symbol": "area",
               "params": 2,
+              "param_types": "int,char",
               "ret": "A",
-              "lib": "libmath"
+              "lib": "libmath",
+              "sig": "area(int,char)->A"
+            },
+            {
+              "prog": "P2",
+              "symbol": "scale",
+              "params": 2,
+              "param_types": "char,int",
+              "ret": "int",
+              "lib": "libmath",
+              "sig": "scale(char,int)->int"
             }
           ],
           "expect_meta": {

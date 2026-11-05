@@ -18,10 +18,11 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 const Ch15Checks = preload("res://src/core/ch15_checks.gd")
 const SocketTrace = preload("res://src/core/socket_trace.gd")
 const NetLibKit = preload("res://src/core/net_lab_kit.gd")
+const SymbolTable = preload("res://src/core/symbol_table.gd")
 
-const EXPECT := 74
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_2_interface": 3, "negative": 8}
-const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧 均精确判红"}
+const EXPECT := 79
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_1_real": 3, "t15_2_interface": 3, "negative": 10}
+const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_1_real": "T15.1-1 符号签名由 SymbolTable 实导：逐行对数据、签名含有序参数类型、同符号跨程序一致", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧/符号类型写错/参数顺序颠倒 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch15_labs.json")
@@ -85,6 +86,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
 
+	_t15_1_real(ctx, labs["library_abi"])
 	_t15_2_interface(ctx, labs["socket_api"])
 
 	_negative(ctx, labs)
@@ -205,6 +207,11 @@ func _good(cfg: Dictionary) -> Dictionary:
 				out[cid] = {"values": (g.get("expect_values", {}) as Dictionary).duplicate(true)}
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
+	var sym: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("symbols", {})
+	if not sym.is_empty():
+		var st: Dictionary = SymbolTable.run(sym)
+		out["T15.1-1"] = {"rows": (st["rows"] as Array).duplicate(true),
+			"meta": (st["meta"] as Dictionary).duplicate(true)}
 	return out
 
 func _gate(cfg: Dictionary, cid: String) -> Dictionary:
@@ -256,6 +263,42 @@ func _t15_2_interface(ctx: TestContext, cfg: Dictionary) -> void:
 			and _deep_eq(tr["frames"], want.get("frames", []))
 			and _deep_eq(tr["unmatched_frames"], want.get("unmatched_frames", [])),
 		str(want.get("frames", [])))
+
+func _t15_1_real(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t15_1_real")
+	var g: Dictionary = _gate(cfg, "T15.1-1")
+	var src: Dictionary = (cfg.get("case_sources", {}) as Dictionary).get("symbols", {})
+	var st: Dictionary = SymbolTable.run(src)
+	var rows: Array = st["rows"]
+	ctx.check("T15.1-1 符号签名由符号表实导且逐行对上数据",
+		_deep_eq(rows, g.get("expect_rows", [])), str(rows))
+	var sigs_ok := true
+	for raw in rows:
+		var r: Dictionary = raw
+		var want := "%s(%s)->%s" % [str(r.get("symbol", "")),
+			str(r.get("param_types", "")), str(r.get("ret", ""))]
+		if str(r.get("sig", "")) != want or int(r.get("params", -1)) != _type_count(r):
+			sigs_ok = false
+	ctx.check("T15.1-1 每行签名含有序参数类型（可逐符号比）", sigs_ok, _sig_list(rows))
+	var across: Dictionary = {}
+	var same := true
+	for raw in rows:
+		var r: Dictionary = raw
+		var k := str(r.get("symbol", ""))
+		if across.has(k) and str(across[k]) != str(r.get("sig", "")):
+			same = false
+		across[k] = str(r.get("sig", ""))
+	ctx.check("T15.1-1 同符号跨程序（P1/P2）签名逐字一致", same, str(across))
+
+func _type_count(row: Dictionary) -> int:
+	var t := str(row.get("param_types", ""))
+	return 0 if t.is_empty() else t.split(",").size()
+
+func _sig_list(rows: Array) -> String:
+	var out := []
+	for raw in rows:
+		out.append(str((raw as Dictionary).get("sig", "")))
+	return str(out)
 
 func _deep_eq(a: Variant, b: Variant) -> bool:
 	if typeof(a) == TYPE_ARRAY and typeof(b) == TYPE_ARRAY:
@@ -352,3 +395,25 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c8: int = _code(rep8, "T15.2-1")
 	print("RED-PROBE CH15 T15.2-1 T15.2-1 删一帧(frame2) -> code=%d" % c8)
 	ctx.eq("T15.2-1 删一帧判红 E_OUTPUT_MISMATCH(10)", c8, GateResult.E_OUTPUT_MISMATCH)
+
+	var a9 := _good(labs["library_abi"])
+	var g9: Dictionary = a9["T15.1-1"]
+	var rows9: Array = (g9["rows"] as Array).duplicate(true)
+	rows9[1]["param_types"] = "char,char"
+	rows9[1]["sig"] = "scale(char,char)->int"
+	g9["rows"] = rows9
+	var r9: Dictionary = Ch15Checks.run("library_abi", labs["library_abi"], {"answers": a9})
+	var c9: int = _code(r9["report"], "T15.1-1")
+	print("RED-PROBE CH15 T15.1-1 第 2 行 scale 参数类型写错(char,int→char,char) -> code=%d" % c9)
+	ctx.eq("T15.1-1 符号类型写错判红 E_TABLE_CELL(7)", c9, GateResult.E_TABLE_CELL)
+
+	var a10 := _good(labs["library_abi"])
+	var g10: Dictionary = a10["T15.1-1"]
+	var rows10: Array = (g10["rows"] as Array).duplicate(true)
+	rows10[1]["param_types"] = "int,char"
+	rows10[1]["sig"] = "scale(int,char)->int"
+	g10["rows"] = rows10
+	var r10: Dictionary = Ch15Checks.run("library_abi", labs["library_abi"], {"answers": a10})
+	var c10: int = _code(r10["report"], "T15.1-1")
+	print("RED-PROBE CH15 T15.1-1 第 2 行 scale 参数顺序颠倒(char,int→int,char) -> code=%d" % c10)
+	ctx.eq("T15.1-1 参数顺序颠倒判红 E_TABLE_CELL(7)", c10, GateResult.E_TABLE_CELL)
