@@ -314,3 +314,25 @@ V_low  = Vdd · Ron / (R_L + Ron)
 - **合法大图不误红（证据）**：`tests/test_ch13.gd` 构造 **60 节点 / 120 边**（每节点 1 个 `field` 字段 `ref`，60 条 `field` 边 + 60 条 `iface` 边，端点全在节点集内、无自环无重边）→ `ObjectGraph.validate` 返回 `ok=true`；同时断言该图距上限仍有余量。日志 `GREEN-PROBE CH13 T13.2-1 合法大图 60 节点/120 边 -> ok`。
 - **扩容规则（一句话）**：后续章节若自然需要超过 64 节点/128 边，由制作人（内容侧）与维护者在 `docs/design/19-interface-extension-proposal.md §2.2` 提出上限变更，**同一次提交**里改 `object_graph.gd` 常量、`test_ch13.gd` 的上限/合法大图用例、本节与 §11 表，并附该章真实最大图与余量证明；**禁止**只改代码常量或只改数据、禁止临时截断。
 
+## 13. 19.3 采样链路的失败码与规模上限（2026-11-05 追加）
+
+> 判据落点：`src/core/sampling_link.gd`，由 `net_lab_kit` 的 `table` 分支在 `gate_cases[].sampling` 存在时调用；该门**不读** `expect_rows`，真值只来自 `src/sim/sim_sampling.gd::trace(cfg)` 的真跑链（采样 → 收帧 → 量化 → 应用 → 落盘），逐段比对原始字节/码值，不先把码值翻译成人话。
+> **不为采样链路新开失败码**——复用白名单里的 3 / 7 / 10 / 13。
+
+| 情形 | code | `detail` 措辞（点名） | 为什么用这个码 |
+|---|---|---|---|
+| 整件 `rows` 未提交 / 不是数组 | 3 `E_UNCONNECTED` | 「表件未提交：rows 不是数组」 | 与对象图同源：没有任何可判段 |
+| 段数不符：缺一段 / 多一段 | 13 `E_COVERAGE` | 「段数不符：交 4 段，网关声明/链路 5 段（缺段或多段）」 | 覆盖率不足/超出，沿用行数口径 |
+| 五段顺序错位（如 parse/apply 对调） | 10 `E_OUTPUT_MISMATCH` | 「第 N 段顺序错位：链路是 parse，交的是 apply」 | 形状合法但链路语义与真跑链相反，属输出不符 |
+| 段节点错位（如 parse 挂到 mcu） | 10 `E_OUTPUT_MISMATCH` | 「第 N 段（parse）节点错位：链路是 adc，交的是 mcu」 | 同上，节点归属是链路语义 |
+| 某段 `in_raw`/`out_raw`/`code`/`sample_ms` 与真跑链不符（被换算成人话或截断） | 7 `E_TABLE_CELL` | 「第 N 段（parse）out_raw 被换算/截断：交 0.5 v，链路原始值 40」 | 原始单元格值错，按表格式错误处理 |
+| `meta.stage_count` 与网关声明不符；`raw_v`/`lsb_v`/`adc_code`/`error_lsb`/`stored_key` 与真跑链不符 | 10 `E_OUTPUT_MISMATCH` | 「网关声明/采样判据 stage_count 不符：交 4，链路 5」 | 声明与判据是链路语义，不是单格排版 |
+| 配置非法：`stages` 为空、`op` 非法、段名重复、`vref`/`bits` 非法、采样超量程、`stage_count` 与 `stages` 长度不一致 | 7 `E_TABLE_CELL` | 「第 N 段 op=foo 不在 sample/receive/quantize/pass/store」 | 链路声明本身不成立，判红不跑 |
+| 段数超过硬上限 32 | 7 `E_TABLE_CELL` | 「段数 33 超过上限 32：判红，不截断」 | 规模契约；**不返回任何截断后的段**（`stages=[]`），避免把少一段伪装成合法链 |
+
+**规模上限的依据**：当前真实最长链是 `ch19/sensor_loop` 的 **5 段**（送→收→解析→应用→落盘）；上限 32 段 = 当前规模的 **6.4 倍**。依据：① 链路是顺序 op，32 段覆盖单章任何自然链路；② 一次校验是 O(段数) 纯比较，32 远低于可感知阈值；③ 32 是 2 的幂，便于后续按页/按块导出。
+
+**合法满规模不误红（证据）**：`tests/test_ch19.gd` `t19_3_chain` 构造 **32 段（正好等于上限）**合法链（sample → receive → quantize → 28 段 pass → store）→ `SimSampling.trace` 与 `SamplingLink.validate_gate` 均 `ok=true`；日志 `GREEN-PROBE Ch19 T19.3-1 合法满规模 32/32 段（余量 6.4x） -> ok=true`。超限探针 33 段 → `code=7` 且 `stages=0`。
+
+**扩容规则（一句话）**：后续章节若自然需要超过 32 段，由制作人（内容侧）与维护者在 `docs/design/19-interface-extension-proposal.md §2.9` 提出上限变更，**同一次提交**里改 `sim_sampling.gd` 的 `MAX_STAGES`、`test_ch19.gd` 的满规模/超限用例、本节与 §2.9 的余量说明，并附该章真实最长链与余量证明；**禁止**只改代码常量或只改数据、禁止在数据里逐条放行、禁止静默截断。
+

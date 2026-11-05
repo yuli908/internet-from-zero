@@ -264,16 +264,25 @@ RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=7
 ```json
 {
   "stages": [
-    {"stage": "sensor", "raw_v": 0.5, "code": null, "stored": false, "sample_ms": 20},
-    {"stage": "adc", "raw_v": 0.5, "code": 64, "stored": false, "sample_ms": 20},
-    {"stage": "server", "raw_v": 0.5, "code": 64, "stored": true, "sample_ms": 20}
+    {"stage": "send",  "node": "sensor", "in_raw": "mv:500", "out_raw": "01f4",   "code": null, "sample_ms": 20},
+    {"stage": "recv",  "node": "adc",    "in_raw": "01f4",   "out_raw": "01f4",   "code": null, "sample_ms": 20},
+    {"stage": "parse", "node": "adc",    "in_raw": "01f4",   "out_raw": "40",     "code": 64,   "sample_ms": 20},
+    {"stage": "apply", "node": "mcu",    "in_raw": "40",     "out_raw": "40",     "code": 64,   "sample_ms": 20},
+    {"stage": "store", "node": "server", "in_raw": "40",     "out_raw": "000140", "code": 64,   "sample_ms": 20}
   ],
-  "lsb_v": 0.0078125,
-  "error_lsb": 0
+  "meta": {"stage_count": 5, "raw_v": 0.5, "lsb_v": 0.0078125,
+           "adc_code": 64, "error_lsb": 0, "stored_key": "srv:0001:40"}
 }
 ```
 
 - **实现侧**：采样与量化在设备侧导出 raw_v/code（仿真核心）；UI 只画链路与码值。
+- **实现落点（已落地 2026-11-05）**：
+  - **生产**：`src/sim/sim_sampling.gd::trace(cfg)` 按 `sampling{stages[]}` 的 op 真跑一遍链路（`sample → receive → quantize → pass/store`），逐段产出原始字节/码值；cfg 只写物理参数与拓扑（`sensor_v/vref/bits/stage_count/stages[].op/ms`），不写任何期望值。0.5 V / 2 V / 8 bit → 帧 `01f4`、码 `40`（64）、LSB 0.0078125 V、误差 0 LSB、落盘记录 `000140`。
+  - **判据**：`src/core/sampling_link.gd`，由 `net_lab_kit` 的 `table` 分支在 `gate_cases[].sampling` 存在时调用（该门不读 `expect_rows`），逐段比对 `in_raw/out_raw/code/sample_ms` 原始值，不先把码值翻译成人话。
+  - **行结构**（五段，段名即 送去/收到/解析/应用/落盘）：`{stage, node, in_raw, out_raw, code, sample_ms}`；`meta={stage_count, raw_v, lsb_v, adc_code, error_lsb, stored_key}`。**没有布尔位**：落盘用原始记录 `000140` / `stored_key` 指认，不用 `stored:true`。
+  - **读取点**：`report.cases[]`（id=`T19.3-1`）的 `actual.rows`（提交逐段）/ `actual.chain`（机器逐段）/ `actual.chain_meta`；UI 与下游按段读。
+  - **失败码**：13 缺段/多段；10 顺序错位、节点错位、`meta.stage_count`/采样判据不符；7 某段原始值被换算/截断、配置非法（超限/声明与结构不一致）。详见 `specs/m5/failure_contract.md §13`。
+  - **上限**：`MAX_STAGES=32`，当前真实最长链 5 段（余量 6.4×）；33 段 → 7 且 `stages=[]`（不截断）；合法满规模 32/32 段 → 绿（`GREEN-PROBE ... ok=true`）。
 - **影响面**：T19.3-1 的「误差 ≤1 LSB」转机判；19.2 的功耗预算可复用同一导出格式。
 - **估时**：8 人日。
 
