@@ -1936,6 +1936,7 @@
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].pending_reason
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].quiz
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].required
+- data/labs/ch19_labs.json :: labs.*.gate_cases[].sampling
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].stage
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].status
 - data/labs/ch19_labs.json :: labs.*.gate_cases[].thresholds

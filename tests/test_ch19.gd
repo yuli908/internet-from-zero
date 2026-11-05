@@ -15,10 +15,12 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch19Checks = preload("res://src/core/ch19_checks.gd")
+const SimSampling = preload("res://src/sim/sim_sampling.gd")
+const SamplingLink = preload("res://src/core/sampling_link.gd")
 
-const EXPECT := 85
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 5, "section_count": 5, "order": 5, "text_nonempty": 5, "text_cap": 5, "screen_sum": 5, "last_after": 5, "practice": 5, "gate_count": 5, "p1_field": 5, "gate_ids": 5, "gate_kinds": 5, "gate_codes": 5, "denominator": 5, "pending_total": 1, "total_sections": 1, "positive": 5, "negative": 7}
-const GROUP_DESCRIPTIONS := {"loadable": "ch19_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T19.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 19）", "pending_total": "全章 pending 条数=1，且进分母计数=19", "total_sections": "全篇段数 25", "positive": "5 节好答案全绿（pending 不计）", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限均精确判红"}
+const EXPECT := 92
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 5, "section_count": 5, "order": 5, "text_nonempty": 5, "text_cap": 5, "screen_sum": 5, "last_after": 5, "practice": 5, "gate_count": 5, "p1_field": 5, "gate_ids": 5, "gate_kinds": 5, "gate_codes": 5, "denominator": 5, "pending_total": 1, "total_sections": 1, "positive": 5, "negative": 7, "t19_3_chain": 7}
+const GROUP_DESCRIPTIONS := {"loadable": "ch19_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T19.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 19）", "pending_total": "全章 pending 条数=1，且进分母计数=19", "total_sections": "全篇段数 25", "positive": "5 节好答案全绿（pending 不计）", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限均精确判红", "t19_3_chain": "19.3 五段采样链路：真跑链、逐段可读、顺序/换算截断/缺段/段数声明四条负例、超限与满规模"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch19_labs.json")
@@ -83,6 +85,7 @@ func run(ctx: TestContext) -> void:
 			bool(r["ok"]), str(r["report"].first_failure()))
 
 	_negative(ctx, labs)
+	_chain(ctx, labs)
 
 func _orders(secs: Array) -> String:
 	var out := []
@@ -191,8 +194,14 @@ func _good(cfg: Dictionary) -> Dictionary:
 		var cid := str(g.get("id", ""))
 		match str(g.get("kind", "")):
 			"table":
-				out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
-					"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
+				if g.has("sampling"):
+					# 19.3：好答案不是抄期望表，而是真跑一遍采样链再交原始字节/码值。
+					var tr: Dictionary = SimSampling.trace(g["sampling"])
+					out[cid] = {"rows": (tr["stages"] as Array).duplicate(true),
+						"meta": (tr["meta"] as Dictionary).duplicate(true)}
+				else:
+					out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
+						"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
 			"skip_layer":
 				var st := str(g.get("stage", ""))
 				out[cid] = {"stages": [st, "downstream"], "missing": st, "downstream_ok": false}
@@ -269,3 +278,117 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c7: int = _code(r7["report"], "T19.5-1")
 	print("RED-PROBE Ch19 T19.5-1 T19.5-1 第 1 台调度 90 超过上限 50 -> code=%d" % c7)
 	ctx.eq("T19.5-1 T19.5-1 第 1 台调度 90 超过上限 50判红 E_DELAY_MISMATCH", c7, GateResult.E_DELAY_MISMATCH)
+
+func _case_actual(report: GateReport, cid: String) -> Dictionary:
+	for c in report.cases:
+		if str(c.get("id", "")) == cid:
+			var a: Variant = c.get("actual", {})
+			return a if a is Dictionary else {}
+	return {}
+
+## 合法 N 段链：sample → receive → quantize → (N-4 段 pass) → store。
+## 与 data 里的五段链同一种 op 语义，只是段数可变，用来验上限与满规模。
+func _chain_cfg(stages: int) -> Dictionary:
+	var arr := []
+	arr.append({"stage": "send", "node": "sensor", "op": "sample", "ms": 20})
+	arr.append({"stage": "recv", "node": "adc", "op": "receive", "ms": 20})
+	arr.append({"stage": "parse", "node": "adc", "op": "quantize", "ms": 20})
+	for i in range(stages - 4):
+		arr.append({"stage": "hop%d" % (i + 1), "node": "mcu", "op": "pass", "ms": 20})
+	arr.append({"stage": "store", "node": "server", "op": "store", "ms": 20})
+	return {"sensor_v": 0.5, "vref": 2.0, "bits": 8,
+		"stage_count": stages, "stages": arr}
+
+## 19.3 五段采样链路：真跑链、逐段可读、四条负例、超限与满规模。
+func _chain(ctx: TestContext, labs: Dictionary) -> void:
+	ctx.begin_group("t19_3_chain")
+	var cfg: Dictionary = labs["sensor_loop"]
+	var gr: Dictionary = Ch19Checks.run("sensor_loop", cfg, {"answers": _good(cfg)})
+	var act := _case_actual(gr["report"], "T19.3-1")
+	var chain: Array = act.get("chain", [])
+	var rows: Array = act.get("rows", [])
+	var read_ok := bool(gr["ok"]) and chain.size() == 5 and rows.size() == 5
+	for raw in chain:
+		if not (raw is Dictionary):
+			read_ok = false
+			continue
+		var s: Dictionary = raw
+		read_ok = read_ok and s.has("stage") and s.has("node") and s.has("in_raw") \
+			and s.has("out_raw") and s.has("code") and s.has("sample_ms")
+	ctx.check("T19.3-1 好答案全绿且五段逐段可读（actual.chain 带 stage/node/in_raw/out_raw/code/sample_ms）",
+		read_ok, "chain=%d rows=%d" % [chain.size(), rows.size()])
+
+	# ① 五段顺序错位：parse 与 apply 对调 → 10（语义错，不能被普通填错 7 吞掉）。
+	var a1 := _good(cfg)
+	var g1: Dictionary = a1["T19.3-1"]
+	var r1: Array = (g1["rows"] as Array).duplicate(true)
+	var tmp: Variant = r1[2]
+	r1[2] = r1[3]
+	r1[3] = tmp
+	g1["rows"] = r1
+	a1["T19.3-1"] = g1
+	var n1: Dictionary = Ch19Checks.run("sensor_loop", cfg, {"answers": a1})
+	var c1: int = _code(n1["report"], "T19.3-1")
+	print("RED-PROBE Ch19 T19.3-1 五段顺序错位（parse/apply 对调） -> code=%d" % c1)
+	ctx.eq("T19.3-1 五段顺序错位判红 E_OUTPUT_MISMATCH", c1, GateResult.E_OUTPUT_MISMATCH)
+
+	# ② 某段原始码值被换算成人话：parse 的 out_raw 40 → "0.5 v" → 7。
+	var a2 := _good(cfg)
+	var g2: Dictionary = a2["T19.3-1"]
+	var r2: Array = (g2["rows"] as Array).duplicate(true)
+	var p2: Dictionary = r2[2]
+	p2["out_raw"] = "0.5 v"
+	r2[2] = p2
+	g2["rows"] = r2
+	a2["T19.3-1"] = g2
+	var n2: Dictionary = Ch19Checks.run("sensor_loop", cfg, {"answers": a2})
+	var c2: int = _code(n2["report"], "T19.3-1")
+	print("RED-PROBE Ch19 T19.3-1 第 3 段 parse 的 out_raw 由 40 换算成 0.5 v -> code=%d" % c2)
+	ctx.eq("T19.3-1 某段原始码值被换算判红 E_TABLE_CELL", c2, GateResult.E_TABLE_CELL)
+
+	# ③ 缺一段：删掉 apply → 行数 4 ≠ 链路 5 → 13。
+	var a3 := _good(cfg)
+	var g3: Dictionary = a3["T19.3-1"]
+	var r3: Array = (g3["rows"] as Array).duplicate(true)
+	r3.remove_at(3)
+	g3["rows"] = r3
+	a3["T19.3-1"] = g3
+	var n3: Dictionary = Ch19Checks.run("sensor_loop", cfg, {"answers": a3})
+	var c3: int = _code(n3["report"], "T19.3-1")
+	print("RED-PROBE Ch19 T19.3-1 删掉 apply 只剩 4 段 -> code=%d" % c3)
+	ctx.eq("T19.3-1 缺一段判红 E_COVERAGE", c3, GateResult.E_COVERAGE)
+
+	# ④ 段数与网关声明不符：五段齐全但 meta.stage_count=4 → 10。
+	var a4 := _good(cfg)
+	var g4: Dictionary = a4["T19.3-1"]
+	var m4: Dictionary = (g4["meta"] as Dictionary).duplicate(true)
+	m4["stage_count"] = 4
+	g4["meta"] = m4
+	a4["T19.3-1"] = g4
+	var n4: Dictionary = Ch19Checks.run("sensor_loop", cfg, {"answers": a4})
+	var c4: int = _code(n4["report"], "T19.3-1")
+	print("RED-PROBE Ch19 T19.3-1 meta.stage_count 交 4、网关声明 5 -> code=%d" % c4)
+	ctx.eq("T19.3-1 段数与网关声明不符判红 E_OUTPUT_MISMATCH", c4, GateResult.E_OUTPUT_MISMATCH)
+
+	# 上限：33 段超 MAX_STAGES=32 → 7，且不返回任何截断后的段。
+	var over_cfg := _chain_cfg(SimSampling.MAX_STAGES + 1)
+	var over: Dictionary = SimSampling.trace(over_cfg)
+	var over_ok := int(over.get("code", -1)) == GateResult.E_TABLE_CELL \
+		and (over.get("stages", []) as Array).is_empty()
+	print("RED-PROBE Ch19 T19.3-1 段数 %d 超过上限 %d（不截断） -> code=%d stages=%d"
+		% [SimSampling.MAX_STAGES + 1, SimSampling.MAX_STAGES,
+			int(over.get("code", -1)), (over.get("stages", []) as Array).size()])
+	ctx.check("段数超上限判红 E_TABLE_CELL 且不静默截断", over_ok, str(over))
+
+	# 合法满规模：正好 32 段（= 上限）也要绿；当前真实链 5 段，余量 6.4×。
+	var full_cfg := _chain_cfg(SimSampling.MAX_STAGES)
+	var full: Dictionary = SimSampling.trace(full_cfg)
+	var fres: Dictionary = SamplingLink.validate_gate(
+		{"rows": full["stages"], "meta": full["meta"]}, full_cfg)
+	var margin := float(SimSampling.MAX_STAGES) / 5.0
+	var full_ok := bool(full.get("ok", false)) and bool(fres.get("ok", false)) and margin >= 6.0
+	print("GREEN-PROBE Ch19 T19.3-1 合法满规模 %d/%d 段（余量 %.1fx） -> ok=%s"
+		% [(full["stages"] as Array).size(), SimSampling.MAX_STAGES, margin, str(full_ok)])
+	ctx.check("合法满规模 32 段通过且余量 ≥6x", full_ok,
+		"stages=%d ok=%s" % [(full["stages"] as Array).size(), str(full_ok)])
+

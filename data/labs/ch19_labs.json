@@ -490,49 +490,43 @@
             "key": "sample_ms",
             "max": 50
           },
-          "keys": [
-            "stage",
-            "in",
-            "out",
-            "sample_ms"
-          ],
-          "expect_rows": [
-            {
-              "stage": "sensor",
-              "in": "0.5 V",
-              "out": "0.5 V",
-              "sample_ms": 20
-            },
-            {
-              "stage": "adc",
-              "in": "0.5 V",
-              "out": 64,
-              "sample_ms": 20
-            },
-            {
-              "stage": "mcu",
-              "in": 64,
-              "out": 64,
-              "sample_ms": 20
-            },
-            {
-              "stage": "radio",
-              "in": 64,
-              "out": 64,
-              "sample_ms": 20
-            },
-            {
-              "stage": "server",
-              "in": 64,
-              "out": "stored",
-              "sample_ms": 20
-            }
-          ],
-          "expect_meta": {
-            "all_stages_io": true,
-            "lsb_ok": true,
-            "stored_ok": true,
-            "w01_w06_grant": true
+          "sampling": {
+            "sensor_v": 0.5,
+            "vref": 2.0,
+            "bits": 8,
+            "stage_count": 5,
+            "stages": [
+              {
+                "stage": "send",
+                "node": "sensor",
+                "op": "sample",
+                "ms": 20
+              },
+              {
+                "stage": "recv",
+                "node": "adc",
+                "op": "receive",
+                "ms": 20
+              },
+              {
+                "stage": "parse",
+                "node": "adc",
+                "op": "quantize",
+                "ms": 20
+              },
+              {
+                "stage": "apply",
+                "node": "mcu",
+                "op": "pass",
+                "ms": 20
+              },
+              {
+                "stage": "store",
+                "node": "server",
+                "op": "store",
+                "ms": 20
+              }
+            ]
           },
           "codes": [
             "E_UNCONNECTED(3)",
