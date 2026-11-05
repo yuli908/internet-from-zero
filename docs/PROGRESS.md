@@ -756,35 +756,41 @@ CH08（3 节 `protocol_editor` / `handshake` / `capture`，各 5 段、共 12 �
 - `节级 deferred` = `required` 且 gate 自身 ready，但所在 lab 非 ready（整节被内容侧延后）；
 - `required=false` = 可选 gate，始终不进分母、也不算 pending。
 
-脚本落点：`tools/lab_account.py`（一次遍历 20 个 `data/labs/*_labs.json` + 20 个 `data/chapters/*_levels.json`，输出逐文件表、4 条明列不计、恒等式验算）。
+脚本落点：`tools/lab_account.py`（一次遍历 20 个 `data/labs/*_labs.json` + 19 个 `data/chapters/*_levels.json`；终章 `final_labs.json` 没有 levels 文件，脚本**显式打印「该章无声明、跳过」**，不静默忽略）。
 
-### 10.1 逐文件统计原文（2026-11-05 脚本实扫 20 个 lab + 20 个 levels，非手工加总）
+### 10.1 逐章统计原文（2026-11-05 脚本实扫 20 个 lab 文件 + 19 个 levels 文件，非手工加总）
 
 ```
-file                     labs  segs  gates  pending  section_def  optional  counted
-ch01                        6    34     24        0            0         0       24
-ch02                        5    25     20        2            3         0       15
-ch03                        4    21     16        0            0         0       16
-ch04                        5    25     20        1            0         0       19
-ch05                        4    21     17        0            0         1       16
-ch06                        6    30     24        2            0         0       22
-ch07                        4    20     16        1            0         0       15
-ch08                        3    15     12        1            0         0       11
-ch09                        5    25     20        1            0         0       19
-ch10                        4    20     16        1            0         0       15
-ch11                        4    20     16        1            0         0       15
-ch12                        5    25     20        1            0         0       19
-ch13                        3    15     12        0            0         0       12
-ch14                        3    15     12        0            0         0       12
-ch15                        4    20     16        1            0         0       15
-ch16                        4    20     16        1            0         0       15
-ch17                        3    15     12        1            0         0       11
-ch18                        4    20     16        1            0         0       15
-ch19                        5    25     20        1            0         0       19
-final                       3     9      9        1            0         0        8
-TOTAL                      84   420    334       17            3         1      313
-验算：334 = 313 进分母 + 17 pending + 3 节级 deferred + 1 required=false → 闭合
+file                     labs  data_gates  level_gates  data_segs  level_segs  pending  section_def  optional  counted
+ch01                        6          24           24         34          34        0            0         0       24
+ch02                        5          20           20         25          25        2            3         0       15
+ch03                        4          16           16         21          21        0            0         0       16
+ch04                        5          20           20         25          25        1            0         0       19
+ch05                        4          17           17         21          21        0            0         1       16
+ch06                        6          24           24         30          30        2            0         0       22
+ch07                        4          16           16         20          20        1            0         0       15
+ch08                        3          12           12         15          15        1            0         0       11
+ch09                        5          20           20         25          25        1            0         0       19
+ch10                        4          16           16         20          20        1            0         0       15
+ch11                        4          16           16         20          20        1            0         0       15
+ch12                        5          20           20         25          25        1            0         0       19
+ch13                        3          12           12         15          15        0            0         0       12
+ch14                        3          12           12         15          15        0            0         0       12
+ch15                        4          16           16         20          20        1            0         0       15
+ch16                        4          16           16         20          20        1            0         0       15
+ch17                        3          12           12         15          15        1            0         0       11
+ch18                        4          16           16         20          20        1            0         0       15
+ch19                        5          20           20         25          25        1            0         0       19
+final                       3           9            0          9           0        1            0         0        8
+TOTAL                      84         334          325        420         411       17            3         1      313
+
+章节 final：无 levels 声明（data/chapters/final_levels.json 不存在），该章无声明、跳过（不参与 gates/segs 比对）
+完整性：gate 数据 334 / levels 声明 325（已声明 lab 81/84）；segs 数据 420 / levels 声明 411
+验算：闭合
 ```
+
+`level_gates` / `level_segs` 的合计比数据小，是因为终章 3 个 lab 没有 levels 声明（`334-9=325`、`420-9=411`），不是比对失败；该章已逐行打印「跳过」。
+
 
 ### 10.1b 4 条明列不计（既不进分母、也不算 pending，逐条可查）
 
@@ -799,8 +805,13 @@ TOTAL                      84   420    334       17            3         1      
 
 - **入口**：`scripts/run_tests.ps1` 在测试跑完后调用 `tools/lab_account.py`，总账先于测试终结判定报错。
   - 测试红 = **1**（原有）；账不闭合 = **8**；总账没跑起来 / 无 `TOTAL` 行 = **9**（三者互不冲突）。
-  - 四桶恒等式按定义恒成立（任一 gate 必落在 counted / pending / 节级 deferred / optional 之一），所以脚本另用**第二份独立声明** `data/chapters/*_levels.json` 的 `gate_ids` 逐 lab 对账：lab 的 gate 条数或编号与 levels 声明不一致即判不闭合。
-  - 注入实测：给 `ch15/library_abi` 加一条 `T15.1-5` → 恒等式仍闭合（`335 = 314 + 17 + 3 + 1`），但账目完整性报「gate 数与 levels 声明不符（数据 5 条 / levels 4 条）」，入口 **exit=8** 并打印「账不闭合」；复原后 **exit=0**、`84 lab / 334 gate / 313 进分母` 不变。
+  - 四桶恒等式按定义恒成立（任一 gate 必落在 counted / pending / 节级 deferred / optional 之一），**因此它只作展示、不作判据**；判据是脚本另用**第二份独立声明** `data/chapters/*_levels.json`（19 章 84 lab，终章无声明已显式跳过）逐 lab 对账，两列都不得漂移：
+    - `gate_ids`：集合必须相等（只比条数会漏掉「换了一条 id」）；
+    - `segs`：段数必须相等（只比 gates 会漏掉「某段被删但 gate 数没变」）。
+  - 注入实测（两个不同章节，各改 1 条）：
+    - 改 gate：`ch14/dynamic_type` 的 `T14.2-1` → `T14.2-1-X`，恒等式仍闭合（`334 = 313 + 17 + 3 + 1`），完整性报「`ch14/dynamic_type: gate 与 levels 声明不符（数据 ['T14.2-1-X', ...] / levels ['T14.2-1', ...]`）」，入口 **exit=8**；
+    - 改 segs：`ch19/embedded_budget` 删末段（5 → 4），恒等式仍闭合（`334 = 313 + 17 + 3 + 1`），完整性报「`ch19/embedded_budget: 段数与 levels 声明不符（数据 4 / levels 5）`」，入口 **exit=8**；
+    - 两处复原后 **exit=0**，`84 lab / 420 段 / 334 gate / 313 进分母` 不变。
   - 无 `TOTAL` 行实测：临时让脚本只输出非 TOTAL 文本 → **exit=9**，提示「总账脚本没有输出 TOTAL 行」。
 - **`same_symbol` / `abi_ok` 不是自己跟自己比**：`same_symbol` 比 P1/P2 各自 `declares`（两份程序数据）；`abi_ok` 比「程序声明 vs 库 `symbols` 导出」并查 `abi_types` 词表（三份数据）。注入时库导出与表行都不动，只改声明：
 
