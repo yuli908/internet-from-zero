@@ -101,7 +101,7 @@
 |---|---|---|
 | `T13.1-1` 的 `line_map_ok` / `stack_ok` / `output_ok` | **已删·理由**：被 `line_map`（pc→src_line 逐条）、`lines_covered`、`unmapped_pc`、`output`（实跑输出数组）替代；栈深已由 `expect_rows[].stack_after` 逐行判 | 布尔位可以填 true 冒充；删一条映射即红 |
 | `T14.1-1` 的 `tokens_match` / `ast_ok` / `values_ok` | **已删·理由**：被行级 `tokens[]` / `ast` / `value` / `stages_exported` 替代 | 只记数量（13/8）不能证明逐段；逐条 token 与逐层 AST 可指认 |
-| `T15.2-1` 的 `frames_match` | **已删·理由**：被 `handles` / `frames` / `unmatched_frames` 替代；gate 仍 pending（缺真实抓包） | 布尔位无法逐帧对齐 `frame_id`/`fd`/`call_n` |
+| `T15.2-1` 的 `frames_match` | **已删·理由**：被 `handles` / `frames` / `unmatched_frames` 替代；gate 已由本机 loopback 真实捕获转正 | 布尔位无法逐帧对齐 `frame_id`/`fd`/`call_n` |
 
 **新增字段（均已登记进附录 D）**：
 
@@ -111,9 +111,10 @@
 | `labs.*.source_lines` | `data/labs/ch13_labs.json` | 数据侧 | 同上（逐行可指认的源码侧） |
 | `labs.*.case_sources` | `data/labs/ch14_labs.json` | 数据侧 | `src/core/mini_interp.gd` → `tests/test_ch14.gd` |
 | `labs.*.socket_calls` | `data/labs/ch15_labs.json` | 数据侧 | `src/core/socket_trace.gd` → `tests/test_ch15.gd` |
+| `labs.*.capture` | `data/labs/ch15_labs.json` | 数据侧（2026-11-05 本机 loopback 原始捕获冻结） | `tests/test_ch15.gd`（真实字节/调用顺序、`text_roundtrip` 推导） |
 
 **转正账**：`T13.1-1` 由 pending → ready；ch13 进分母 11→12（`bytecode_vm` 3→4），全章 pending 1→0。不是凑数：5 条 pc 的行映射与输出 `[5]` 都由参考执行器实跑，删一条映射判红（code 10）。
-**不转正**：`T15.2-1` 接口已具备（handles/frames/unmatched 导出、能红），但只有模型数据、没有真实抓包；保持 pending，`pending_reason` 写明「接口已具备、缺数据源」。
+**转正账（15.2）**：`T15.2-1` 由 pending → ready；ch15 进分母 15→16（`socket_api` 3→4），全章 pending 1→0。不是凑数：句柄/帧编号来自 2026-11-05 本机 loopback 真实捕获（Python socket，客户端 fd=332、send/recv 同一 12 B 字节），原始 10 条调用与 `bytes_hex` 冻结在 `socket_api.capture`；手改 `frame2` 的 `call_n` 仍判 10、删一帧判 10。
 
 **防增长守卫**：`tests/test_field_registry.gd`（已注册进 `tests/run_tests.gd`）。口径是 **`文件 :: 路径`**，含 `id` 的对象归一成 `*`，数组元素归一成 `[]`——不按键名去重，避免重蹈 `ports` 的合并盲区。数据里新增未登记路径 → **判红并打印路径**；登记了但数据已不存在 → 只打印条数、不判红。登记表见附录 D。
 
@@ -1767,6 +1768,7 @@
 - data/labs/ch15_labs.json :: labs.*.case_sources
 - data/labs/ch15_labs.json :: labs.*.case_sources.symbols.programs[].declares
 - data/labs/ch15_labs.json :: labs.*.case_sources.symbols.programs[].id
+- data/labs/ch15_labs.json :: labs.*.capture
 - data/labs/ch15_labs.json :: labs.*.gate_cases
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].codes
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].expect_meta
@@ -1775,12 +1777,9 @@
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].id
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].keys
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].kind
-- data/labs/ch15_labs.json :: labs.*.gate_cases[].pending_reason
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].quiz
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].required
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].stage
-- data/labs/ch15_labs.json :: labs.*.gate_cases[].status
-- data/labs/ch15_labs.json :: labs.*.gate_cases[].thresholds
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].title
 - data/labs/ch15_labs.json :: labs.*.grants
 - data/labs/ch15_labs.json :: labs.*.hint

@@ -2,8 +2,8 @@ extends RefCounted
 
 ## CH15 结构 + 判据校验（20 段）。
 ## 分母口径：required 且非 pending 的 gate 数，按 Ch15Checks.deferred_gates(cfg) 现算；
-## 15.2 句柄/帧同编号接口已具备（handles/frames/unmatched_frames），但缺真实抓包数据源，
-## T15.2-1 仍 pending → 4 降为 3；接口形状与能红单独在 t15_2_interface 组验证。
+## 15.2 句柄/帧同编号接口已用本机 loopback 真实捕获（Python socket，fd=332、12 B 原样
+## 回环）转正，T15.2-1 不再 pending → 4 条全进分母；接口形状与能红在 t15_2_interface 组验证。
 ## 负例断言给出精确失败码；断言能红，不是恒真。
 
 const LABS := ["library_abi", "socket_api", "version_compat", "dns_resolve"]
@@ -20,9 +20,9 @@ const SocketTrace = preload("res://src/core/socket_trace.gd")
 const NetLibKit = preload("res://src/core/net_lab_kit.gd")
 const SymbolTable = preload("res://src/core/symbol_table.gd")
 
-const EXPECT := 89
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_1_real": 3, "t15_2_interface": 3, "t15_3_real": 3, "negative": 17}
-const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 3，因 T15.2-1 仍 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_1_real": "T15.1-1 符号签名由 SymbolTable 实导：逐行对数据、签名含有序参数类型、程序声明与库导出跨源一致", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧", "t15_3_real": "T15.3-1 兼容表由新旧符号对实导：五类 reason 各命中一条，主版本变更按规则拒绝", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧/符号类型写错/参数顺序颠倒/同符号声明不一致/abi_ok 不符/五类 reason 改错 均精确判红"}
+const EXPECT := 90
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "t15_1_real": 3, "t15_2_interface": 4, "t15_3_real": 3, "negative": 17}
+const GROUP_DESCRIPTIONS := {"loadable": "ch15_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T15.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（socket_api 为 4，T15.2-1 已由真实捕获转正）", "pending_total": "全章 pending 条数=0，且进分母计数=16", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "t15_1_real": "T15.1-1 符号签名由 SymbolTable 实导：逐行对数据、签名含有序参数类型、程序声明与库导出跨源一致", "t15_2_interface": "T15.2-1 接口：handles/frames/unmatched_frames 由 socket_trace 实导且同编号逐帧；捕获源客户端字节与 payload 一字节一致", "t15_3_real": "T15.3-1 兼容表由新旧符号对实导：五类 reason 各命中一条，主版本变更按规则拒绝", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/frame call_n 改坏/删一帧/符号类型写错/参数顺序颠倒/同符号声明不一致/abi_ok 不符/五类 reason 改错 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch15_labs.json")
@@ -73,7 +73,7 @@ func run(ctx: TestContext) -> void:
 		counted_sum += int(d["counted"])
 		total += secs.size()
 	ctx.begin_group("pending_total")
-	ctx.check("全章 pending=1、进分母=15", pending_sum == 1 and counted_sum == 15,
+	ctx.check("全章 pending=0、进分母=16", pending_sum == 0 and counted_sum == 16,
 		"pending=%d counted=%d" % [pending_sum, counted_sum])
 
 	ctx.begin_group("total_sections")
@@ -218,6 +218,10 @@ func _good(cfg: Dictionary) -> Dictionary:
 		var cr: Dictionary = SymbolTable.compat_report(vp)
 		out["T15.3-1"] = {"rows": (cr["rows"] as Array).duplicate(true),
 			"meta": (cr["meta"] as Dictionary).duplicate(true)}
+	if str(cfg.get("id", "")) == "socket_api":
+		# T15.2-1 的好答案从真实捕获派生（socket_calls 的 fd/顺序 + capture 的字节），
+		# 不是照抄 expect_meta；expect_meta 只作静态对照，防数据漂移。
+		out["T15.2-1"] = _answer_15_2(cfg)
 	return out
 
 func _gate(cfg: Dictionary, cid: String) -> Dictionary:
@@ -235,11 +239,27 @@ func _answer_15_2(cfg: Dictionary) -> Dictionary:
 		var c: Dictionary = raw
 		rows.append({"call": str(c.get("op", "")), "stack_layer": str(c.get("stack_layer", "")),
 			"frame": str(c.get("frame", ""))})
+	# text_roundtrip 不再手写 true：从捕获源的客户端 send/recv 字节算出来。
+	var cap: Dictionary = cfg.get("capture", {})
+	var sent_hex := ""
+	var recv_hex := ""
+	for raw in cap.get("calls", []):
+		if not (raw is Dictionary):
+			continue
+		var c: Dictionary = raw
+		if str(c.get("who", "")) != "client":
+			continue
+		if str(c.get("op", "")) == "send":
+			sent_hex = str(c.get("bytes_hex", ""))
+		if str(c.get("op", "")) == "recv":
+			recv_hex = str(c.get("bytes_hex", ""))
+	var roundtrip := not sent_hex.is_empty() and sent_hex == recv_hex \
+		and sent_hex == str(cap.get("payload_hex", ""))
 	return {"rows": rows, "meta": {
 		"handles": tr["handles"],
 		"frames": tr["frames"],
 		"unmatched_frames": tr["unmatched_frames"],
-		"text_roundtrip": true,
+		"text_roundtrip": roundtrip,
 		"blueprint": true,
 	}}
 
@@ -264,6 +284,29 @@ func _t15_2_interface(ctx: TestContext, cfg: Dictionary) -> void:
 	ctx.check("T15.2-1 抓包与 socket 帧同编号：frame_id/call_n/fd 逐帧对上",
 		numbered and (tr["unmatched_frames"] as Array).is_empty(),
 		"frames=%s unmatched=%s" % [str(tr["frames"]), str(tr["unmatched_frames"])])
+	# 捕获源真实性：客户端 send/recv 的原始字节必须与 payload 同一串，且 fd 与 socket_calls 一致。
+	var cap: Dictionary = cfg.get("capture", {})
+	var sent_hex := ""
+	var recv_hex := ""
+	var cap_fd := -1
+	for raw in cap.get("calls", []):
+		if not (raw is Dictionary):
+			continue
+		var c: Dictionary = raw
+		if str(c.get("who", "")) != "client":
+			continue
+		cap_fd = int(c.get("fd", -1))
+		if str(c.get("op", "")) == "send":
+			sent_hex = str(c.get("bytes_hex", ""))
+		if str(c.get("op", "")) == "recv":
+			recv_hex = str(c.get("bytes_hex", ""))
+	var payload_hex := str(cap.get("payload_hex", ""))
+	var socket_fd := int((cfg.get("socket_calls", [])[0] as Dictionary).get("fd", -2))
+	ctx.check("T15.2-1 捕获源真实：客户端 send/recv 字节与 payload 同一串，fd 与 socket_calls 一致",
+		not sent_hex.is_empty() and sent_hex == recv_hex and sent_hex == payload_hex
+			and cap_fd == socket_fd,
+		"send=%s recv=%s payload=%s fd=%d socket_fd=%d"
+			% [sent_hex, recv_hex, payload_hex, cap_fd, socket_fd])
 	ctx.check("T15.2-1 实导 handles/frames/unmatched 与 expect_meta 逐项一致",
 		_deep_eq(tr["handles"], want.get("handles", []))
 			and _deep_eq(tr["frames"], want.get("frames", []))
@@ -426,7 +469,7 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	print("RED-PROBE CH15 T15.4-1 T15.4-1 缺 rows -> code=%d" % c6)
 	ctx.eq("T15.4-1 缺 rows 判红 E_UNCONNECTED(3)", c6, GateResult.E_UNCONNECTED)
 
-	# 能红证据：T15.2-1 虽 pending，接口判据本身可红。直接走 _table（绕过 pending 跳过）。
+	# 能红证据：接口判据本身可红（T15.2-1 已由真实捕获转正，直接走 _table）。
 	var g7: Dictionary = _gate(labs["socket_api"], "T15.2-1")
 	var ans7: Dictionary = _answer_15_2(labs["socket_api"])
 	(ans7["meta"]["frames"] as Array)[1]["call_n"] = 9
