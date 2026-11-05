@@ -1,6 +1,6 @@
 # 接口扩展提案（字段级）
 
-状态：**部分批准并已实施（2026-11-05）**。用户批了 §2.1（13.1 源码行映射）、§2.3（14.1 tokens/AST 序列导出）、§2.5（15.2 句柄编号映射），本轮另按指令实施 §2.6（16.3 逐请求时延）与 §2.4（15.1 符号签名）。§2.1/§2.3/§2.4/§2.6 已落成真判据；§2.5 只到接口形成，`T15.2-1` 仍 pending（缺真实抓包数据源）。另新增第 11 项 §2.11（14.2 类型标签导出，来自 CH14 §2 的扩接口诉求），**已实施并转正** `T14.2-1`（CH14 进分母 11→12、pending 1→0；全书实测 pending 由 19 降到 17，见 `docs/PROGRESS.md` §10.2）。其余各项**仍未批准、未实施**，不得报成已实现。
+状态：**部分批准并已实施（2026-11-05）**。用户批了 §2.1（13.1 源码行映射）、§2.3（14.1 tokens/AST 序列导出）、§2.5（15.2 句柄编号映射），本轮另按指令实施 §2.6（16.3 逐请求时延）与 §2.4（15.1 符号签名），并把 §2.4 里为 15.3 预留的 `diff_sig` 接线为 `compat_report`（`T15.3-1` 六行现算，五类 reason 各一条负例）。§2.1/§2.3/§2.4/§2.6 已落成真判据；§2.5 只到接口形成，`T15.2-1` 仍 pending（缺真实抓包数据源）。另新增第 11 项 §2.11（14.2 类型标签导出，来自 CH14 §2 的扩接口诉求），**已实施并转正** `T14.2-1`（CH14 进分母 11→12、pending 1→0；全书实测 pending 由 19 降到 17，见 `docs/PROGRESS.md` §10.2）。其余各项**仍未批准、未实施**，不得报成已实现。
 
 ## 0. 背景与口径
 
@@ -110,7 +110,14 @@
 }
 ```
 
-- **规则**：签名 = 名称 + **有序**参数类型 + 返回类型；`param_types` 参与逐格比，`int,char` 与 `char,int` 是两个不同签名，`sig` 列是同一份签名的可读形式。`same_symbol` 由行数据算出（同一符号在 P1/P2 的 `sig` 逐字一致），`abi_ok` 由行数据算出（参数数 == 类型数、返回非空、库名非空），都不是手填。
+- **规则**：签名 = 名称 + **有序**参数类型 + 返回类型；`param_types` 参与逐格比，`int,char` 与 `char,int` 是两个不同签名，`sig` 列是同一份签名的可读形式。`same_symbol` 比**两份程序声明**（`programs[].declares`，P1 vs P2），`abi_ok` 比**程序声明 vs 库导出**（`symbols`）并查 `abi_types` 词表——两者都是跨源比对，不是行内自比。注入证据（库导出与表行都不动，只改声明）：
+
+```
+RED-PROBE CH15 T15.1-1 P2 声明 area(int,char,int)（库导出/行不变）-> same_symbol=false abi_ok=false
+RED-PROBE CH15 T15.1-1 同符号声明不一致 -> code=10
+RED-PROBE CH15 T15.1-1 P1/P2 都声明 area(...)->B（与库导出 A 不符）-> same_symbol=true abi_ok=false
+RED-PROBE CH15 T15.1-1 abi_ok 不符 -> code=10
+```
 - **读取点（下游真读）**：`tests/test_ch15.gd` 的 `_good` 用 `SymbolTable.run(case_sources.symbols)` 生成 `T15.1-1` 的 `rows/meta`，不再抄 `expect_rows`；判据由 `table` 逐列比对。
 - **能红的证据**（本轮实测）：
 
@@ -119,8 +126,21 @@ RED-PROBE CH15 T15.1-1 第 2 行 scale 参数类型写错(char,int→char,char) 
 RED-PROBE CH15 T15.1-1 第 2 行 scale 参数顺序颠倒(char,int→int,char) -> code=7
 ```
 
-- **与 15.3 的共用关系**：同一份符号表已预留 `SymbolTable.diff_sig(a, b)`——只比 `symbol / param_types / ret`，返回 `{same, reasons:[name_changed|arity_changed|order_changed|type_changed|ret_changed]}`，正好对应 15.3 版本兼容要判的「同符号签名是否变了」。**本轮没有把 15.3 接线**：`T15.3-1` 仍用静态 `expect_meta.sig_diff_detected`；未做的还有「跨版本的旧/新符号表成对导出」与调用点 `call_sites`（`pc/argc`）登记——提案里的 `call_sites`、`order`、`from` 三列本轮未落。
-- **影响面**：`T15.1-1` 原为 ready，进分母与 pending 不变（CH15 仍 15 进分母、1 pending）；`test_ch15` 74→79。
+- **与 15.3 的共用关系（已接线）**：`SymbolTable.diff_sig(a, b)` 只比 `name / param_types / ret`，返回 `{same, reasons:[name_changed|arity_changed|order_changed|type_changed|ret_changed]}`；`compat_report(manifest)` 在其上叠加版本规则（主版本变即 `rejected`）。`T15.3-1` 的六行由 `tests/test_ch15.gd` 的 `_good` 调 `SymbolTable.compat_report(case_sources.version_pairs)` 现算，逐格比对 `symbol/old_sig/new_sig/reason/compatible/result`，不抄 `expect_rows`。
+  - **旧/新符号表成对来源**：`data/labs/ch15_labs.json` 的 `labs[version_compat].case_sources.version_pairs`——`pairs[]` 每条含 `old` 与 `new` 两份 `{name, params, ret}` 声明，外加 `lib/req_version/lib_version`；这是课件数据里真实存在的一对，不是期望表里的数字。
+  - **五类分布（当前真实数据）**：`ret_changed` 1（area）、`order_changed` 1（scale）、`arity_changed` 1（sum）、`name_changed` 1（peek）、`type_changed` 1（emit），未变的 tick 1 行（`compatible=true`，但主版本 1.0→2.0 仍 `rejected`）。五类全部有数据，无预留项。
+  - **每类一条负例**（把该行 `expect_rows` 的 `reason` 改错）实测：
+
+```
+RED-PROBE CH15 T15.3-1 area 行 reason 改错(ret_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 scale 行 reason 改错(order_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 sum 行 reason 改错(arity_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 peek 行 reason 改错(name_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 emit 行 reason 改错(type_changed→ret_changed) -> code=7
+```
+
+  未做的仍是调用点 `call_sites`（`pc/argc`）登记——提案里的 `call_sites`、`order`、`from` 三列本轮未落。
+- **影响面**：`T15.1-1` 原为 ready，进分母与 pending 不变（CH15 仍 15 进分母、1 pending）；`test_ch15` 74→79（15.1 跨源 + 2 负例）→ 89（15.3 接线 `t15_3_real` 3 条 + 5 类 reason 负例 7 条）。
 - **估时**：4 人日（原估）。
 
 ### 2.5 15.2 句柄编号映射（`T15.2-1`）
@@ -300,9 +320,9 @@ RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=7
 ## 4. 与既有判据的关系
 
 - 已落地的 `table`（含 `delay:{key,max}` 与 `timing`）能承接 2.1/2.2/2.6/2.7/2.8/2.9 的行级比对形状；2.3/2.5 需要嵌套结构，仍在 `table` 内以「一行一对象」表达，不改 kind。2.6 的 `sent_at/got_at` 取自仿真事件时钟，`timing` 只做自洽校验，不引入新失败码。
-- 2.4 的签名顺序与 15.3 的 ABI 判据共用符号表；批 2.4 前不得先改 15.3。
+- 2.4 的签名顺序与 15.3 的 ABI 判据共用符号表；15.3 的 `compat_report` 已建在 `diff_sig` 之上（`T15.3-1` 现算），后续改动符号表须同时跑 `test_ch15` 的 `t15_1_real`/`t15_3_real` 与 12 条负例。
 - 2.10 与 17.1/17.3 共用「真实字节」口径；批 2.10 前 F1 仍按最小替代判。
 - 2.11（14.2 标签导出）已落地，与 2.3（14.1 tokens/AST）共用同一份 `mini_interp`：14.1 走纯数值 `eval`，14.2 走 `run_typed` 的带标签求值；两套口径互不影响。
 
 ——
-本文件由 CH13–CH19 + 终章落地批次整理；2026-11-05 补录并实施 §2.11，同日按指令实施 §2.6（16.3 逐请求时延）与 §2.4（15.1 符号签名）。
+本文件由 CH13–CH19 + 终章落地批次整理；2026-11-05 补录并实施 §2.11，同日按指令实施 §2.6（16.3 逐请求时延）与 §2.4（15.1 符号签名），并把 15.3 的 `diff_sig` 接线为 `compat_report`。

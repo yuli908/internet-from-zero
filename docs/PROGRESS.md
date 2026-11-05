@@ -795,6 +795,32 @@ TOTAL                      84   420    334       17            3         1      
 | `data/labs/ch02_labs.json` | `replace` | `T2.4-3` | 节级 deferred | 同上 |
 | `data/labs/ch05_labs.json` | `clock_limit` | `T5.4-5` | `required=false` | `9773238` 首次入库即 `required:false`，非后续改动；该节 `practice` 行 `judge` 原文「answer 对照；非唯一 gate」；`tests/test_ch05.gd` 断言每节 `required` 恰 4 条（这条是第 5 条可选 quiz） |
 
+### 10.1c 总账进收工判定 + `same_symbol`/`abi_ok` 跨源证据（2026-11-05）
+
+- **入口**：`scripts/run_tests.ps1` 在测试跑完后调用 `tools/lab_account.py`，总账先于测试终结判定报错。
+  - 测试红 = **1**（原有）；账不闭合 = **8**；总账没跑起来 / 无 `TOTAL` 行 = **9**（三者互不冲突）。
+  - 四桶恒等式按定义恒成立（任一 gate 必落在 counted / pending / 节级 deferred / optional 之一），所以脚本另用**第二份独立声明** `data/chapters/*_levels.json` 的 `gate_ids` 逐 lab 对账：lab 的 gate 条数或编号与 levels 声明不一致即判不闭合。
+  - 注入实测：给 `ch15/library_abi` 加一条 `T15.1-5` → 恒等式仍闭合（`335 = 314 + 17 + 3 + 1`），但账目完整性报「gate 数与 levels 声明不符（数据 5 条 / levels 4 条）」，入口 **exit=8** 并打印「账不闭合」；复原后 **exit=0**、`84 lab / 334 gate / 313 进分母` 不变。
+  - 无 `TOTAL` 行实测：临时让脚本只输出非 TOTAL 文本 → **exit=9**，提示「总账脚本没有输出 TOTAL 行」。
+- **`same_symbol` / `abi_ok` 不是自己跟自己比**：`same_symbol` 比 P1/P2 各自 `declares`（两份程序数据）；`abi_ok` 比「程序声明 vs 库 `symbols` 导出」并查 `abi_types` 词表（三份数据）。注入时库导出与表行都不动，只改声明：
+
+```
+RED-PROBE CH15 T15.1-1 P2 声明 area(int,char,int)（库导出/行不变）-> same_symbol=false abi_ok=false
+RED-PROBE CH15 T15.1-1 同符号声明不一致 -> code=10
+RED-PROBE CH15 T15.1-1 P1/P2 都声明 area(...)->B（与库导出 A 不符）-> same_symbol=true abi_ok=false
+RED-PROBE CH15 T15.1-1 abi_ok 不符 -> code=10
+```
+
+- **15.3 接线**：`T15.3-1` 的 6 行由 `SymbolTable.compat_report(case_sources.version_pairs)` 现算（旧/新符号表成对写在课件数据 `ch15_labs.json` 里，不是期望表里的数字）；`reason` 逐格比对，五类各一条（area `ret_changed` / scale `order_changed` / sum `arity_changed` / peek `name_changed` / emit `type_changed`），未变的 tick 一行 `compatible=true` 但主版本 1.0→2.0 仍 `rejected`。五类各一条负例把 `reason` 改错 → 均 7：
+
+```
+RED-PROBE CH15 T15.3-1 area 行 reason 改错(ret_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 scale 行 reason 改错(order_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 sum 行 reason 改错(arity_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 peek 行 reason 改错(name_changed→type_changed) -> code=7
+RED-PROBE CH15 T15.3-1 emit 行 reason 改错(type_changed→ret_changed) -> code=7
+```
+
 ### 10.2 20 行总账（一章一行，数字全部来自 10.1）
 
 | 章 | lab | 段 | gate | pending | 进分母 | 入库日期 | 提交 |
@@ -838,26 +864,25 @@ TOTAL                      84   420    334       17            3         1      
 ### 10.3 全量检查（2026-11-05 复跑，原文）
 
 ```
-SUITE_TOTAL expected=7366 actual=7366
-RESULT: 7368 checks, 0 failures
+SUITE_TOTAL expected=7376 actual=7376
+RESULT: 7378 checks, 0 failures
 ```
 
-60 个套件；`SUITE_TOTAL` 只统计套件自身（7366），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
+60 个套件；`SUITE_TOTAL` 只统计套件自身（7376），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
 `[guard] 自测：故意中断的 suite 被判红` 与 `[guard] 防线自检探针存在`（`tests/run_tests.gd` §runner 尾部）。
-（上一版为 7361 / 7363；+5 全部来自 `test_ch15` 的 `t15_1_real` 3 条 + 新负例 2 条，见 §10.5。）
+（上一版为 7366 / 7368；+10 全部来自 `test_ch15`：`t15_3_real` 3 条 + 新负例 7 条，见 §10.5。）
 
 ### 10.4 口径错因（两版差异必须点名，不允许"以最新版为准"）
 
 - **581 段 / 340 gate 那一版是错的**，错在把课件稿里尚未落库的内容当成已落库计入：`docs/curriculum/*.md` 里的 JSON 块合计 **78 lab / 386 段 / 312 gate**，`data/labs` 合计 **84 lab / 420 段 / 334 gate**，两组数各自、以及相加（806 段 / 646 gate）都得不到 581 / 340，即该版在仓库里**无任何可复现来源**。
 - **415 段 / 335 gate 那一版也是错的**，错在 20 行表上手工逐行加总（段少 5、gate 多 1），不是脚本读数。
-- 唯一有效值：**84 lab / 420 段 / 334 gate / 17 pending / 313 进分母**，与 `SUITE_TOTAL 7366` / `RESULT 7368` 同时在库。恒等式 **334 = 313 + 17 + 3 节级 deferred + 1 required=false** 由 `tools/lab_account.py` 每次运行自动验算；本轮对 20 个 lab 文件 + 20 个 levels 文件整扫，313 为按 `deferred_gates` 逐节算出的读数（4 条明列不计见 §10.1b）。
+- 唯一有效值：**84 lab / 420 段 / 334 gate / 17 pending / 313 进分母**，与 `SUITE_TOTAL 7376` / `RESULT 7378` 同时在库。恒等式 **334 = 313 + 17 + 3 节级 deferred + 1 required=false** 由 `tools/lab_account.py` 每次运行自动验算；本轮对 20 个 lab 文件 + 20 个 levels 文件整扫，313 为按 `deferred_gates` 逐节算出的读数（4 条明列不计见 §10.1b）。
 
 ### 10.5 套件期望数变化溯源（CH15 / CH16 / CH17）
 
-- `test_ch15`：首次入库 **74**（positive 4 / t15_2_interface 3 / negative 8）→ 本会话 **79**（positive 4 / t15_1_real 3 / t15_2_interface 3 / negative 10）。
-  +3 = `t15_1_real` 三条真判据（签名表逐行对数据、签名含有序参数类型、同符号跨程序一致）；
-  +2 = 两条新负例（`T15.1-1` 符号类型写错→7、参数顺序颠倒→7）。
-  旧负例 8 条本已覆盖 `params` 列与 `T15.2-1`，不重复计；故 74+5=79。
+- `test_ch15`：首次入库 **74**（positive 4 / t15_2_interface 3 / negative 8）→ 本会话上一轮 **79**（positive 4 / t15_1_real 3 / t15_2_interface 3 / negative 10）→ 本轮 **89**（positive 4 / t15_1_real 3 / t15_2_interface 3 / t15_3_real 3 / negative 17）。
+  74→79：+3 = `t15_1_real` 三条真判据；+2 = 两条负例（`T15.1-1` 符号类型写错→7、参数顺序颠倒→7）。
+  79→89：+3 = `t15_3_real` 三条真判据（兼容表逐行对数据、五类 reason 各命中一条、主版本规则拒绝）；+7 = 七条负例（`same_symbol` 声明不一致→10、`abi_ok` 与库导出不符→10、五类 reason 改错各→7）。
 - `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ `4fc45ec` 后 **71**（positive 5 / negative 7，+2 为 `delay` 上限正负探针）→ 本会话 **78**（positive 5 / t16_3_real 3 / negative 11）。
   +3 = `t16_3_real` 三条真判据（逐行对数据、时间戳来自时钟事件、时延逐条由 got−sent 且非固定常数）；
   +4 = 四条新负例（时延改固定 12→9、`got_at` 抄 `sent_at`→9、`req_id` 绑错→7、`client_seq` 绑错→7）。
@@ -866,7 +891,7 @@ RESULT: 7368 checks, 0 failures
 
 ### 10.6 未写入的承诺
 
-`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**5 项已实施**（§2.1 13.1、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3；其中 15.2 只到接口形成、`T15.2-1` 仍 pending；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。其余 **5 项未批准、未实施**（§2.2 13.2、§2.7 17.1、§2.8 18.4、§2.9 19.3、§2.10 F1）。
+`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**5 项已实施**（§2.1 13.1、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3；其中 15.2 只到接口形成、`T15.2-1` 仍 pending；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表，并把 15.3 的 `diff_sig` 接线为 `compat_report`——`T15.3-1` 六行现算、五类 reason 各一条负例，见 §10.1c）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。§2.4 里仍未落的是调用点 `call_sites`（`pc/argc`）与 `order`/`from` 三列——提案字段未齐，不代表 15.1/15.3 判据是布尔位。其余 **5 项未批准、未实施**（§2.2 13.2、§2.7 17.1、§2.8 18.4、§2.9 19.3、§2.10 F1）。
 这 10 项对应 CH13–CH19 与终章里"课文要求玩家能指认、数据侧却只有布尔位/汇总数"的 gate：**课文里有这些要求，判据目前只是布尔位**。任一项落地必须同时给单测（越限/缺失各一例）、一条 `RED-PROBE ... -> code=N` 实测原文，并同步删除对应章降级清单里的该条。
 
 ### 10.7 仍缺四样
