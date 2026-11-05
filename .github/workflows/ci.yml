@@ -34,21 +34,104 @@ jobs:
       - name: 安装 Godot 4.4.1 到 C:\tools\godot-4.4.1
         shell: powershell
         run: |
+          # Keep this script ASCII-only: Windows PowerShell 5 misreads UTF-8 scripts without BOM.
+          # Every sub-step has a checkpoint; failures go through Fail() and emit
+          # ::error::<which step + what error> instead of a bare .github:41 annotation.
           $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
           $version = "4.4.1"
           $url = "https://github.com/godotengine/godot/releases/download/$version-stable/Godot_v$version-stable_win64.exe.zip"
           $dest = "C:\tools\godot-$version"
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          $zip = Join-Path $env:RUNNER_TEMP "godot.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-          Expand-Archive -Path $zip -DestinationPath $dest -Force
-          $exe = Join-Path $dest "Godot_v$version-stable_win64.exe"
-          if (-not (Test-Path $exe)) { throw "未找到 $exe" }
-          # 与本地 scripts/*.ps1 约定的启动器路径保持一致
-          $cmd = Join-Path $dest "godot.cmd"
-          Set-Content -Path $cmd -Value "@echo off`r`n`"%~dp0Godot_v$version-stable_win64.exe`" %*" -Encoding ASCII
-          & $cmd --version
-          if (-not (Test-Path $env:GODOT_BIN)) { throw "安装完成但 GODOT_BIN 指向的 $env:GODOT_BIN 不存在" }
+          $log = Join-Path $env:RUNNER_TEMP "install-godot.log"
+          New-Item -ItemType File -Force -Path $log | Out-Null
+
+          function Write-Step([string]$m) {
+            $line = "[$(Get-Date -Format 'HH:mm:ss')] $m"
+            Write-Host $line
+            Add-Content -Path $log -Value $line
+          }
+          $script:step = "init"
+          function Fail([string]$detail) {
+            Write-Step "FAIL @ $script:step :: $detail"
+            Write-Host "::error::Godot install failed @ $script:step :: $detail"
+            exit 1
+          }
+
+          Write-Host "::group::Install Godot $version"
+          try {
+            # ---- 1/6 create dir ----
+            $script:step = "create-dir"
+            Write-Step "checkpoint 1/6: create $dest"
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+            if (-not (Test-Path $dest)) { Fail "directory not created: $dest" }
+
+            # ---- 2/6 download (choco fallback only on failure) ----
+            $zip = Join-Path $env:RUNNER_TEMP "godot.zip"
+            $exe = $null
+            $downloaded = $false
+            $script:step = "download"
+            Write-Step "checkpoint 2/6: download $url"
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+              $size = (Get-Item $zip).Length
+              Write-Step "downloaded zip: $zip ($size B)"
+              if ($size -lt 30MB) { throw "file too small ($size B), truncated or an error page" }
+              $downloaded = $true
+            } catch {
+              Write-Step "direct download failed: $($_.Exception.Message)"
+              Write-Step "FALLBACK: using 'choco install godot --version=$version' (only when direct download fails)"
+              $script:step = "fallback-choco"
+              choco install godot --version=$version -y --no-progress
+              if ($LASTEXITCODE -ne 0) { throw "choco exited with code $LASTEXITCODE" }
+              $shim = Get-ChildItem "C:\ProgramData\chocolatey\bin" -Filter "godot*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $shim) {
+                $shim = Get-ChildItem "C:\ProgramData\chocolatey\lib\godot" -Recurse -Filter "Godot*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+              }
+              if (-not $shim) { throw "fallback install finished but no godot exe found" }
+              $exe = $shim.FullName
+              Write-Step "fallback ok, exe: $exe"
+            }
+
+            # ---- 3/6 + 4/6 expand and verify (direct-download path only) ----
+            if ($downloaded) {
+              $script:step = "expand"
+              Write-Step "checkpoint 3/6: Expand-Archive -> $dest"
+              Expand-Archive -Path $zip -DestinationPath $dest -Force
+              $script:step = "verify-exe"
+              $exe = Join-Path $dest "Godot_v$version-stable_win64.exe"
+              Write-Step "checkpoint 4/6: verify $exe"
+              if (-not (Test-Path $exe)) { Fail "exe missing after expand: $exe" }
+            }
+
+            # ---- 5/6 write launcher and self-check version ----
+            $script:step = "write-launcher"
+            $cmd = Join-Path $dest "godot.cmd"
+            Write-Step "checkpoint 5/6: write $cmd and run --version"
+            Set-Content -Path $cmd -Value "@echo off`r`n`"$exe`" %*" -Encoding ASCII
+            $out = (& $cmd --version 2>&1 | Out-String).Trim()
+            Write-Step "godot --version output: $out"
+            if ($out -notmatch "4\.4\.1") { Fail "unexpected version: $out" }
+
+            # ---- 6/6 write GITHUB_ENV for later steps ----
+            $script:step = "write-github-env"
+            Write-Step "checkpoint 6/6: write GITHUB_ENV"
+            Add-Content -Path $env:GITHUB_ENV -Value "GODOT_BIN=$cmd"
+            Write-Step "GITHUB_ENV: $(Get-Content -Raw $env:GITHUB_ENV)"
+
+            Write-Step "done: GODOT_BIN=$cmd"
+            Write-Host "::endgroup::"
+          } catch {
+            Fail "exception: $($_.Exception.GetType().Name): $($_.Exception.Message)"
+          }
+          exit 0
+
+      - name: 上传安装日志（失败也传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-install-log
+          path: ${{ runner.temp }}/install-godot.log
+          if-no-files-found: warn
 
       - name: 导入检查（headless --editor --quit）
         shell: powershell
