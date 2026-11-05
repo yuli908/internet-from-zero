@@ -6,6 +6,7 @@ extends RefCounted
 ## 不新增 kind、不新增失败码；cfg 里声明真值，answers 里取玩家证据。
 
 const Kit := preload("res://src/core/lab_gate_kit.gd")
+const ObjectGraph := preload("res://src/core/object_graph.gd")
 
 static func is_pending(c: Dictionary) -> bool:
 	return str(c.get("content_status", c.get("status", "ready"))) != "ready"
@@ -202,6 +203,14 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 				{str(key): expect_meta[key]}, {str(key): meta.get(key, null)},
 				"判据 %s 不符：%s ≠ %s" % [str(key), str(meta.get(key, "?")),
 					str(expect_meta[key])])
+			return
+	# 对象图（19 §2.2）：cfg 声明 `graph{nodes,edges}` 时，答案里的 graph 必须通过端点/
+	# 边语义/规模上限/多重集比对；仍属 table，不新增 kind。actual 带解析后的图供下游读。
+	if c.has("graph"):
+		var gres: Dictionary = ObjectGraph.validate(got.get("graph", null), c.get("graph", {}))
+		if not bool(gres["ok"]):
+			Kit.emit(rep, tracker, int(gres["code"]), c, false, gres["input"],
+				gres["expected"], gres["actual"], str(gres["detail"]))
 			return
 	Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, got,
 		"表行逐格一致、判据全真", got, "表与判据全对")
