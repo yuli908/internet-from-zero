@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""全书 lab 总账：一次扫 20 个 data/labs/*_labs.json + 20 个 data/chapters/*_levels.json。
+"""全书 lab 总账：一次扫 20 个 data/labs/*_labs.json + 19 个 data/chapters/*_levels.json。
 
 口径（与 docs/PROGRESS.md §10 同文，改口径必须同时改这两处）：
   进分母 = required==true 且 gate 自身 status/content_status=="ready"
@@ -7,9 +7,13 @@
   恒等式 = 总 gate 数 == 进分母 + pending（required 且 gate 非 ready）
                           + 节级 deferred（required、gate ready，但所在 lab 非 ready）
                           + required=false（可选 gate）
+  注意：四桶恒等式按定义结构上恒真（任一侧怎么扫都相等），它只作展示，不当判据。
+  真正能红的判据是下面两类逐条完整性比对：
+    a) 账目自身：空 id / 重复 id / required 非布尔 / status 取值未知；
+    b) 与 levels 的第二份声明逐 lab 比对：gate_ids（集合相等）与 segs（段数相等）。
+       只比 gate 数会漏掉「某段被删但 gate 数没变」，所以 segs 必须单独比。
   任一项不成立，脚本以退出码 1 结束，不许把数字抄进文档。
-  四桶恒等式按定义恒成立，所以另加逐条账目完整性校验（空 id / 重复 id /
-  required 非布尔 / status 取值未知），任一条账目对不上也以退出码 1 结束。
+  没有 levels 文件的章（如 final_labs.json）不静默跳过，打印「该章无声明、跳过」。
   调用方（scripts/run_tests.ps1）据此映射：有 TOTAL 且“验算：闭合”才放行；
   正常退出码 0，账目不闭合 1（入口映射为 8），脚本没跑起来/无 TOTAL 行为 9。
 
@@ -50,10 +54,10 @@ def lab_status(cfg, level_status):
     return level_status.get(str(cfg.get("id", "")), "ready")
 
 
-def load_level_gate_ids():
-    """章节级 gate 声明，按 chapter -> data_key -> [gate_id]。
+def load_level_decls():
+    """章节级第二份声明，按 chapter -> data_key -> {gate_ids, segs}。
 
-    这是与 data/labs 独立的第二份声明：只改 lab 的 gate 数、不改这里，账目就对不上。
+    这是与 data/labs 独立的声明：只改 lab 的 gate 数或段数、不改这里，账目就对不上。
     """
     out = {}
     for path in glob.glob(os.path.join(LEVELS_DIR, "*_levels.json")):
@@ -62,15 +66,19 @@ def load_level_gate_ids():
             doc = json.load(fh)
         per = {}
         for lab in doc.get("labs", []):
-            per[str(lab.get("data_key", ""))] = [str(x) for x in lab.get("gate_ids", [])]
+            per[str(lab.get("data_key", ""))] = {
+                "gate_ids": [str(x) for x in lab.get("gate_ids", [])],
+                "segs": lab.get("segs"),
+            }
         out[chapter] = per
     return out
 
 
 def scan():
     level_status = load_level_status()
-    level_gate_ids = load_level_gate_ids()
+    decls = load_level_decls()
     problems = []
+    skipped = []
     seen_ids = {}
     per_chapter = {}
     counted_list = []
@@ -82,15 +90,33 @@ def scan():
         with open(path, encoding="utf-8") as fh:
             doc = json.load(fh)
         row = {"labs": 0, "segs": 0, "gates": 0, "pending": 0, "counted": 0,
-               "section_deferred": 0, "optional": 0}
-        declared = level_gate_ids.get(chapter, {})
+               "section_deferred": 0, "optional": 0,
+               "decl_gates": 0, "decl_segs": 0, "declared_labs": 0}
+        declared = decls.get(chapter)
+        if declared is None:
+            skipped.append(chapter)
+            declared = {}
         for lab_id, cfg in (doc.get("labs") or {}).items():
             row["labs"] += 1
-            row["segs"] += len(cfg.get("sections") or [])
+            data_segs = len(cfg.get("sections") or [])
+            row["segs"] += data_segs
             got_ids = [str(g.get("id", "")) for g in cfg.get("gate_cases") or []]
-            if lab_id in declared and sorted(got_ids) != sorted(declared[lab_id]):
-                problems.append("%s/%s: gate 数与 levels 声明不符（数据 %s / levels %s）"
-                                % (chapter, lab_id, sorted(got_ids), sorted(declared[lab_id])))
+            decl = declared.get(lab_id)
+            if decl is not None:
+                row["declared_labs"] += 1
+                row["decl_gates"] += len(decl["gate_ids"])
+                if sorted(got_ids) != sorted(decl["gate_ids"]):
+                    problems.append("%s/%s: gate 与 levels 声明不符（数据 %s / levels %s）"
+                                    % (chapter, lab_id, sorted(got_ids), sorted(decl["gate_ids"])))
+                if decl["segs"] is None:
+                    problems.append("%s/%s: levels 缺 segs 声明（无法比对段数）" % (chapter, lab_id))
+                else:
+                    row["decl_segs"] += int(decl["segs"])
+                    if int(decl["segs"]) != data_segs:
+                        problems.append("%s/%s: 段数与 levels 声明不符（数据 %d / levels %d）"
+                                        % (chapter, lab_id, data_segs, int(decl["segs"])))
+            elif declared:
+                problems.append("%s/%s: 数据有该 lab，但 levels 未声明" % (chapter, lab_id))
             st = lab_status(cfg, level_status)
             if st not in ("ready", "deferred"):
                 problems.append("%s/%s: lab content_status=%r 未知" % (chapter, lab_id, st))
@@ -130,22 +156,28 @@ def scan():
         for missing in sorted(declared):
             problems.append("%s/%s: levels 声明了该 lab，但数据文件里没有" % (chapter, missing))
         per_chapter[chapter] = row
-    return per_chapter, pending_list, section_deferred_list, optional_list, problems
+    return per_chapter, pending_list, section_deferred_list, optional_list, problems, skipped
 
 
 def main():
-    per_chapter, pending, section_deferred, optional, problems = scan()
-    print("file                     labs  segs  gates  pending  section_def  optional  counted")
+    per_chapter, pending, section_deferred, optional, problems, skipped = scan()
+    print("file                     labs  data_gates  level_gates  data_segs  level_segs  "
+          "pending  section_def  optional  counted")
     for chapter, r in per_chapter.items():
-        print("%-24s %4d  %4d  %5d  %7d  %11d  %8d  %7d"
-              % (chapter, r["labs"], r["segs"], r["gates"], r["pending"],
-                 r["section_deferred"], r["optional"], r["counted"]))
+        print("%-24s %4d  %10d  %11d  %9d  %10d  %7d  %11d  %8d  %7d"
+              % (chapter, r["labs"], r["gates"], r["decl_gates"], r["segs"], r["decl_segs"],
+                 r["pending"], r["section_deferred"], r["optional"], r["counted"]))
     total = {k: sum(r[k] for r in per_chapter.values())
              for k in ("labs", "segs", "gates", "pending", "section_deferred",
-                       "optional", "counted")}
-    print("TOTAL                    %4d  %4d  %5d  %7d  %11d  %8d  %7d"
-          % (total["labs"], total["segs"], total["gates"], total["pending"],
-             total["section_deferred"], total["optional"], total["counted"]))
+                       "optional", "counted", "decl_gates", "decl_segs", "declared_labs")}
+    print("TOTAL                    %4d  %10d  %11d  %9d  %10d  %7d  %11d  %8d  %7d"
+          % (total["labs"], total["gates"], total["decl_gates"], total["segs"],
+             total["decl_segs"], total["pending"], total["section_deferred"],
+             total["optional"], total["counted"]))
+    for chapter in skipped:
+        print()
+        print("章节 %s：无 levels 声明（data/chapters/%s_levels.json 不存在），"
+              "该章无声明、跳过（不参与 gates/segs 比对）" % (chapter, chapter))
     print()
     print("明列不计（既不进分母、也不算 pending）：")
     for item in section_deferred:
@@ -157,6 +189,12 @@ def main():
     print("恒等式：%d = %d 进分母 + %d pending + %d 节级 deferred + %d required=false"
           % (total["gates"], total["counted"], total["pending"],
              total["section_deferred"], total["optional"]))
+    print("（恒等式结构上恒真，只作展示，不作判据；判据是下面的逐条完整性比对）")
+    print()
+    print("完整性：gate 数据 %d / levels 声明 %d（已声明 lab %d/%d）；"
+          "segs 数据 %d / levels 声明 %d"
+          % (total["gates"], total["decl_gates"], total["declared_labs"], total["labs"],
+             total["segs"], total["decl_segs"]))
     if problems:
         print()
         print("账目完整性问题（%d 条）：" % len(problems))

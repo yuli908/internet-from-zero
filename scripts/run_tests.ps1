@@ -13,7 +13,7 @@
 #   5  FAIL  引擎返回码非 0（结果看着绿但进程异常）
 #   6  FAIL  工程或 Godot 启动器不存在（环境问题，不跑）
 #   7  FAIL  测试进程超过 -TimeoutSec 未退出（退出期自旋/死锁），已强杀（CI 兜底，绝不允许挂死）
-#   8  FAIL  总账不闭合（四桶恒等式或逐条账目完整性/与 levels 的 gate 数不符）
+#   8  FAIL  总账不闭合（四桶恒等式或逐条账目完整性/与 levels 的 gate 或 segs 声明不符）
 #   9  FAIL  总账没跑起来（无 python / 脚本缺失 / 输出里没有 TOTAL 行）
 #
 # 判定只读 runner 的三条终结行（RESULT / 终结行 / SUITE_TOTAL），
@@ -152,7 +152,7 @@ if (-not (Test-Path $accountScript)) {
 $accountText = (& python $accountScript 2>&1 | Out-String)
 $accountCode = $LASTEXITCODE
 foreach ($line in ($accountText -split "`r?`n")) {
-	if ($line -match "TOTAL|恒等式|验算|原因=|账目完整性|gate 数与 levels|levels 声明了") {
+	if ($line -match "TOTAL|恒等式|验算|原因=|账目完整性|完整性：|与 levels|levels 声明|无 levels") {
 		Write-Host $line
 	}
 }
