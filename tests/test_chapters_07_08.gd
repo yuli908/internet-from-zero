@@ -81,7 +81,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s levels+labs 成对登记" % cid,
 			files.has("res://data/chapters/%s_levels.json" % cid)
 			and files.has("res://data/labs/%s_labs.json" % cid))
-	ctx.check("manifest 26 项", files.size() == 26, str(files.size()))
+	ctx.check("manifest 27 项", files.size() == 27, str(files.size()))
 
 	for cid in ["ch07", "ch08"]:
 		ctx.begin_group("levels_ids")

@@ -61,7 +61,7 @@ func run(ctx: TestContext) -> void:
 	var ch: ChapterRuntime = db.chapter
 
 	ctx.begin_group("manifest")
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 26)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 27)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.begin_group("item_catalog")
