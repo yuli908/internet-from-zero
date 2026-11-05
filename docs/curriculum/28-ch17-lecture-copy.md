@@ -9,8 +9,8 @@
       docs/design/17-practice-first-policy.md（P0–P5 分级与 H1–H5；P5 含「17 双客户端 20 条」）
       docs/curriculum/27-ch16-lecture-copy.md（格式基准：JSON 段 + 实践表 + 校验表）
 边界: 只写 docs/curriculum/**；未动 src/**、data/**、tests/**、docs/design/**、project.godot
-说明: CH17 的 gate 尚未落库（data/labs 仅有 ch01/ch02/ch05/ch06，src/core 无 ch17_checks.gd），`lab` 名与 `T17.x-n` 均为提案
-      `after` 按每节 4 条 required 推定；最终以数据侧 gate 列表为准；若数据侧落成 3 条，末段改为 after=2
+说明: CH17 的 gate 已落库（data/labs/ch17_labs.json、src/core/ch17_checks.gd、tests/test_ch17.gd，EXPECT 55）
+      `lab` 名与 `T17.x-n` 与数据一致；T17.1-1 因字段位宽未批挂 pending（分母 12→11），末段 after=3
 ```
 
 ## 0. 口径
@@ -133,10 +133,10 @@
 
 ## 5. 待办与接缝状态
 
-1. **gate 未落库**：`data/labs` 只有 ch01/ch02/ch05/ch06，`src/core` 无 `ch17_checks.gd`；`lab` 名（`msg_format` / `presence_offline` / `two_client_chat`）与 `T17.1-1..4` 等均为提案。`after` 按 4 条 required 推定，数据侧定稿后只改 `after`，段数与文案不动；**若为 3 条，末段 `after=2`**。
+1. **gate 已落库**：`data/labs/ch17_labs.json` 与 `src/core/ch17_checks.gd` 已按 `msg_format` / `presence_offline` / `two_client_chat` 落 3×4 条，`tests/test_ch17.gd` EXPECT 55；`after` 按 4 条 required 定稿（末段 `after=3`）。`T17.1-1` 因字段位宽未批挂 pending，不进分母（12→11）。
 2. **3 项扩接口未批**：见 §4 末条。批之前对应 A 条只能按「最小替代」判，**不得**降级成纯问答或「看界面」。
 3. **12 不采用**：`E_ENCAPSULATION`(12) 不在白名单，语义仅到「尚未封装」，与「本地伪造消息 / 离线队列没接」不同；本文件按 3 + 10 拆报，未新开码。
-4. **字段与容量未定**：02 CH17 只列「类型/长度/负载/时间戳」与「在线状态表、消息队列」，没有位宽、长度上限、队列容量、时间戳精度；本文件写「以数据侧为准」，**未拍数值**。
+4. **字段与容量由数据侧定稿**：02 CH17 只列「类型/长度/负载/时间戳」与「在线状态表、消息队列」；数据侧定头 6 B（type 1 + len 2 + ts 3）、长度上限 256 B、离线队列 3 条、补发上限 50 ms。这些是**数据侧假设值**，接口提案通过前不得当成 02 原文。
 5. **UI 未定义**：02 只给「低饱和硬朗、大字号」的风格方向，没有控件名与布局；本文件**不编造 UI 组件**，17.3 只判消息一致性，不判像素。
 6. **前置与产出**：02 CH17 前置 CH16，产出 `P09`、`P08` 完整版、`P13/P14` 前置；本文件按此写，**没有**把 CH17 写成 CH16 的重复（16.x 讲服务端，17.x 讲应用层消息与在线状态）。
 7. **与既有机制的接缝**：消息格式接 8.1（接缝 1），在线/离线接 16.1 与 10.x（接缝 2），对发接 16.x 服务端与 15.2 socket（接缝 3）。本文件**没有**新造报文头、用户状态协议或传输层。

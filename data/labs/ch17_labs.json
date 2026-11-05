@@ -1,0 +1,595 @@
+{
+  "version": 2,
+  "source": "docs/curriculum/28-ch17-lecture-copy.md",
+  "source_note": "段落按课件 §1–§3 的 JSON 块原样抽取（未并段、未改义）。数据侧定稿：头 6 B（type 1 + len 2 + ts 3）、长度上限 256 B、离线队列 3 条、补发上限 50 ms、双向各 20 条。",
+  "pending_kinds": {
+    "table": "17.1 消息字段位宽与超长拒绝接口未批；T17.1-1 挂 pending 不进分母。"
+  },
+  "labs": {
+    "msg_format": {
+      "id": "msg_format",
+      "title": "消息格式 · 先定消息长什么样",
+      "body": "类型、长度、负载、时间戳四类字段沿用 8.1，不另造报文头；长度按字节算，超长必须拒。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 先定消息长什么样",
+          "text": "聊天软件的第一件事不是界面，是消息长什么样。类型说明这是登录、文本还是心跳；长度告诉解析器读到哪；负载是内容；时间戳用于排序与补发。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "字段 · 沿用 8.1，不另造报文头",
+          "text": "格式沿用 8.1 的字段与封装口径，不另造报文头。长度按 6.1 的字节数算，不按字符数；时间戳精度与起点以数据侧为准，本文件不拍编码。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 一条正常，一条超长",
+          "text": "做一遍：填一份消息协议，发一条正常消息与一条超长消息。正常消息能解析回原文；超长消息必须被明确拒绝，并说明超了哪个字段。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 长度字段摆着不校验",
+          "text": "负例：长度字段摆着不校验，超长消息照样发出去，接收端按长度读进越界。协议表填了，检查没接——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 超长被明确拒绝",
+          "text": "验收：超长被明确拒绝。四条同时——①四个字段都能解析；②正常消息往返一致；③超长消息被拒且有可读原因；④P09 聊天客户端落袋。只测正常长度，不给过。"
+        }
+      ],
+      "p1": "填消息协议，发正常与超长两条，超长要有可读拒绝原因",
+      "p1_gates": [
+        "T17.1-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "定义四类字段，发一条正常消息与一条超长消息",
+          "judge": "四条同时：①四字段可解析；②正常往返一致；③超长被拒且原因可读；④P09 落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T17.1-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "去掉长度检查，超长消息直接发，接收端越界读",
+          "judge": "接收端读到越界数据，无拒绝记录；detail 写「长度字段未校验，超长消息被接受」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T17.1-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按字段表与 6.1 编码算头 + 负载的总字节数",
+          "judge": "与机器长度字段一致；不算 P1；detail 写「头长或负载字节数算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T17.1-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「类型定种类，长度定边界，负载是内容，时间戳排顺序」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T17.1-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T17.1-1",
+          "title": "两条消息逐字段对上：类型、长度、时间戳、拒绝原因",
+          "kind": "table",
+          "required": true,
+          "status": "pending",
+          "pending_reason": "消息字段位宽与超长拒绝接口未批（02 CH17 只列四类字段，无位宽与长度上限）；不以假设位宽冒充逐字段可追溯。",
+          "thresholds": {
+            "field_width": {
+              "status": "pending",
+              "initial": "type=1B,len=2B,ts=3B",
+              "reason": "位宽与长度上限未定；只定协议上限 256 B 供 17.1-C 复算。"
+            }
+          },
+          "keys": [
+            "msg",
+            "type",
+            "len",
+            "ts",
+            "accepted",
+            "reason"
+          ],
+          "expect_rows": [
+            {
+              "msg": "normal",
+              "type": 1,
+              "len": 6,
+              "ts": 1001,
+              "accepted": true,
+              "reason": ""
+            },
+            {
+              "msg": "oversize",
+              "type": 1,
+              "len": 300,
+              "ts": 1002,
+              "accepted": false,
+              "reason": "len"
+            }
+          ],
+          "expect_meta": {
+            "four_fields_ok": true,
+            "roundtrip_ok": true,
+            "oversize_rejected": true,
+            "p09_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T17.1-2",
+          "title": "负例：长度字段不校验，超长照发",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "len_check",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T17.1-3",
+          "title": "按头 6 B + 负载 6 B 算总字节与上限",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "header_bytes": 6,
+            "normal_total": 12,
+            "limit": 256
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T17.1-4",
+          "title": "四个字段各管什么",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "四个字段各管什么？",
+            "options": [
+              "类型定种类，长度定边界，负载是内容，时间戳用于排序与补发",
+              "类型定长度，长度定内容，负载是时间戳，时间戳是种类",
+              "四个字段都只是给人看的标签，解析器不看",
+              "只要有负载，其余三个可以省略"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先写死四类字段，再算 6 B 头 + 6 B 负载；超长只留一条带字段名的拒绝。",
+      "misconception": "把「正常消息能显示」当成「协议对了」；超长没拒，说明长度字段只是摆着。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "presence_offline": {
+      "id": "presence_offline",
+      "title": "在线与离线 · 状态在表，消息在队列",
+      "body": "在线表回答谁连着；离线队列复用 10.x 的序号与确认，重连按序号补发，不重不漏。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 谁在线，消息给谁",
+          "text": "在线表回答两件事：谁现在连着、消息该投给哪个连接。上线登记、下线摘除；连接断了不等于用户消失，离线消息要先存住。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "队列 · 复用 10.x 的序号与确认",
+          "text": "离线队列复用 10.x 的序号与确认：每条消息有序号，收到确认才删；重连后按序号补发未读，不重不漏。队列容量以数据侧为准。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 下线发 3 条，重连补齐",
+          "text": "做一遍：A 上线、B 上线，B 下线后 A 发 3 条，B 重连，确认 3 条按序补发且不重复。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 状态对了，离线消息丢了",
+          "text": "负例：在线表只改状态，离线消息直接丢弃；或重连后把已读消息再发一遍。状态对了、消息丢了——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 重连后未读按序补发",
+          "text": "验收：重连后未读按序补发。四条同时——①在线表随上下线更新；②离线消息入队不丢；③重连按序号补发、不重复；④在线表落袋。只测在线收发，不给过。"
+        }
+      ],
+      "p1": "B 下线后 A 发 3 条，B 重连，核对补发顺序与去重",
+      "p1_gates": [
+        "T17.2-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P4",
+          "produce": "B 下线后 A 发 3 条，B 重连，核对补发顺序与去重",
+          "judge": "四条同时：①在线表随上下线更新；②离线消息入队不丢；③按序号补发不重；④在线表落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T17.2-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "下线时把消息丢弃，重连无补发",
+          "judge": "消息条数为 0，在线表却显示正常；detail 写「离线消息未入队，重连无补发」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T17.2-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按已发、已确认、已读算未读条数与序号范围",
+          "judge": "与机器队列一致；不算 P1；detail 写「未读条数或序号范围算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T17.2-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「连接只是通道，用户状态单独记，消息先入队」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T17.2-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T17.2-1",
+          "title": "3 条离线消息按序号补发：载荷、时延、状态",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "redeliver_ms",
+            "max": 50
+          },
+          "keys": [
+            "seq",
+            "payload",
+            "redeliver_ms",
+            "state"
+          ],
+          "expect_rows": [
+            {
+              "seq": 1,
+              "payload": "m1",
+              "redeliver_ms": 40,
+              "state": "delivered"
+            },
+            {
+              "seq": 2,
+              "payload": "m2",
+              "redeliver_ms": 45,
+              "state": "delivered"
+            },
+            {
+              "seq": 3,
+              "payload": "m3",
+              "redeliver_ms": 50,
+              "state": "delivered"
+            }
+          ],
+          "expect_meta": {
+            "presence_ok": true,
+            "queued_ok": true,
+            "ordered_ok": true,
+            "presence_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T17.2-2",
+          "title": "负例：只改在线状态，离线消息直接丢",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "offline_queue",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T17.2-3",
+          "title": "按已发/已确认/已读算未读条数与序号范围",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "unread": 3,
+            "seq_from": 1,
+            "seq_to": 3
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T17.2-4",
+          "title": "断线为什么不等于用户消失",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "断线为什么不等于用户消失？",
+            "options": [
+              "连接只是通道，用户状态要单独记，消息先入离线队列",
+              "断线即用户注销，消息可以丢弃",
+              "在线表就是用户表，连接一断整行删掉",
+              "离线消息没有序号，重连按时间猜顺序"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记下线时刻的队列快照，再按 1→2→3 对补发日志；时延超 50 ms 单独记。",
+      "misconception": "把「在线表有名字」当成「消息能到」；队列快照为空就是没入队。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    },
+    "two_client_chat": {
+      "id": "two_client_chat",
+      "title": "双客户端对发 · 双向 20 条一致",
+      "body": "对发只组合 17.1 格式、17.2 在线表与 16.x 服务端；一致性按发出、转发、显示三层比对。",
+      "sections": [
+        {
+          "order": 1,
+          "after": 0,
+          "title": "开场 · 双客户端各发 20 条",
+          "text": "双客户端对发是本章的总验收：两个客户端各发 20 条，对方都要按发送顺序显示，内容一字不差。"
+        },
+        {
+          "order": 2,
+          "after": 0,
+          "title": "一致性 · 三层比对",
+          "text": "一致性按三层比对：发出的字节、服务端转发的字节、对方显示的文本。任一层错位都算不一致；序号用于判顺序，不靠界面看起来对。"
+        },
+        {
+          "order": 3,
+          "after": 1,
+          "title": "做一遍 · 双开，双向各 20 条",
+          "text": "做一遍：双开两个客户端连同一服务端，A 发 20 条、B 发 20 条，逐条核对顺序与内容，导出双向日志。"
+        },
+        {
+          "order": 4,
+          "after": 2,
+          "title": "负例 · 界面显示本地伪造的 20 条",
+          "text": "负例：界面显示 20 条本地伪造的消息，根本没走服务端；或只显示自己发的，看不到对方。界面热闹、链路为空——必须判红。"
+        },
+        {
+          "order": 5,
+          "after": 3,
+          "title": "验收 · 双向 20 条 100% 一致",
+          "text": "验收：双向 20 条顺序与内容 100% 一致。四条同时——①两客户端都真连服务端；②双向各 20 条；③顺序与内容逐条一致；④P13/P14 前置落袋。只单机自说自话，不给过。"
+        }
+      ],
+      "p1": "双开两客户端，A/B 各发 20 条，逐条核对顺序与内容并导出双向日志",
+      "p1_gates": [
+        "T17.3-1"
+      ],
+      "practice": [
+        {
+          "id": "A",
+          "level": "P5",
+          "produce": "双开两客户端同连服务端，A/B 各发 20 条，逐条核对",
+          "judge": "四条同时：①两端都真连；②双向各 20 条；③顺序内容一致；④P13/P14 前置落袋",
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ],
+          "gates": [
+            "T17.3-1"
+          ]
+        },
+        {
+          "id": "B",
+          "level": "负例",
+          "produce": "界面直接生成本地消息，不经过服务端",
+          "judge": "服务端无对应请求，对方收不到；detail 写「消息为本地伪造，未走服务端」",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ],
+          "gates": [
+            "T17.3-2"
+          ]
+        },
+        {
+          "id": "C",
+          "level": "P0b",
+          "produce": "按各 20 条与序号规则算总条数与末序号",
+          "judge": "与机器日志一致；不算 P1；detail 写「总条数或序号范围算错」",
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ],
+          "gates": [
+            "T17.3-3"
+          ]
+        },
+        {
+          "id": "D",
+          "level": "quiz",
+          "produce": "选「序号才是链路真实顺序，界面可能被重排」",
+          "judge": "answer 对照；非唯一 gate",
+          "codes": [
+            "E_QUIZ(14)"
+          ],
+          "gates": [
+            "T17.3-4"
+          ]
+        }
+      ],
+      "gate_cases": [
+        {
+          "id": "T17.3-1",
+          "title": "双向各 20 条：发出、转发、显示三层逐层对齐",
+          "kind": "table",
+          "required": true,
+          "delay": {
+            "key": "max_delay_ms",
+            "max": 50
+          },
+          "keys": [
+            "dir",
+            "sent",
+            "forwarded",
+            "displayed",
+            "max_delay_ms"
+          ],
+          "expect_rows": [
+            {
+              "dir": "a2b",
+              "sent": 20,
+              "forwarded": 20,
+              "displayed": 20,
+              "max_delay_ms": 35
+            },
+            {
+              "dir": "b2a",
+              "sent": 20,
+              "forwarded": 20,
+              "displayed": 20,
+              "max_delay_ms": 40
+            }
+          ],
+          "expect_meta": {
+            "both_connected": true,
+            "counts_20_20": true,
+            "order_ok": true,
+            "p13_grant": true
+          },
+          "codes": [
+            "E_UNCONNECTED(3)",
+            "E_TABLE_CELL(7)",
+            "E_OUTPUT_MISMATCH(10)",
+            "E_DELAY_MISMATCH(9)",
+            "E_COVERAGE(13)"
+          ]
+        },
+        {
+          "id": "T17.3-2",
+          "title": "负例：界面显示本地伪造的 20 条",
+          "kind": "skip_layer",
+          "required": true,
+          "stage": "server_forward",
+          "codes": [
+            "E_OUTPUT_MISMATCH(10)"
+          ]
+        },
+        {
+          "id": "T17.3-3",
+          "title": "按各 20 条与序号规则算总条数与末序号",
+          "kind": "derived_number",
+          "required": true,
+          "expect_values": {
+            "total": 40,
+            "last_seq": 40,
+            "per_dir": 20
+          },
+          "codes": [
+            "E_TABLE_CELL(7)"
+          ]
+        },
+        {
+          "id": "T17.3-4",
+          "title": "为什么按序号而不是按界面判顺序",
+          "kind": "quiz",
+          "required": true,
+          "quiz": {
+            "question": "为什么按序号而不是按界面判顺序？",
+            "options": [
+              "界面顺序可能被显示层重排，序号才是链路上的真实顺序",
+              "界面顺序一定对，序号只是装饰",
+              "按界面判更严格，因为人眼看得见",
+              "序号只在离线补发时有用，在线不需要"
+            ],
+            "answer": 0
+          },
+          "codes": [
+            "E_QUIZ(14)"
+          ]
+        }
+      ],
+      "hint": "先记两个方向的序号与条数，再拿三层日志逐条对；时延上限 50 ms。",
+      "misconception": "把「界面看起来有 20 条」当成「链路通了」；服务端无转发记录就是本地自说自话。",
+      "grants": {
+        "items": {},
+        "blueprint": []
+      }
+    }
+  }
+}
