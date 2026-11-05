@@ -1,87 +1,141 @@
 ﻿# 全量测试（headless）。
 #
-# 用法：powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
+# 用法：
+#   powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -ReplayLog <日志>
 #
-# 解析 `RESULT: N checks, M failures`：
-#   - M > 0            -> FAIL，exit 1
-#   - 解析不到结果行    -> FAIL，exit 1（防止"测试没跑起来却当作通过"）
-#   - 引擎返回码非 0     -> FAIL，exit 1
+# 退出码（CI 只看这个：0=绿，非 0=红）：
+#   0  PASS  终结行「=== ALL PASS ===」、RESULT 0 failures、SUITE_TOTAL expected=actual、引擎返回 0
+#   1  FAIL  「RESULT: N checks, M failures」中 M > 0
+#   2  FAIL  日志里没有 RESULT 行（测试没跑起来 / 日志被截断）
+#   3  FAIL  日志里没有「=== ALL PASS ===」（崩溃、半途中断，或终结行是「=== FAILED ===」）
+#   4  FAIL  SUITE_TOTAL expected≠actual（有 check 未执行：套件中途中止或被跳过）
+#   5  FAIL  引擎返回码非 0（结果看着绿但进程异常）
+#   6  FAIL  工程或 Godot 启动器不存在（环境问题，不跑）
 #
-# 输出同时写入 artifacts/logs/tests.log。
+# 判定只读 runner 的三条终结行（RESULT / 终结行 / SUITE_TOTAL），
+# 不采用「grep 到 FAIL 就 exit 1」的粗口径。
+# -ReplayLog 不跑 Godot，用现成日志走同一套判定，专门用来验证红/绿判定本身。
+#
+# 输出同时写入 artifacts/logs/tests.log；开跑前先删旧日志，禁止读到上一轮的 PASS。
 
 param(
 	[string]$Root = "",
 	[string]$Godot = "C:\tools\godot-4.4.1\godot.cmd",
-	[string]$LogFile = ""
+	[string]$LogFile = "",
+	[string]$ReplayLog = ""
 )
 
 $ErrorActionPreference = "Continue"
 
+# 统一出口：任何红色情形都打印原因、日志路径与退出码，然后 exit。
+function Fail-Exit([string]$Reason, [int]$Code) {
+	Write-Host "[run_tests] FAIL $Reason" -ForegroundColor Red
+	Write-Host "[run_tests] 完整日志：$LogFile"
+	Write-Host "[run_tests] exit=$Code" -ForegroundColor Red
+	exit $Code
+}
+
+$replay = -not [string]::IsNullOrWhiteSpace($ReplayLog)
+$engineCode = 0
+
 if ([string]::IsNullOrWhiteSpace($Root)) {
 	$Root = Split-Path -Parent $PSScriptRoot
 }
-if ([string]::IsNullOrWhiteSpace($LogFile)) {
-	$LogFile = Join-Path $Root "artifacts\logs\tests.log"
-}
 
-if (-not (Test-Path (Join-Path $Root "project.godot"))) {
-	Write-Host "[run_tests] FAIL 找不到工程：$Root\project.godot" -ForegroundColor Red
-	exit 1
-}
-if (-not (Test-Path $Godot)) {
-	Write-Host "[run_tests] FAIL 找不到 Godot 启动器：$Godot" -ForegroundColor Red
-	exit 1
-}
+if ($replay) {
+	$LogFile = $ReplayLog
+	if (-not (Test-Path $LogFile)) {
+		Fail-Exit "回放日志不存在：$LogFile" 2
+	}
+} else {
+	if ([string]::IsNullOrWhiteSpace($LogFile)) {
+		$LogFile = Join-Path $Root "artifacts\logs\tests.log"
+	}
+	if (-not (Test-Path (Join-Path $Root "project.godot"))) {
+		Fail-Exit "找不到工程：$Root\project.godot" 6
+	}
+	if (-not (Test-Path $Godot)) {
+		Fail-Exit "找不到 Godot 启动器：$Godot" 6
+	}
 
-$logDir = Split-Path -Parent $LogFile
-if (-not (Test-Path $logDir)) {
-	New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+	$logDir = Split-Path -Parent $LogFile
+	if (-not (Test-Path $logDir)) {
+		New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+	}
+
+	# 先删旧日志：若本轮写入失败（文件被占用等），宁可「没有日志」判红，
+	# 也不能让判定读到上一轮留下的 PASS 日志——那是假绿最直接的来源。
+	if (Test-Path $LogFile) {
+		Remove-Item -Force -Path $LogFile -ErrorAction SilentlyContinue
+	}
+	if (Test-Path $LogFile) {
+		Fail-Exit "旧日志删不掉（被其它进程占用？）：$LogFile" 2
+	}
+
+	Write-Host "[run_tests] root : $Root"
+	Write-Host "[run_tests] log  : $LogFile"
+
+	& $Godot --headless --path $Root -s "res://tests/run_tests.gd" 2>&1 | Out-File -FilePath $LogFile -Encoding utf8
+	$engineCode = $LASTEXITCODE
+	if ($null -eq $engineCode) { $engineCode = -1 }  # 取不到返回码按异常处理，不当 0
 }
-
-Write-Host "[run_tests] root : $Root"
-Write-Host "[run_tests] log  : $LogFile"
-
-& $Godot --headless --path $Root -s "res://tests/run_tests.gd" 2>&1 | Out-File -FilePath $LogFile -Encoding utf8
-$code = $LASTEXITCODE
-if ($null -eq $code) { $code = 0 }
 
 $text = ""
 if (Test-Path $LogFile) {
 	$text = Get-Content -Raw -Path $LogFile
 }
+if ($null -eq $text) { $text = "" }
 
 # 打印关键行，便于人工快速读结论
 $lines = $text -split "`r?`n"
 foreach ($line in $lines) {
-	if ($line -match "RESULT:" -or $line -match "=== ALL PASS" -or $line -match "=== FAILED" -or $line -match "FAIL ") {
+	if ($line -match "RESULT:" -or $line -match "SUITE_TOTAL" -or $line -match "=== ALL PASS" -or $line -match "=== FAILED" -or $line -match "FAIL ") {
 		Write-Host $line
 	}
 }
 
+# ------------------------------------------------- 判定：只读 runner 的三条终结行
 $checks = -1
 $failures = -1
 $m = [regex]::Match($text, "RESULT:\s*(\d+)\s*checks,\s*(\d+)\s*failures")
-if ($m.Success) {
-	$checks = [int]$m.Groups[1].Value
-	$failures = [int]$m.Groups[2].Value
-}
-
 if (-not $m.Success) {
-	Write-Host "[run_tests] FAIL 未找到 `RESULT: N checks, M failures`（测试可能没跑起来）" -ForegroundColor Red
-	Write-Host "[run_tests] 完整日志：$LogFile"
-	exit 1
+	Fail-Exit "未找到「RESULT: N checks, M failures」（测试可能没跑起来，或日志被截断）" 2
 }
+$checks = [int]$m.Groups[1].Value
+$failures = [int]$m.Groups[2].Value
 
 if ($failures -gt 0) {
-	Write-Host "[run_tests] FAIL $checks 项检查中有 $failures 项失败" -ForegroundColor Red
-	Write-Host "[run_tests] 完整日志：$LogFile"
-	exit 1
+	Fail-Exit "$checks 项检查中有 $failures 项失败" 1
 }
 
-if ($code -ne 0) {
-	Write-Host "[run_tests] FAIL 引擎返回码 $code（结果为 0 失败但进程非 0，按失败处理）" -ForegroundColor Red
-	exit 1
+# 终结行：取日志里最后一条「=== ALL PASS ===」或「=== FAILED ===」。
+# 一条都没有 = 进程崩溃 / 半途中断 / 输出被截断，不能算通过。
+$verdicts = [regex]::Matches($text, "=== (ALL PASS|FAILED) ===")
+if ($verdicts.Count -eq 0) {
+	Fail-Exit "日志里没有「=== ALL PASS ===」（进程崩溃、半途中断或输出被截断）" 3
+}
+$verdict = $verdicts[$verdicts.Count - 1].Groups[1].Value
+if ($verdict -ne "ALL PASS") {
+	Fail-Exit "终结行是「=== FAILED ===」" 3
 }
 
-Write-Host "[run_tests] PASS $checks checks, 0 failures" -ForegroundColor Green
+# 套件总数：有 check 未执行（套件中途中止 / 被跳过）时 expected≠actual，同样要红。
+$totals = [regex]::Matches($text, "SUITE_TOTAL expected=(\d+) actual=(\d+)")
+if ($totals.Count -eq 0) {
+	Fail-Exit "未找到「SUITE_TOTAL expected=... actual=...」（无法证明所有套件都跑完）" 4
+}
+$t = $totals[$totals.Count - 1]
+$expTotal = [int]$t.Groups[1].Value
+$actTotal = [int]$t.Groups[2].Value
+if ($expTotal -ne $actTotal) {
+	Fail-Exit "SUITE_TOTAL expected=$expTotal actual=$actTotal（有 check 未执行：套件中途中止或被跳过）" 4
+}
+
+if ($engineCode -ne 0) {
+	Fail-Exit "引擎返回码 $engineCode（结果看着绿但进程非 0，按失败处理）" 5
+}
+
+Write-Host "[run_tests] PASS $checks checks, 0 failures (SUITE_TOTAL $expTotal/$actTotal)" -ForegroundColor Green
+Write-Host "[run_tests] exit=0" -ForegroundColor Green
 exit 0
