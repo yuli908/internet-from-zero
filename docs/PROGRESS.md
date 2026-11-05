@@ -643,7 +643,7 @@ M4 已按 `specs/m4/tasks.md` 的 T0→T5 交付：宏单元接口 + ALU 七页�
 ## 7. 验证命令（当前基线的复现方式）
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 5267 checks, 0 failures（46 套件；含并行 CH09–CH11，见 §9）
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1     # 期望 RESULT: 5862 checks, 0 failures（55 套件；基线见 §10）
 powershell -ExecutionPolicy Bypass -File .\scripts\selfcheck.ps1     # 导入 + 测试 + GUI 冒烟
 powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1         # 性能基准（gate 场景）
 .\scripts\bench.ps1 -Scenario l3 -Sizes "50,80,100" -Frames 400       # L3 场景（DFF 链 + 计数器）
@@ -737,4 +737,107 @@ CH08（3 节 `protocol_editor` / `handshake` / `capture`，各 5 段、共 12 �
 - CH04 `area_check` 仍 pending（沿用 §8）。
 - CH09/CH10 的 levels、manifest、skilltree 注册不在本轮范围。
 - `src/ui/`、`project.godot`、`docs/design/`、`docs/curriculum/` 未改。
+
+## 10. 全书内容总账（CH01–CH19 + 终章，2026-11-05）
+
+口径：**只认 `data/labs/*.json` 已落库内容**。所有数字由脚本一次遍历产出，不做手工加总：
+
+- `labs` = 文件内 `labs` 键的条目数；
+- `段` = 各 lab `sections` 长度之和；
+- `gate` = 各 lab `gate_cases` 条目数（CH01/CH02 的 gate 也在这张表里，故两章 `p1_gates` 为空不影响计数）；
+- `pending` = `gate_cases` 里 `status == "pending"` 或带 `pending_reason` 的条目数（不进分母、不判红）。
+
+### 10.1 逐文件统计原文
+
+```
+file                labs   segs  gates  pending
+ch01_labs.json         6     34     24        0
+ch02_labs.json         5     25     20        2
+ch03_labs.json         4     21     16        0
+ch04_labs.json         5     25     20        1
+ch05_labs.json         4     21     17        0
+ch06_labs.json         6     30     24        2
+ch07_labs.json         4     20     16        1
+ch08_labs.json         3     15     12        1
+ch09_labs.json         5     25     20        1
+ch10_labs.json         4     20     16        1
+ch11_labs.json         4     20     16        1
+ch12_labs.json         5     25     20        1
+ch13_labs.json         3     15     12        1
+ch14_labs.json         3     15     12        1
+ch15_labs.json         4     20     16        1
+ch16_labs.json         4     20     16        1
+ch17_labs.json         3     15     12        1
+ch18_labs.json         4     20     16        1
+ch19_labs.json         5     25     20        1
+final_labs.json        3      9      9        1
+TOTAL                 84    420    334       19
+gates_in_denominator = 315
+```
+
+### 10.2 20 行总账（一章一行，数字全部来自 10.1）
+
+| 章 | lab | 段 | gate | pending | 进分母 | 入库日期 | 提交 |
+|---|---|---|---|---|---|---|---|
+| CH01 | 6 | 34 | 24 | 0 | 24 | 2026-11-04 | `0d63b67` |
+| CH02 | 5 | 25 | 20 | 2 | 18 | 2026-11-04 | `cd057cf` |
+| CH03 | 4 | 21 | 16 | 0 | 16 | 2026-11-05 | `de7bc7a` |
+| CH04 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `42e2911` |
+| CH05 | 4 | 21 | 17 | 0 | 17 | 2026-11-05 | `9773238` |
+| CH06 | 6 | 30 | 24 | 2 | 22 | 2026-11-05 | `9773238` |
+| CH07 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `e22432b` |
+| CH08 | 3 | 15 | 12 | 1 | 11 | 2026-11-05 | `d425c59` |
+| CH09 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `c065c68` |
+| CH10 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `1134677` |
+| CH11 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `f408b0e` |
+| CH12 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `09e08d4` |
+| CH13 | 3 | 15 | 12 | 1 | 11 | 2026-11-05 | `5369bae` |
+| CH14 | 3 | 15 | 12 | 1 | 11 | 2026-11-05 | `26d2423` |
+| CH15 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `0183c8d` |
+| CH16 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `6c1b051` |
+| CH17 | 3 | 15 | 12 | 1 | 11 | 2026-11-05 | `080b693` |
+| CH18 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `04f2483` |
+| CH19 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `5164c4c` |
+| 终章 | 3 | 9 | 9 | 1 | 8 | 2026-11-05 | `f4452d9` |
+| **合计** | **84** | **420** | **334** | **19** | **315** | — | — |
+
+交叉校验：`test_gate_result` 的期望正是 **315**（= 进分母的 gate 数），与脚本合计一致。
+
+### 10.3 全量检查（同日复跑，原文）
+
+```
+SUITE_TOTAL expected=5860 actual=5860
+RESULT: 5862 checks, 0 failures
+```
+
+55 个套件；`SUITE_TOTAL` 只统计套件自身（5860），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
+`[guard] 自测：故意中断的 suite 被判红` 与 `[guard] 防线自检探针存在`（`tests/run_tests.gd` §runner 尾部）。
+
+### 10.4 口径错因（两版差异必须点名，不允许"以最新版为准"）
+
+- **581 段 / 340 gate 那一版是错的**，错在把课件稿里尚未落库的内容当成已落库计入：`docs/curriculum/*.md` 里的 JSON 块合计 **78 lab / 386 段 / 312 gate**，`data/labs` 合计 **84 lab / 420 段 / 334 gate**，两组数各自、以及相加（806 段 / 646 gate）都得不到 581 / 340，即该版在仓库里**无任何可复现来源**。
+- **415 段 / 335 gate 那一版也是错的**，错在 20 行表上手工逐行加总（段少 5、gate 多 1），不是脚本读数。
+- 唯一有效值：**84 lab / 420 段 / 334 gate / 19 pending / 315 进分母**，与 `SUITE_TOTAL 5860` / `RESULT 5862` 同时在库。
+
+### 10.5 套件期望数变化溯源（CH16 / CH17）
+
+- `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ 现在 **71**（positive 5 / negative 7）。
+  +1 = 正向探针「`T16.3-1` 时延 12 在限内 -> code=0」；+1 = 负向探针「`T16.3-1` 第 1 行时延 60 超过上限 30 -> code=9」。
+  两条都由 `4fc45ec`（9 号洞：`table` 增可选 `delay{key,max}`，越限先发 `E_DELAY_MISMATCH(9)`）带出。
+- `test_ch17`：库里只有 `080b693` 一版，**55**（positive 3 / negative 7）；提交前的估算值 54（= 15×3+9）从未入库。
+  从 54 到 55 的 +1 就是第 7 条负例「`T17.3-1` 第 1 向时延 90 超过上限 50 -> code=9」，与 CH16 同一条发射路径。
+
+### 10.6 未写入的承诺
+
+`docs/design/19-interface-extension-proposal.md`：**10 项字段级接口扩展，合计 42 人日，状态 = 未批准、未实施**（未改 `src/**`、`data/**`、`tests/**`）。
+这 10 项对应 CH13–CH19 与终章里"课文要求玩家能指认、数据侧却只有布尔位/汇总数"的 gate：**课文里有这些要求，判据目前只是布尔位**。任一项落地必须同时给单测（越限/缺失各一例）、一条 `RED-PROBE ... -> code=N` 实测原文，并同步删除对应章降级清单里的该条。
+
+### 10.7 仍缺四样
+
+| 缺项 | 卡在哪一侧 | 需要什么才能动 |
+|---|---|---|
+| 其余各章练习题库（42 题题库仅 CH01 有） | 内容侧（教学组出题与判分口径） | 每章题面 + 选项/数值判分表；`QuestionBank` 与 `data/questions/*.json` 接口已就绪，CH01 的 42 题已登记进 manifest |
+| `static_current` 器件级网表 | 仿真侧（无最小 L1 电流模型） | 器件级网表 + 稳态电流求解；当前 `T2.2-3`、`T2.4-4` 仍是 `E_PENDING` / `required=false`，不算通过 |
+| 原生 GDExtension | 构建侧（`native/` 只有脚手架） | 编译 `.gdextension` 动态库（需 `godot-cpp`，MSVC 未验证）、与 GDScript 跑同向量、接入 `project.godot`；`ifz_selftest` 已在 MinGW g++ 15.1 + CMake 下 1/1 通过 |
+| 真实 CI | 基础设施侧（无远程仓库/runner，本地验不了） | `.github/workflows/ci.yml` 已存在但从未在 GitHub Actions 上跑过；需要远程仓库与 runner 才能把"本地 0 失败"升级为"CI 0 失败" |
 
