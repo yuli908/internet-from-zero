@@ -1898,6 +1898,7 @@
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].pending_reason
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].quiz
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].required
+- data/labs/ch18_labs.json :: labs.*.gate_cases[].script
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].stage
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].status
 - data/labs/ch18_labs.json :: labs.*.gate_cases[].thresholds

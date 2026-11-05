@@ -16,9 +16,9 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 
 const Ch18Checks = preload("res://src/core/ch18_checks.gd")
 
-const EXPECT := 70
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "negative": 7}
-const GROUP_DESCRIPTIONS := {"loadable": "ch18_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T18.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 15）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限均精确判红"}
+const EXPECT := 77
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "negative": 7, "t18_4_script": 7}
+const GROUP_DESCRIPTIONS := {"loadable": "ch18_labs.json 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T18.x-n 定稿", "gate_kinds": "只用既有 kind（table / skip_layer / derived_number / quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（合计 15）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "negative": "错值/负例未复现/缺行/复算错/quiz 错/缺 answers/时延越限均精确判红", "t18_4_script": "剧本开关与证书结果可指认：两遍相反、下游可读、开关开启写通过(10)、证书校验不符(10)、关开关结果缺失(7)、链上 sig_ok 错(10)"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch18_labs.json")
@@ -83,6 +83,7 @@ func run(ctx: TestContext) -> void:
 			bool(r["ok"]), str(r["report"].first_failure()))
 
 	_negative(ctx, labs)
+	_t18_4_script(ctx, labs)
 
 func _orders(secs: Array) -> String:
 	var out := []
@@ -191,7 +192,10 @@ func _good(cfg: Dictionary) -> Dictionary:
 		var cid := str(g.get("id", ""))
 		match str(g.get("kind", "")):
 			"table":
-				out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
+				var rows_good: Array = (g.get("expect_rows", []) as Array).duplicate(true)
+				if g.has("script"):
+					_merge_script(rows_good, g.get("script", {}))
+				out[cid] = {"rows": rows_good,
 					"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
 			"skip_layer":
 				var st := str(g.get("stage", ""))
@@ -201,6 +205,160 @@ func _good(cfg: Dictionary) -> Dictionary:
 			"quiz":
 				out[cid] = int((g.get("quiz", {}) as Dictionary).get("answer", 0))
 	return out
+
+## 剧本字段（19 §2.8）合进表行：好答案必须交 switch/cert_verify/result/reason/chain，
+## 不能只交 intercepted/rejected 两个布尔位，否则下游读不出"开关是哪档、拒在哪一级"。
+func _merge_script(rows: Array, script: Dictionary) -> void:
+	var key := str(script.get("row_key", "phase"))
+	var phases: Dictionary = script.get("phases", {})
+	for phase in phases:
+		var wp: Dictionary = phases[phase]
+		for raw in rows:
+			if not (raw is Dictionary):
+				continue
+			var row: Dictionary = raw
+			if str(row.get(key, "")) != phase:
+				continue
+			row["switch"] = str(wp.get("switch", ""))
+			row["cert_verify"] = bool(wp.get("cert_verify", false))
+			row["result"] = str(wp.get("expect", ""))
+			row["reason"] = str(wp.get("reason", ""))
+			row["chain"] = (wp.get("chain", []) as Array).duplicate(true)
+
+func _gate(cfg: Dictionary, id: String) -> Dictionary:
+	for raw in (cfg.get("gate_cases", []) as Array):
+		if str((raw as Dictionary).get("id", "")) == id:
+			return raw
+	return {}
+
+func _case(report: GateReport, cid: String) -> Dictionary:
+	for raw in report.cases:
+		var c: Dictionary = raw
+		if str(c.get("id", "")) == cid:
+			return c
+	return {}
+
+## 下游读取点：成功 case 的 actual.rows 必须逐行带开关/证书结论/理由/链，且类型可读。
+func _downstream_ok(rows: Array) -> bool:
+	if rows.is_empty():
+		return false
+	for raw in rows:
+		if not (raw is Dictionary):
+			return false
+		var row: Dictionary = raw
+		if not ["on", "off"].has(str(row.get("switch", ""))):
+			return false
+		if typeof(row.get("cert_verify", null)) != TYPE_BOOL:
+			return false
+		if not ["intercepted", "rejected", "pass"].has(str(row.get("result", ""))):
+			return false
+		if typeof(row.get("reason", null)) != TYPE_STRING:
+			return false
+		var chain_v: Variant = row.get("chain", null)
+		if not (chain_v is Array) or (chain_v as Array).is_empty():
+			return false
+		for cn in chain_v:
+			if not (cn is Dictionary):
+				return false
+			if typeof((cn as Dictionary).get("sig_ok", null)) != TYPE_BOOL:
+				return false
+	return true
+
+## 18.4 剧本开关与证书结果（提案 19 §2.8）：两遍剧本相反 → 下游可读 → 三条负例精确判红。
+func _t18_4_script(ctx: TestContext, labs: Dictionary) -> void:
+	ctx.begin_group("t18_4_script")
+	var cfg: Dictionary = labs.get("mitm_lab", {})
+	var gate: Dictionary = _gate(cfg, "T18.4-1")
+	var phases: Dictionary = (gate.get("script", {}) as Dictionary).get("phases", {})
+	var off: Dictionary = phases.get("verify_off", {})
+	var on: Dictionary = phases.get("verify_on", {})
+	ctx.check("T18.4-1 两遍剧本开关相反、要求结果相反",
+		str(off.get("switch", "")) == "off" and str(on.get("switch", "")) == "on" \
+			and str(off.get("expect", "")) == "intercepted" \
+			and str(on.get("expect", "")) == "rejected" \
+			and bool(off.get("cert_verify", true)) == false \
+			and bool(on.get("cert_verify", false)) == true,
+		"off=%s/%s cv=%s；on=%s/%s cv=%s" % [str(off.get("switch", "")),
+			str(off.get("expect", "")), str(off.get("cert_verify", null)),
+			str(on.get("switch", "")), str(on.get("expect", "")),
+			str(on.get("cert_verify", null))])
+
+	var good := _good(cfg)
+	var r0: Dictionary = Ch18Checks.run("mitm_lab", cfg, {"answers": good})
+	var c0: Dictionary = _case(r0["report"], "T18.4-1")
+	ctx.check("T18.4-1 剧本齐全的好答案全绿", bool(r0["ok"]),
+		str((r0["report"] as GateReport).first_failure()))
+	var rows0: Array = ((c0.get("actual", {}) as Dictionary).get("rows", []) as Array)
+	if rows0.size() >= 2:
+		print("GREEN-PROBE Ch18 T18.4-1 下游读取 actual.rows 行数=%d switch=%s/%s result=%s/%s"
+			% [rows0.size(),
+				str((rows0[0] as Dictionary).get("switch", "?")),
+				str((rows0[1] as Dictionary).get("switch", "?")),
+				str((rows0[0] as Dictionary).get("result", "?")),
+				str((rows0[1] as Dictionary).get("result", "?"))])
+	else:
+		print("GREEN-PROBE Ch18 T18.4-1 下游读取 actual.rows 行数=%d（不足以展示）"
+			% rows0.size())
+	ctx.check("下游可逐行读 switch/cert_verify/result/reason/chain（非单一布尔位）",
+		_downstream_ok(rows0), "rows=%d" % rows0.size())
+
+	# ① 开关开着，却把结果写成通过（剧本要求拒绝）→ 10。
+	var a1 := _good(cfg)
+	var g1: Dictionary = a1["T18.4-1"]
+	var rows1: Array = (g1["rows"] as Array).duplicate(true)
+	for raw in rows1:
+		if str((raw as Dictionary).get("phase", "")) == "verify_on":
+			raw["intercepted"] = false
+			raw["rejected"] = false
+			raw["result"] = "pass"
+	g1["rows"] = rows1
+	var r1: Dictionary = Ch18Checks.run("mitm_lab", cfg, {"answers": a1})
+	var c1: int = _code(r1["report"], "T18.4-1")
+	print("RED-PROBE Ch18 T18.4-1 开关开着却写通过（剧本要拒绝） -> code=%d" % c1)
+	ctx.eq("T18.4-1 开关开启时结果写成通过判红 E_OUTPUT_MISMATCH",
+		c1, GateResult.E_OUTPUT_MISMATCH)
+
+	# ② 证书校验结果与剧本不符（开验证那遍交 cert_verify=false）→ 10。
+	var a2 := _good(cfg)
+	var g2: Dictionary = a2["T18.4-1"]
+	var rows2: Array = (g2["rows"] as Array).duplicate(true)
+	for raw in rows2:
+		if str((raw as Dictionary).get("phase", "")) == "verify_on":
+			raw["cert_verify"] = false
+	g2["rows"] = rows2
+	var r2: Dictionary = Ch18Checks.run("mitm_lab", cfg, {"answers": a2})
+	var c2: int = _code(r2["report"], "T18.4-1")
+	print("RED-PROBE Ch18 T18.4-1 证书校验结果与剧本不符 -> code=%d" % c2)
+	ctx.eq("T18.4-1 证书校验结果与剧本不符判红 E_OUTPUT_MISMATCH",
+		c2, GateResult.E_OUTPUT_MISMATCH)
+
+	# ③ 开关关闭那遍结果字段缺失（只交开关不交结果）→ 7。
+	var a3 := _good(cfg)
+	var g3: Dictionary = a3["T18.4-1"]
+	var rows3: Array = (g3["rows"] as Array).duplicate(true)
+	for raw in rows3:
+		if str((raw as Dictionary).get("phase", "")) == "verify_off":
+			raw.erase("intercepted")
+	g3["rows"] = rows3
+	var r3: Dictionary = Ch18Checks.run("mitm_lab", cfg, {"answers": a3})
+	var c3: int = _code(r3["report"], "T18.4-1")
+	print("RED-PROBE Ch18 T18.4-1 开关关闭时结果字段缺失 -> code=%d" % c3)
+	ctx.eq("T18.4-1 开关关闭时结果字段缺失判红 E_TABLE_CELL", c3, GateResult.E_TABLE_CELL)
+
+	# ④ 拒因落到具体一级：链上第 1 级 sig_ok 与剧本不符 → 10，detail 点名该级。
+	var a4 := _good(cfg)
+	var g4: Dictionary = a4["T18.4-1"]
+	var rows4: Array = (g4["rows"] as Array).duplicate(true)
+	for raw in rows4:
+		if str((raw as Dictionary).get("phase", "")) == "verify_on":
+			var chain4: Array = (raw as Dictionary)["chain"]
+			(chain4[0] as Dictionary)["sig_ok"] = true
+	g4["rows"] = rows4
+	var r4: Dictionary = Ch18Checks.run("mitm_lab", cfg, {"answers": a4})
+	var c4: int = _code(r4["report"], "T18.4-1")
+	print("RED-PROBE Ch18 T18.4-1 证书链第 1 级 sig_ok 与剧本不符 -> code=%d" % c4)
+	ctx.eq("T18.4-1 证书链逐级结论与剧本不符判红 E_OUTPUT_MISMATCH",
+		c4, GateResult.E_OUTPUT_MISMATCH)
 
 func _code(report: GateReport, cid: String) -> int:
 	for c in report.cases:

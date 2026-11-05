@@ -701,6 +701,30 @@
             "reason_readable": true,
             "report": true
           },
+          "script": {
+            "row_key": "phase",
+            "phases": {
+              "verify_off": {
+                "switch": "off",
+                "cert_verify": false,
+                "expect": "intercepted",
+                "reason": "",
+                "chain": [
+                  {"node": "leaf", "sig_ok": true, "reason": ""},
+                  {"node": "root", "sig_ok": true, "reason": ""}
+                ]
+              },
+              "verify_on": {
+                "switch": "on",
+                "cert_verify": true,
+                "expect": "rejected",
+                "reason": "untrusted_root",
+                "chain": [
+                  {"node": "leaf", "sig_ok": false, "reason": "untrusted_root"}
+                ]
+              }
+            }
+          },
           "codes": [
             "E_UNCONNECTED(3)",
             "E_TABLE_CELL(7)",
