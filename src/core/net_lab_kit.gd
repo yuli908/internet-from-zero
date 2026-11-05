@@ -136,6 +136,50 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 					"第 %d 行 %s=%s 超过上限 %s（时延越限）"
 						% [i + 1, delay_key, str(dv), str(delay_max)])
 				return
+	# 时间戳自洽：cfg 可选 `timing:{id,seq,sent,got,latency,gap}`。时延必须由两枚真实时钟事件
+	# 现算（latency == got − sent 且 >0），发送时刻必须来自仿真调度（sent = 序号×gap），
+	# 请求编号与客户端序号必须按发送顺序绑定。时钟/时延不符 → 9；编号绑错 → 7。
+	# 并发请求的完成次序本来就可以乱序，故不校验 got 单调。
+	var timing: Dictionary = c.get("timing", {})
+	var t_id := str(timing.get("id", ""))
+	var t_seq := str(timing.get("seq", ""))
+	var t_sent := str(timing.get("sent", ""))
+	var t_got := str(timing.get("got", ""))
+	var t_lat := str(timing.get("latency", ""))
+	var t_gap := int(timing.get("gap", 0))
+	if not (t_id.is_empty() or t_seq.is_empty() or t_sent.is_empty()
+			or t_got.is_empty() or t_lat.is_empty()):
+		for i in range(rows.size()):
+			if not (rows[i] is Dictionary):
+				continue
+			var tr: Dictionary = rows[i]
+			if not (tr.has(t_id) and tr.has(t_seq) and tr.has(t_sent)
+					and tr.has(t_got) and tr.has(t_lat)):
+				continue
+			if int(tr[t_id]) != i + 1 or int(tr[t_seq]) != i + 1:
+				Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, tr,
+					{str(t_id): i + 1, str(t_seq): i + 1},
+					{str(t_id): tr[t_id], str(t_seq): tr[t_seq]},
+					"第 %d 行请求身份绑错：req_id/client_seq 与发送顺序不符" % (i + 1))
+				return
+			var sent := int(tr[t_sent])
+			var got_t := int(tr[t_got])
+			if sent != i * t_gap:
+				Kit.emit(rep, tracker, GateResult.E_DELAY_MISMATCH, c, false, tr,
+					{str(t_sent): i * t_gap}, {str(t_sent): sent},
+					"第 %d 行发送时刻不是仿真时钟事件：%d ≠ %d" % [i + 1, sent, i * t_gap])
+				return
+			if got_t <= sent:
+				Kit.emit(rep, tracker, GateResult.E_DELAY_MISMATCH, c, false, tr,
+					{str(t_got): "> %d" % sent}, {str(t_got): got_t},
+					"第 %d 行到达时刻不在发送之后：got=%d sent=%d" % [i + 1, got_t, sent])
+				return
+			if int(tr[t_lat]) != got_t - sent or int(tr[t_lat]) <= 0:
+				Kit.emit(rep, tracker, GateResult.E_DELAY_MISMATCH, c, false, tr,
+					{str(t_lat): got_t - sent}, {str(t_lat): tr[t_lat]},
+					"第 %d 行时延不是两枚事件之差：%s ≠ %d−%d"
+						% [i + 1, str(tr[t_lat]), got_t, sent])
+				return
 	for i in range(rows.size()):
 		if not (rows[i] is Dictionary):
 			Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, rows[i],
