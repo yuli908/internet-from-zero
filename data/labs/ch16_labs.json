@@ -470,6 +470,10 @@
           "title": "8 条请求逐条记录：结果、状态、时延",
           "kind": "table",
           "required": true,
+          "delay": {
+            "key": "latency",
+            "max": 30
+          },
           "keys": [
             "req_id",
             "ok",
@@ -690,6 +694,10 @@
           "title": "断开后 5 秒内 closed、槽位释放、10 分钟内存不涨",
           "kind": "table",
           "required": true,
+          "delay": {
+            "key": "closed_at",
+            "max": 5
+          },
           "status": "pending",
           "pending_reason": "「10 分钟内存不增长」是 02 的【假设·未校准】，数据侧无定稿阈值与长时采样接口；不以假设阈值冒充。",
           "thresholds": {

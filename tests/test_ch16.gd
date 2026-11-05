@@ -16,9 +16,9 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 
 const Ch16Checks = preload("res://src/core/ch16_checks.gd")
 
-const EXPECT := 69
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 4, "negative": 6}
-const GROUP_DESCRIPTIONS := {"loadable": "ch16_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T16.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（resident_cleanup 为 3，因 T16.4-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows 均精确判红"}
+const EXPECT := 71
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 4, "section_count": 4, "order": 4, "text_nonempty": 4, "text_cap": 4, "screen_sum": 4, "last_after": 4, "practice": 4, "gate_count": 4, "p1_field": 4, "gate_ids": 4, "gate_kinds": 4, "gate_codes": 4, "denominator": 4, "pending_total": 1, "total_sections": 1, "positive": 5, "negative": 7}
+const GROUP_DESCRIPTIONS := {"loadable": "ch16_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T16.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（resident_cleanup 为 3，因 T16.4-1 pending）", "pending_total": "全章 pending 条数=1，且进分母计数=15", "total_sections": "全篇段数 20", "positive": "4 节好答案全绿（pending 不计）+ T16.3-1 时延在限内回 0", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/时延越限均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch16_labs.json")
@@ -81,6 +81,13 @@ func run(ctx: TestContext) -> void:
 		ctx.begin_group("positive")
 		ctx.check("%s 好答案全绿（pending=%d）" % [id, (r["pending"] as Array).size()],
 			bool(r["ok"]), str(r["report"].first_failure()))
+
+	ctx.begin_group("positive")
+	var rg: Dictionary = Ch16Checks.run("load_test", labs["load_test"],
+		{"answers": _good(labs["load_test"])})
+	var cg: int = _code(rg["report"], "T16.3-1")
+	print("PROBE CH16 T16.3-1 时延 12 在限内 -> code=%d" % cg)
+	ctx.eq("T16.3-1 时延未越限回 0", cg, GateResult.OK)
 
 	_negative(ctx, labs)
 
@@ -259,3 +266,13 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c6: int = _code(r6["report"], "T16.3-1")
 	print("RED-PROBE CH16 T16.3-1 T16.3-1 缺 rows -> code=%d" % c6)
 	ctx.eq("T16.3-1 缺 rows 判红 E_UNCONNECTED(3)", c6, GateResult.E_UNCONNECTED)
+
+	var a7 := _good(labs["load_test"])
+	var g7: Dictionary = a7["T16.3-1"]
+	var rows7: Array = (g7["rows"] as Array).duplicate(true)
+	rows7[0]["latency"] = 60
+	g7["rows"] = rows7
+	var r7: Dictionary = Ch16Checks.run("load_test", labs["load_test"], {"answers": a7})
+	var c7: int = _code(r7["report"], "T16.3-1")
+	print("RED-PROBE CH16 T16.3-1 第 1 行时延 60 超过上限 30 -> code=%d" % c7)
+	ctx.eq("T16.3-1 时延越限判红 E_DELAY_MISMATCH(9)", c7, GateResult.E_DELAY_MISMATCH)

@@ -98,6 +98,26 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 					"表里有重复键 %s：唯一性未成立" % k)
 				return
 			seen[k] = true
+	# 时延越限：cfg 可选 `delay:{key,max}`。只在该列越上限时报 9（语义本就属 E_DELAY_MISMATCH），
+	# 值在限内但与机器不符仍归 7。这样 data 里写的 9 是可发射的，不是死判据。
+	var delay_cfg: Dictionary = c.get("delay", {})
+	var delay_key := str(delay_cfg.get("key", ""))
+	var delay_max := float(delay_cfg.get("max", 0.0))
+	if not delay_key.is_empty() and delay_max > 0.0:
+		for i in range(rows.size()):
+			if not (rows[i] is Dictionary):
+				continue
+			var dr: Dictionary = rows[i]
+			var dv: Variant = dr.get(delay_key, null)
+			if dv == null or not (typeof(dv) == TYPE_INT or typeof(dv) == TYPE_FLOAT):
+				continue
+			if float(dv) > delay_max:
+				Kit.emit(rep, tracker, GateResult.E_DELAY_MISMATCH, c, false, dr,
+					{str(delay_key): "<= %s" % str(delay_max)},
+					{str(delay_key): dv},
+					"第 %d 行 %s=%s 超过上限 %s（时延越限）"
+						% [i + 1, delay_key, str(dv), str(delay_max)])
+				return
 	for i in range(rows.size()):
 		if not (rows[i] is Dictionary):
 			Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, false, rows[i],
