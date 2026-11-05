@@ -29,6 +29,7 @@
         "KN-INTERP-01"
       ],
       "skill_node": "SK-INTERP",
+      "segs": 5,
       "gate_ids": [
         "T14.1-1",
         "T14.1-2",
@@ -56,6 +57,7 @@
         "KN-DYNTYPE-01"
       ],
       "skill_node": "SK-DYNTYPE",
+      "segs": 5,
       "gate_ids": [
         "T14.2-1",
         "T14.2-2",
@@ -83,6 +85,7 @@
         "KN-SCRIPT-01"
       ],
       "skill_node": "SK-SCRIPT",
+      "segs": 5,
       "gate_ids": [
         "T14.3-1",
         "T14.3-2",

@@ -29,6 +29,7 @@
         "KN-LISTEN-01"
       ],
       "skill_node": "SK-LISTEN",
+      "segs": 5,
       "gate_ids": [
         "T16.1-1",
         "T16.1-2",
@@ -56,6 +57,7 @@
         "KN-CONCUR-01"
       ],
       "skill_node": "SK-CONCUR",
+      "segs": 5,
       "gate_ids": [
         "T16.2-1",
         "T16.2-2",
@@ -83,6 +85,7 @@
         "KN-LOAD-16"
       ],
       "skill_node": "SK-LOAD",
+      "segs": 5,
       "gate_ids": [
         "T16.3-1",
         "T16.3-2",
@@ -110,6 +113,7 @@
         "KN-CLEANUP-01"
       ],
       "skill_node": "SK-CLEANUP",
+      "segs": 5,
       "gate_ids": [
         "T16.4-1",
         "T16.4-2",

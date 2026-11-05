@@ -29,6 +29,7 @@
         "KN-ADDR-09"
       ],
       "skill_node": "SK-ADDRESSING",
+      "segs": 5,
       "gate_ids": [
         "T9.1-1",
         "T9.1-2",
@@ -56,6 +57,7 @@
         "KN-ARP-01"
       ],
       "skill_node": "SK-ARP",
+      "segs": 5,
       "gate_ids": [
         "T9.1a-1",
         "T9.1a-2",
@@ -83,6 +85,7 @@
         "KN-SWITCH-01"
       ],
       "skill_node": "SK-SWITCH",
+      "segs": 5,
       "gate_ids": [
         "T9.2-1",
         "T9.2-2",
@@ -110,6 +113,7 @@
         "KN-ROUTE-01"
       ],
       "skill_node": "SK-ROUTER",
+      "segs": 5,
       "gate_ids": [
         "T9.3-1",
         "T9.3-2",
@@ -137,6 +141,7 @@
         "KN-LOOP-01"
       ],
       "skill_node": "SK-LOOP",
+      "segs": 5,
       "gate_ids": [
         "T9.4-1",
         "T9.4-2",

@@ -29,6 +29,7 @@
         "KN-ASM-01"
       ],
       "skill_node": "SK-ASM",
+      "segs": 5,
       "gate_ids": [
         "T11.1-1",
         "T11.1-2",
@@ -56,6 +57,7 @@
         "KN-BRANCH-01"
       ],
       "skill_node": "SK-BRANCH",
+      "segs": 5,
       "gate_ids": [
         "T11.2-1",
         "T11.2-2",
@@ -83,6 +85,7 @@
         "KN-STACK-01"
       ],
       "skill_node": "SK-STACK",
+      "segs": 5,
       "gate_ids": [
         "T11.3-1",
         "T11.3-2",
@@ -110,6 +113,7 @@
         "KN-DEBUG-01"
       ],
       "skill_node": "SK-DEBUG",
+      "segs": 5,
       "gate_ids": [
         "T11.4-1",
         "T11.4-2",

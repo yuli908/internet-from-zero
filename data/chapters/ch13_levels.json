@@ -29,6 +29,7 @@
         "KN-BC-01"
       ],
       "skill_node": "SK-BYTECODE",
+      "segs": 5,
       "gate_ids": [
         "T13.1-1",
         "T13.1-2",
@@ -56,6 +57,7 @@
         "KN-OBJ-01"
       ],
       "skill_node": "SK-OBJECT",
+      "segs": 5,
       "gate_ids": [
         "T13.2-1",
         "T13.2-2",
@@ -83,6 +85,7 @@
         "KN-GC-01"
       ],
       "skill_node": "SK-GC",
+      "segs": 5,
       "gate_ids": [
         "T13.3-1",
         "T13.3-2",

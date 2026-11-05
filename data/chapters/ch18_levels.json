@@ -29,6 +29,7 @@
         "KN-XOR-01"
       ],
       "skill_node": "SK-XOR",
+      "segs": 5,
       "gate_ids": [
         "T18.1-1",
         "T18.1-2",
@@ -56,6 +57,7 @@
         "KN-KEYEX-01"
       ],
       "skill_node": "SK-KEYEX",
+      "segs": 5,
       "gate_ids": [
         "T18.2-1",
         "T18.2-2",
@@ -83,6 +85,7 @@
         "KN-HASH-01"
       ],
       "skill_node": "SK-HASH",
+      "segs": 5,
       "gate_ids": [
         "T18.3-1",
         "T18.3-2",
@@ -110,6 +113,7 @@
         "KN-MITM-01"
       ],
       "skill_node": "SK-MITM",
+      "segs": 5,
       "gate_ids": [
         "T18.4-1",
         "T18.4-2",

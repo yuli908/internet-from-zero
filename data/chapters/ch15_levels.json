@@ -29,6 +29,7 @@
         "KN-ABI-01"
       ],
       "skill_node": "SK-ABI",
+      "segs": 5,
       "gate_ids": [
         "T15.1-1",
         "T15.1-2",
@@ -56,6 +57,7 @@
         "KN-SOCK-01"
       ],
       "skill_node": "SK-SOCKET",
+      "segs": 5,
       "gate_ids": [
         "T15.2-1",
         "T15.2-2",
@@ -83,6 +85,7 @@
         "KN-VER-01"
       ],
       "skill_node": "SK-VERSION",
+      "segs": 5,
       "gate_ids": [
         "T15.3-1",
         "T15.3-2",
@@ -110,6 +113,7 @@
         "KN-DNS-01"
       ],
       "skill_node": "SK-DNS",
+      "segs": 5,
       "gate_ids": [
         "T15.4-1",
         "T15.4-2",

@@ -29,6 +29,7 @@
         "KN-SEQ-01"
       ],
       "skill_node": "SK-SEQ",
+      "segs": 5,
       "gate_ids": [
         "T10.1-1",
         "T10.1-2",
@@ -56,6 +57,7 @@
         "KN-ACK-01"
       ],
       "skill_node": "SK-ACK",
+      "segs": 5,
       "gate_ids": [
         "T10.2-1",
         "T10.2-2",
@@ -83,6 +85,7 @@
         "KN-WIN-01"
       ],
       "skill_node": "SK-WINDOW",
+      "segs": 5,
       "gate_ids": [
         "T10.3-1",
         "T10.3-2",
@@ -110,6 +113,7 @@
         "KN-REL-01"
       ],
       "skill_node": "SK-RELIABLE",
+      "segs": 5,
       "gate_ids": [
         "T10.4-1",
         "T10.4-2",

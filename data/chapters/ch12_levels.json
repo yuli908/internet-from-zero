@@ -29,6 +29,7 @@
         "KN-EXPR-01"
       ],
       "skill_node": "SK-COMPILE",
+      "segs": 5,
       "gate_ids": [
         "T12.1-1",
         "T12.1-2",
@@ -56,6 +57,7 @@
         "KN-PTR-01"
       ],
       "skill_node": "SK-POINTER",
+      "segs": 5,
       "gate_ids": [
         "T12.2-1",
         "T12.2-2",
@@ -83,6 +85,7 @@
         "KN-FRAME-01"
       ],
       "skill_node": "SK-FRAME-12",
+      "segs": 5,
       "gate_ids": [
         "T12.3-1",
         "T12.3-2",
@@ -110,6 +113,7 @@
         "KN-RECUR-01"
       ],
       "skill_node": "SK-RECUR",
+      "segs": 5,
       "gate_ids": [
         "T12.4-1",
         "T12.4-2",
@@ -137,6 +141,7 @@
         "KN-STR-01"
       ],
       "skill_node": "SK-STRING",
+      "segs": 5,
       "gate_ids": [
         "T12.5-1",
         "T12.5-2",

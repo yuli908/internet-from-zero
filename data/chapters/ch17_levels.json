@@ -29,6 +29,7 @@
         "KN-MSG-01"
       ],
       "skill_node": "SK-MSG",
+      "segs": 5,
       "gate_ids": [
         "T17.1-1",
         "T17.1-2",
@@ -56,6 +57,7 @@
         "KN-PRES-01"
       ],
       "skill_node": "SK-PRESENCE",
+      "segs": 5,
       "gate_ids": [
         "T17.2-1",
         "T17.2-2",
@@ -83,6 +85,7 @@
         "KN-CHAT-01"
       ],
       "skill_node": "SK-CHAT",
+      "segs": 5,
       "gate_ids": [
         "T17.3-1",
         "T17.3-2",

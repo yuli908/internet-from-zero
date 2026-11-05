@@ -29,6 +29,7 @@
         "KN-MEDIUM-01"
       ],
       "skill_node": "SK-MEDIUM",
+      "segs": 5,
       "gate_ids": [
         "T19.1-1",
         "T19.1-2",
@@ -56,6 +57,7 @@
         "KN-EMBED-01"
       ],
       "skill_node": "SK-EMBED",
+      "segs": 5,
       "gate_ids": [
         "T19.2-1",
         "T19.2-2",
@@ -83,6 +85,7 @@
         "KN-SENSOR-01"
       ],
       "skill_node": "SK-SENSOR",
+      "segs": 5,
       "gate_ids": [
         "T19.3-1",
         "T19.3-2",
@@ -110,6 +113,7 @@
         "KN-FW-01"
       ],
       "skill_node": "SK-FIRMWARE",
+      "segs": 5,
       "gate_ids": [
         "T19.4-1",
         "T19.4-2",
@@ -137,6 +141,7 @@
         "KN-ALARM-01"
       ],
       "skill_node": "SK-ALARM",
+      "segs": 5,
       "gate_ids": [
         "T19.5-1",
         "T19.5-2",
