@@ -95,6 +95,26 @@
 | `static_current_max_ua` / `max_ua` | 只登记，不删 | 第二章转正时 `static_current` 实现要用 |
 | 其余死字段 | 只登记，不删 | 用户要求"不许删任何数据字段" |
 
+### 6.1 接口批次（2026-11-05）：旧布尔位「已删·理由」与新增字段
+
+| 旧字段 | 登记 | 理由 |
+|---|---|---|
+| `T13.1-1` 的 `line_map_ok` / `stack_ok` / `output_ok` | **已删·理由**：被 `line_map`（pc→src_line 逐条）、`lines_covered`、`unmapped_pc`、`output`（实跑输出数组）替代；栈深已由 `expect_rows[].stack_after` 逐行判 | 布尔位可以填 true 冒充；删一条映射即红 |
+| `T14.1-1` 的 `tokens_match` / `ast_ok` / `values_ok` | **已删·理由**：被行级 `tokens[]` / `ast` / `value` / `stages_exported` 替代 | 只记数量（13/8）不能证明逐段；逐条 token 与逐层 AST 可指认 |
+| `T15.2-1` 的 `frames_match` | **已删·理由**：被 `handles` / `frames` / `unmatched_frames` 替代；gate 仍 pending（缺真实抓包） | 布尔位无法逐帧对齐 `frame_id`/`fd`/`call_n` |
+
+**新增字段（均已登记进附录 D）**：
+
+| 字段 | 定义 | 生产者 | 消费者 |
+|---|---|---|---|
+| `labs.*.program` | `data/labs/ch13_labs.json` | `src/core/bytecode_trace.gd`（`run`） | `tests/test_ch13.gd` → table gate |
+| `labs.*.source_lines` | `data/labs/ch13_labs.json` | 数据侧 | 同上（逐行可指认的源码侧） |
+| `labs.*.case_sources` | `data/labs/ch14_labs.json` | 数据侧 | `src/core/mini_interp.gd` → `tests/test_ch14.gd` |
+| `labs.*.socket_calls` | `data/labs/ch15_labs.json` | 数据侧 | `src/core/socket_trace.gd` → `tests/test_ch15.gd` |
+
+**转正账**：`T13.1-1` 由 pending → ready；ch13 进分母 11→12（`bytecode_vm` 3→4），全章 pending 1→0。不是凑数：5 条 pc 的行映射与输出 `[5]` 都由参考执行器实跑，删一条映射判红（code 10）。
+**不转正**：`T15.2-1` 接口已具备（handles/frames/unmatched 导出、能红），但只有模型数据、没有真实抓包；保持 pending，`pending_reason` 写明「接口已具备、缺数据源」。
+
 **防增长守卫**：`tests/test_field_registry.gd`（已注册进 `tests/run_tests.gd`）。口径是 **`文件 :: 路径`**，含 `id` 的对象归一成 `*`，数组元素归一成 `[]`——不按键名去重，避免重蹈 `ports` 的合并盲区。数据里新增未登记路径 → **判红并打印路径**；登记了但数据已不存在 → 只打印条数、不判红。登记表见附录 D。
 
 ## 附录 A　`data/**` schema 字段逐条（285 条）
@@ -1353,7 +1373,9 @@
 - data/labs/ch13_labs.json :: labs.*.practice[].judge
 - data/labs/ch13_labs.json :: labs.*.practice[].level
 - data/labs/ch13_labs.json :: labs.*.practice[].produce
+- data/labs/ch13_labs.json :: labs.*.program
 - data/labs/ch13_labs.json :: labs.*.sections
+- data/labs/ch13_labs.json :: labs.*.source_lines
 - data/labs/ch13_labs.json :: labs.*.title
 - data/labs/ch13_labs.json :: pending_kinds
 - data/labs/ch13_labs.json :: source
@@ -1361,6 +1383,7 @@
 - data/labs/ch13_labs.json :: version
 - data/labs/ch14_labs.json :: labs
 - data/labs/ch14_labs.json :: labs.*.body
+- data/labs/ch14_labs.json :: labs.*.case_sources
 - data/labs/ch14_labs.json :: labs.*.gate_cases
 - data/labs/ch14_labs.json :: labs.*.gate_cases[].codes
 - data/labs/ch14_labs.json :: labs.*.gate_cases[].expect_meta
@@ -1426,6 +1449,7 @@
 - data/labs/ch15_labs.json :: labs.*.practice[].level
 - data/labs/ch15_labs.json :: labs.*.practice[].produce
 - data/labs/ch15_labs.json :: labs.*.sections
+- data/labs/ch15_labs.json :: labs.*.socket_calls
 - data/labs/ch15_labs.json :: labs.*.title
 - data/labs/ch15_labs.json :: pending_kinds
 - data/labs/ch15_labs.json :: source
