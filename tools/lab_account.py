@@ -10,8 +10,14 @@
   注意：四桶恒等式按定义结构上恒真（任一侧怎么扫都相等），它只作展示，不当判据。
   真正能红的判据是下面两类逐条完整性比对：
     a) 账目自身：空 id / 重复 id / required 非布尔 / status 取值未知；
-    b) 与 levels 的第二份声明逐 lab 比对：gate_ids（集合相等）与 segs（段数相等）。
-       只比 gate 数会漏掉「某段被删但 gate 数没变」，所以 segs 必须单独比。
+    b) 与 levels 逐 lab 比对：gate_ids 是内容侧声明（集合相等）；segs 是**冻结快照**
+       （来源＝提交 ac1c428 时刻各 lab 的 sections 数），用途＝漂移提醒，**不是内容侧
+       应有值**。两者不同：改了数据却没同步锁值会红（提醒），但"数据本身对不对"仍由
+       课件「校验口径」表与各章 test 的 section_count 断言负责（74/84 lab 已核对课件
+       逐行段数且完全一致，其余 10 个课件表无逐 lab 行）。
+       内容侧若有意改段数，**必须同时改 levels 声明**，否则这条会一直红——这是预期
+       行为，不许当成误报关掉。只比 gate 会漏掉「某段被删但 gate 数没变」，所以 segs
+       必须单独比。
   任一项不成立，脚本以退出码 1 结束，不许把数字抄进文档。
   没有 levels 文件的章（如 final_labs.json）不静默跳过，打印「该章无声明、跳过」。
   调用方（scripts/run_tests.ps1）据此映射：有 TOTAL 且“验算：闭合”才放行；
@@ -55,9 +61,11 @@ def lab_status(cfg, level_status):
 
 
 def load_level_decls():
-    """章节级第二份声明，按 chapter -> data_key -> {gate_ids, segs}。
+    """章节级声明，按 chapter -> data_key -> {gate_ids, segs}。
 
-    这是与 data/labs 独立的声明：只改 lab 的 gate 数或段数、不改这里，账目就对不上。
+    gate_ids 是内容侧声明；segs 是 ac1c428 时刻 sections 数的**冻结快照**，只作漂移提醒，
+    不是内容侧应有值（应有值见课件「校验口径」表与 test_chNN 的 section_count 断言）。
+    只改 lab 的 gate 数或段数、不改这里，账目就会红。
     """
     out = {}
     for path in glob.glob(os.path.join(LEVELS_DIR, "*_levels.json")):
@@ -195,6 +203,9 @@ def main():
           "segs 数据 %d / levels 声明 %d"
           % (total["gates"], total["decl_gates"], total["declared_labs"], total["labs"],
              total["segs"], total["decl_segs"]))
+    print("segs 声明性质：冻结快照（来源：ac1c428 时刻的 sections 数），用途＝漂移提醒；"
+          "不是内容侧应有值。内容侧有意改段数时必须同步改 levels 声明，否则本条会一直红"
+          "（预期行为，不许当误报关掉）。")
     if problems:
         print()
         print("账目完整性问题（%d 条）：" % len(problems))
