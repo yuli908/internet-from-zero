@@ -18,7 +18,7 @@ const GROUP_DESCRIPTIONS := {
 	"gate_cases_per_lab": "每节 4 条 gate、gate_ids 与用例一一对应、奖励物品存在",
 	"gate_totals": "20 条 gate、2 条 pending 且清单为 T2.2-3/T2.4-4",
 	"economy": "CH01 结余区间、CH02 收支与章末结余、起始金币模式与开局物品",
-	"manifest": "manifest 登记 10 个文件且含 ch02 两个新文件",
+	"manifest": "manifest 条目全部存在且含 ch02 两个新文件",
 	"transistor_correct": "2.1 正确解全过、四测点、Vds=6.0 仍饱和且 Id 封顶 5000µA",
 	"transistor_quiz": "2.1 错误选择题失败并命中 E_QUIZ",
 	"transistor_region": "2.1 三区域判对/判错/未作答/期望区域不符均按 E_REGION 处理",
@@ -84,10 +84,15 @@ func run(ctx: TestContext) -> void:
 	ctx.eq("CH02 起始金币模式", str(lv.get("start_gold_mode", "")), "carry")
 	ctx.eq("开局物品存在", _missing_item({"items": lv.get("start_items", {})}, cat), "")
 
-	# ---- manifest 登记：8 → 10 → 11（CH01 练习题库）----
+	# ---- manifest 登记：只验结构（条目可解析），不锁具体条数，扩章不再红 ----
 	var files: Array = TestUtil.read_json("res://data/manifest.json").get("files", [])
 	ctx.begin_group("manifest")
-	ctx.eq("manifest 27 文件", files.size(), 27)
+	var missing := ""
+	for p in files:
+		if not FileAccess.file_exists(str(p)):
+			missing = str(p)
+			break
+	ctx.check("manifest 条目全部存在", missing == "", missing)
 	ctx.check("manifest 含 ch02_levels", "res://data/chapters/ch02_levels.json" in files)
 	ctx.check("manifest 含 ch02_labs", "res://data/labs/ch02_labs.json" in files)
 

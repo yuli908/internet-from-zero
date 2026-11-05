@@ -6,11 +6,11 @@ extends RefCounted
 
 const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
 
-const EXPECT := 38
+const EXPECT := 40
 const EXPECT_GROUPS := {
 	"loadable": 1, "order": 1, "chapter_loaded": 3, "use_chapter": 2,
 	"labs_nonempty": 2, "runtime": 2, "manifest": 7, "levels_ids": 2,
-	"next_chain": 3, "gate_dangling": 2, "node_refs": 2, "gate_count": 2,
+	"next_chain": 5, "gate_dangling": 2, "node_refs": 2, "gate_count": 2,
 	"gate_alignment": 2, "validate": 1, "red_proof": 5, "totals": 1,
 }
 const GROUP_DESCRIPTIONS := {
@@ -22,7 +22,7 @@ const GROUP_DESCRIPTIONS := {
 	"runtime": "两章运行时可取且 lab_order 对齐",
 	"manifest": "4 个新数据文件全部登记，且每章 levels+labs 成对",
 	"levels_ids": "levels 文档 id/number 与注册表一致",
-	"next_chain": "ch06→ch07→ch08→ch09（ch09 数据未建）",
+	"next_chain": "ch06→ch07→…→final 的 next_chapter 链接首尾相接",
 	"gate_dangling": "每章 gate_ids 全部能在本章用例中找到",
 	"node_refs": "每章里程碑/知识卡/技能节点都存在",
 	"gate_count": "每章实验各 4 条 gate",
@@ -43,11 +43,12 @@ func run(ctx: TestContext) -> void:
 	var db = TestUtil.data_db()
 
 	ctx.begin_group("loadable")
-	ctx.check("DataDB 可读", db != null and db.chapter_ids().size() >= 8)
+	ctx.check("DataDB 可读", db != null and db.chapter_ids().size() >= 19)
 
 	ctx.begin_group("order")
-	ctx.check("章节顺序 ch01..ch08", db.chapter_ids() == ["ch01", "ch02", "ch03", "ch04",
-		"ch05", "ch06", "ch07", "ch08"], str(db.chapter_ids()))
+	ctx.check("章节顺序 ch01..ch19", db.chapter_ids() == ["ch01", "ch02", "ch03", "ch04",
+		"ch05", "ch06", "ch07", "ch08", "ch09", "ch10", "ch11", "ch12", "ch13", "ch14",
+		"ch15", "ch16", "ch17", "ch18", "ch19"], str(db.chapter_ids()))
 
 	for cid in ["ch07", "ch08"]:
 		ctx.begin_group("chapter_loaded")
@@ -81,7 +82,7 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s levels+labs 成对登记" % cid,
 			files.has("res://data/chapters/%s_levels.json" % cid)
 			and files.has("res://data/labs/%s_labs.json" % cid))
-	ctx.check("manifest 27 项", files.size() == 27, str(files.size()))
+	ctx.check("manifest 49 项", files.size() == 49, str(files.size()))
 
 	for cid in ["ch07", "ch08"]:
 		ctx.begin_group("levels_ids")
@@ -93,8 +94,12 @@ func run(ctx: TestContext) -> void:
 	ctx.begin_group("next_chain")
 	ctx.check("ch06→ch07", str(ChapterRegistry.levels_doc("ch06").get("next_chapter", "")) == "ch07")
 	ctx.check("ch07→ch08", str(ChapterRegistry.levels_doc("ch07").get("next_chapter", "")) == "ch08")
-	ctx.check("ch08→ch09（ch09 数据未建）",
+	ctx.check("ch08→ch09",
 		str(ChapterRegistry.levels_doc("ch08").get("next_chapter", "")) == "ch09")
+	ctx.check("ch09→ch10",
+		str(ChapterRegistry.levels_doc("ch09").get("next_chapter", "")) == "ch10")
+	ctx.check("ch19→final",
+		str(ChapterRegistry.levels_doc("ch19").get("next_chapter", "")) == "final")
 
 	for cid in ["ch07", "ch08"]:
 		ctx.begin_group("gate_dangling")

@@ -15,7 +15,7 @@ const EXPECT_GROUPS := {
 }
 const GROUP_DESCRIPTIONS := {
 	"loadable": "DataDB 可读",
-	"order": "章节顺序 ch01..ch08",
+	"order": "章节 id 从 ch01 起连续编号",
 	"chapter_loaded": "四章均被注册表装载且章号正确",
 	"use_chapter": "use_chapter 逐章可达",
 	"labs_nonempty": "labs_by_chapter 非空且数量正确",
@@ -48,8 +48,12 @@ func run(ctx: TestContext) -> void:
 	ctx.check("DataDB 可读", db != null and db.chapter_ids().size() >= 6)
 
 	ctx.begin_group("order")
-	ctx.check("章节顺序 ch01..ch08", db.chapter_ids() == ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06", "ch07", "ch08"],
-		str(db.chapter_ids()))
+	var ids: Array = db.chapter_ids()
+	var seq_ok := ids.size() >= 6
+	for i in ids.size():
+		if str(ids[i]) != "ch%02d" % (i + 1):
+			seq_ok = false
+	ctx.check("章节顺序从 ch01 连续", seq_ok, str(ids))
 
 	for cid in ["ch03", "ch04", "ch05", "ch06"]:
 		ctx.begin_group("chapter_loaded")
@@ -84,7 +88,12 @@ func run(ctx: TestContext) -> void:
 		ctx.check("%s levels+labs 成对登记" % cid,
 			files.has("res://data/chapters/%s_levels.json" % cid)
 			and files.has("res://data/labs/%s_labs.json" % cid))
-	ctx.check("manifest 27 项", files.size() == 27, str(files.size()))
+	var miss := ""
+	for cid in db.chapter_ids():
+		for p in ["res://data/chapters/%s_levels.json" % cid, "res://data/labs/%s_labs.json" % cid]:
+			if not files.has(p):
+				miss = p
+	ctx.check("manifest 覆盖全部章节 levels+labs", miss == "", miss)
 
 	for cid in ["ch03", "ch04", "ch05", "ch06"]:
 		ctx.begin_group("levels_ids")

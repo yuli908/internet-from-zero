@@ -10,7 +10,7 @@ const EXPECT_GROUPS := {
 	"progress_effects": 4,
 }
 const GROUP_DESCRIPTIONS := {
-	"node_counts": "节点总数 62 与 progress/knowledge 两棵树节点数",
+	"node_counts": "节点总数与 progress/knowledge 两棵树节点数，均从 skilltree.json 推导",
 	"gate_lock": "未过 gate 时 CH01-1 锁定且不可解锁",
 	"gate_unlock": "过 gate 后可用、解锁成功、状态转 completed、里程碑不发金币",
 	"ch01_sequence": "CH01-2 依赖 CH01-1 的锁定/可用/解锁三段",
@@ -24,10 +24,18 @@ const GROUP_DESCRIPTIONS := {
 func run(ctx: TestContext) -> void:
 	var db: Node = TestUtil.data_db()
 	var kg: KnowledgeGraph = db.skill_graph
+	# 计数一律从 skilltree.json 推导：扩树后不需要回来改常量
+	var raw_nodes: Array = TestUtil.read_json("res://data/skilltree.json").get("nodes", [])
+	var unique_ids := {}
+	var per_tree := {}
+	for n in raw_nodes:
+		unique_ids[str(n.get("id", ""))] = true
+		var t := str(n.get("tree", ""))
+		per_tree[t] = int(per_tree.get(t, 0)) + 1
 	ctx.begin_group("node_counts")
-	ctx.eq("node count", kg.nodes.size(), 167)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 52)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 74)
+	ctx.eq("node count", kg.nodes.size(), unique_ids.size())
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), int(per_tree.get("progress", 0)))
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), int(per_tree.get("knowledge", 0)))
 
 	ctx.begin_group("gate_lock")
 	var st := PlayerState.new()
@@ -76,7 +84,7 @@ func run(ctx: TestContext) -> void:
 	ctx.check("poor cannot unlock binary", not bool(kg.can_unlock(poor, "binary").get("ok", false)))
 
 	ctx.begin_group("progress_effects")
-	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), 167)
+	ctx.eq("progress total", int(kg.progress(st).get("total", 0)), raw_nodes.size())
 	ctx.check("progress done grew", int(kg.progress(st).get("done", 0)) >= 3)
 	ctx.check("demorgan node exists", kg.nodes.has("demorgan"))
 	ctx.check("bargain effect", str(kg.node("bargain").get("effects", {})).contains("price_discount"))

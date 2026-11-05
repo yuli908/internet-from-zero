@@ -5,15 +5,15 @@ const ChapterRegistry := preload("res://src/core/chapter_registry.gd")
 ## 数据完整性：物品、价格、配方、双树、章节、实验配置、gate 用例。
 
 ## 本套件自报期望数：EXPECT = 各组之和，runner 逐组比对实际计数。
-const EXPECT := 619
+const EXPECT := 627
 const EXPECT_GROUPS := {
 	"manifest": 2, "item_catalog": 1, "item_names": 86, "item_taxonomy": 5,
 	"price_refs": 98, "price_values": 4, "recipe_count": 1, "recipe_outputs": 77,
-	"recipe_inputs": 20, "recipe_keys": 141, "recipe_skill_refs": 1, "skill_tree": 9,
+	"recipe_inputs": 20, "recipe_keys": 141, "recipe_skill_refs": 1, "skill_tree": 13,
 	"chapter_meta": 5, "start_items": 2, "chapter_prereq": 3, "lab_config": 6,
 	"gate_case_counts": 6, "gate_case_kinds": 24, "gate_id_alignment": 6,
 	"lab_node_refs": 37, "lab_reward": 6, "gate_total": 1, "sim_config": 15,
-	"lab_limits": 4, "chapter_registry": 10, "ch02_labs": 4, "ch02_runtime": 5,
+	"lab_limits": 4, "chapter_registry": 14, "ch02_labs": 4, "ch02_runtime": 5,
 	"grid_count": 2, "ch02_node_refs": 27, "ch02_totals": 2, "tree_integrity": 2,
 	"chapter_reward_payout": 5, "tutorial": 1, "loadable": 1,
 }
@@ -61,7 +61,7 @@ func run(ctx: TestContext) -> void:
 	var ch: ChapterRuntime = db.chapter
 
 	ctx.begin_group("manifest")
-	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 27)
+	ctx.eq("manifest files", int(db.manifest.get("files", []).size()), 49)
 	ctx.eq("manifest version", int(db.manifest.get("version", 0)), 2)
 
 	ctx.begin_group("item_catalog")
@@ -118,12 +118,20 @@ func run(ctx: TestContext) -> void:
 			ctx.begin_group("recipe_skill_refs")
 			ctx.check("recipe %s skill %s" % [rid, need], kg.nodes.has(need))
 
+	var raw_nodes: Array = TestUtil.read_json("res://data/skilltree.json").get("nodes", [])
+	var unique_ids := {}
+	for n in raw_nodes:
+		unique_ids[str(n.get("id", ""))] = true
 	ctx.begin_group("skill_tree")
-	ctx.eq("skill node count", kg.nodes.size(), 167)
-	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 52)
-	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 74)
-	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 41)
+	ctx.eq("skill node count", kg.nodes.size(), unique_ids.size())
+	ctx.eq("progress nodes", kg.nodes_of_tree("progress").size(), 118)
+	ctx.eq("knowledge nodes", kg.nodes_of_tree("knowledge").size(), 118)
+	ctx.eq("skill nodes", kg.nodes_of_tree("skill").size(), 85)
 	ctx.check("CH01 milestone exists", kg.nodes.has("CH01"))
+	ctx.check("CH09 milestone exists", kg.nodes.has("CH09"))
+	ctx.check("CH19 milestone exists", kg.nodes.has("CH19"))
+	ctx.check("KN-ADDR-01 exists", kg.nodes.has("KN-ADDR-01"))
+	ctx.check("SK-ALARM exists", kg.nodes.has("SK-ALARM"))
 	ctx.check("KN-ELEC-01 exists", kg.nodes.has("KN-ELEC-01"))
 	ctx.check("SK-LEVEL exists", kg.nodes.has("SK-LEVEL"))
 	ctx.check("SK-DEMORGAN exists", kg.nodes.has("SK-DEMORGAN"))
@@ -218,14 +226,18 @@ func run(ctx: TestContext) -> void:
 
 	# ---- 穿过接缝：从 DataDB 入口直达 CH02，证明章节注册表真的被读 ----
 	ctx.begin_group("chapter_registry")
-	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06", "ch07", "ch08"])
+	ctx.eq("章节注册表顺序", db.chapter_ids(), ["ch01", "ch02", "ch03", "ch04", "ch05", "ch06", "ch07", "ch08", "ch09", "ch10", "ch11", "ch12", "ch13", "ch14", "ch15", "ch16", "ch17", "ch18", "ch19"])
 	ctx.check("注册表含 ch01", db.has_chapter("ch01"))
 	ctx.check("注册表含 ch02", db.has_chapter("ch02"))
 	ctx.check("注册表含 ch03", db.has_chapter("ch03"))
 	ctx.check("注册表含 ch04", db.has_chapter("ch04"))
 	ctx.check("注册表含 ch05", db.has_chapter("ch05"))
 	ctx.check("注册表含 ch06", db.has_chapter("ch06"))
+	ctx.check("注册表含 ch09", db.has_chapter("ch09"))
+	ctx.check("注册表含 ch19", db.has_chapter("ch19"))
 	ctx.eq("ch02 章号", int(db.chapter_meta("ch02").get("number", 0)), 2)
+	ctx.eq("ch09 章号", int(db.chapter_meta("ch09").get("number", 0)), 9)
+	ctx.eq("ch19 章号", int(db.chapter_meta("ch19").get("number", 0)), 19)
 	ctx.eq("默认章节来自注册表", db.default_chapter_id(), "ch01")
 	ctx.eq("兼容 labs 指向默认章节", db.labs, db.labs_for("ch01"))
 	var ch02_labs: Dictionary = db.labs_for("ch02")
