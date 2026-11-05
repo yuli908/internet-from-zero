@@ -8,6 +8,7 @@ extends RefCounted
 const Kit := preload("res://src/core/lab_gate_kit.gd")
 const ObjectGraph := preload("res://src/core/object_graph.gd")
 const CertScript := preload("res://src/core/cert_script.gd")
+const SamplingLink := preload("res://src/core/sampling_link.gd")
 
 static func is_pending(c: Dictionary) -> bool:
 	return str(c.get("content_status", c.get("status", "ready"))) != "ready"
@@ -90,19 +91,21 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 			"rows 数组", "missing", "填表证据未提交：没有 rows")
 		return
 	var rows: Array = rows_v
+	var sampling := c.has("sampling")
 	var want: Array = c.get("expect_rows", [])
 	var keys: Array = c.get("keys", [])
-	if want.is_empty():
+	if want.is_empty() and not sampling:
 		Kit.emit(rep, tracker, GateResult.E_UNKNOWN_TARGET, c, false, got,
 			"expect_rows", "missing", "gate 配置缺 expect_rows")
 		return
-	if keys.is_empty():
-		keys = (want[0] as Dictionary).keys()
-	if rows.size() != want.size():
-		Kit.emit(rep, tracker, GateResult.E_COVERAGE, c, false, got,
-			{"rows": want.size()}, {"rows": rows.size()},
-			"表行数不符：交 %d 行，机器要 %d 行" % [rows.size(), want.size()])
-		return
+	if not sampling:
+		if keys.is_empty():
+			keys = (want[0] as Dictionary).keys()
+		if rows.size() != want.size():
+			Kit.emit(rep, tracker, GateResult.E_COVERAGE, c, false, got,
+				{"rows": want.size()}, {"rows": rows.size()},
+				"表行数不符：交 %d 行，机器要 %d 行" % [rows.size(), want.size()])
+			return
 	var unique := str(c.get("unique_key", ""))
 	if not unique.is_empty():
 		var seen := {}
@@ -138,6 +141,21 @@ static func _table(rep: GateReport, tracker: GateAttemptTracker, c: Dictionary,
 					"第 %d 行 %s=%s 超过上限 %s（时延越限）"
 						% [i + 1, delay_key, str(dv), str(delay_max)])
 				return
+	# 采样链路（19 §2.9）：cfg 声明 `sampling{stages...}` 时，真值只来自
+	# `src/sim/sim_sampling.gd::trace(cfg)`（真跑采样→收帧→量化→应用→落盘），
+	# 不读 expect_rows；逐段比对原始字节/码值。放在逐格比对之前：顺序错位/原始值
+	# 被换算的语义错必须先以自己的码报出来，不能被普通填错(7)吞掉。
+	# 成功后整份提交行 + 机器链一起进 actual，下游逐段可读。
+	if sampling:
+		var sres: Dictionary = SamplingLink.validate_gate(got, c.get("sampling", {}))
+		if not bool(sres["ok"]):
+			Kit.emit(rep, tracker, int(sres["code"]), c, false, sres["input"],
+				sres["expected"], sres["actual"], str(sres["detail"]))
+			return
+		Kit.emit(rep, tracker, GateResult.E_TABLE_CELL, c, true, sres["actual"],
+			"五段原始字节/码值逐段一致，段数与网关声明一致", sres["actual"],
+			"五段链路全对（逐段可读）")
+		return
 	# 时间戳自洽：cfg 可选 `timing:{id,seq,sent,got,latency,gap}`。时延必须由两枚真实时钟事件
 	# 现算（latency == got − sent 且 >0），发送时刻必须来自仿真调度（sent = 序号×gap），
 	# 请求编号与客户端序号必须按发送顺序绑定。时钟/时延不符 → 9；编号绑错 → 7。
