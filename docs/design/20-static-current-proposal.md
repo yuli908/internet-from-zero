@@ -72,12 +72,12 @@
 
 但 `pending_reason` 要改口径——现在这句话把缺口说小了（暗示「只是仿真少个公式」）：
 
-- 旧（`data/labs/ch02_labs.json:81`、`:139`）：
+- 旧（`data/labs/ch02_labs.json:81`、`:139`，以及 `:5`、`ch02_checks.gd:14-16`、`failure_contract.md:244`）：
   `L1 仿真层只输出逻辑值，无稳态电流模型，规格要求 50 tick 平均 Idd`
-- 新：
-  `仿真层无电流量，且 2.2/2.4 的编辑器只有门级调色板（lab_ch02.gd:148），玩家搭不出非互补结构；缺口是一层晶体管网表入口，不是单个 Id 公式`
+- 新（已落地，四处逐字一致）：
+  `缺口在编辑器：2.2 调色板仅 NOT 门，无法搭出两管同时导通；补模型会让 T2.2-3/T2.4-4 变成恒绿死判据`
 
-同步位置：`data/labs/ch02_labs.json:81`、`:139`；`data/chapters/ch02_levels.json` 2.4 的 `deferred_reason`（`:33`）；`src/core/ch02_checks.gd:14-16`；`specs/m5/failure_contract.md:244`。
+同步位置：两处 gate `pending_reason`（`data/labs/ch02_labs.json:81`、`:139`）、`pending_kinds`（`:5`）、`PENDING_REASONS`（`src/core/ch02_checks.gd:15`）、契约 `specs/m5/failure_contract.md:244`。`data/chapters/ch02_levels.json:33` 的 `deferred_reason` 是玩家可读文案，受内部术语断言约束，**不套用这句**。
 
 **不降级成别的判据**：门图上任何电流类判据都恒真；降级成 `quiz` 就是拿知识题冒充电路判定（`KN-CMOS-02` 已经覆盖了那个知识点，`data/skilltree.json:45`），同样是假 gate。**宁可 pending，也不发一个永远绿的 gate。**
 
