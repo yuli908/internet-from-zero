@@ -383,7 +383,7 @@
               "addr": "0x40",
               "field": "y",
               "offset": 3,
-              "value": 3
+              "value": "0x48"
             },
             {
               "obj": "B",
@@ -405,6 +405,18 @@
             "offsets_ok": true,
             "refs_ok": true,
             "card": true
+          },
+          "graph": {
+            "nodes": [
+              {"obj_addr": "0x40", "type": "A", "fields": [{"name": "x", "offset": 2}, {"name": "y", "offset": 3}]},
+              {"obj_addr": "0x48", "type": "B", "fields": [{"name": "inherit_x", "offset": 2}, {"name": "own_z", "offset": 4}]},
+              {"obj_addr": "0x18", "type": "I", "fields": []}
+            ],
+            "edges": [
+              {"kind": "parent", "from": "0x48", "to": "0x40", "field": ""},
+              {"kind": "iface", "from": "0x48", "to": "0x18", "field": ""},
+              {"kind": "field", "from": "0x40", "to": "0x48", "field": "y"}
+            ]
           },
           "codes": [
             "E_UNCONNECTED(3)",

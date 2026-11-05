@@ -17,9 +17,9 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 const Ch13Checks = preload("res://src/core/ch13_checks.gd")
 const BytecodeTrace = preload("res://src/core/bytecode_trace.gd")
 
-const EXPECT := 59
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t13_1_real": 3, "negative": 8}
-const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（13.1 行映射落地后 bytecode_vm 为 4）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（含 T13.1-1 实跑作答）", "t13_1_real": "T13.1-1 行映射/覆盖/输出由 bytecode_trace 实跑导出并与数据期望逐项一致", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/行映射改坏/映射项删除 均精确判红"}
+const EXPECT := 68
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t13_1_real": 3, "t13_2_graph": 9, "negative": 8}
+const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（13.1 行映射落地后 bytecode_vm 为 4）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（含 T13.1-1 实跑作答）", "t13_1_real": "T13.1-1 行映射/覆盖/输出由 bytecode_trace 实跑导出并与数据期望逐项一致", "t13_2_graph": "13.2 对象图：数据图自洽、下游真读 report.actual.graph、端点缺失/kind 错/方向颠倒/节点超限/边超限 五条负例实测", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/行映射改坏/映射项删除 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch13_labs.json")
@@ -84,6 +84,7 @@ func run(ctx: TestContext) -> void:
 			bool(r["ok"]), str(r["report"].first_failure()))
 
 	_t13_1_real(ctx, labs["bytecode_vm"])
+	_t13_2_graph(ctx, labs["object_ref"])
 
 	_negative(ctx, labs)
 
@@ -197,6 +198,8 @@ func _good(cfg: Dictionary) -> Dictionary:
 			"table":
 				out[cid] = {"rows": (g.get("expect_rows", []) as Array).duplicate(true),
 					"meta": (g.get("expect_meta", {}) as Dictionary).duplicate(true)}
+				if g.has("graph"):
+					(out[cid] as Dictionary)["graph"] = (g["graph"] as Dictionary).duplicate(true)
 			"skip_layer":
 				var st := str(g.get("stage", ""))
 				out[cid] = {"stages": [st, "downstream"], "missing": st, "downstream_ok": false}
@@ -342,3 +345,101 @@ func _negative(ctx: TestContext, labs: Dictionary) -> void:
 	var c8: int = _code(r8["report"], "T13.1-1")
 	print("RED-PROBE CH13 T13.1-1 T13.1-1 删一条 pc2 行映射项 -> code=%d" % c8)
 	ctx.eq("T13.1-1 删映射项判红 E_OUTPUT_MISMATCH(10)", c8, GateResult.E_OUTPUT_MISMATCH)
+
+## 13.2 对象图（19 §2.2）：边语义在 ObjectGraph 里定稿；这里验数据自洽、
+## 下游真读（report.actual.graph）、以及五条能红的负例（端点/kind/方向/两道规模上限）。
+func _t13_2_graph(ctx: TestContext, cfg: Dictionary) -> void:
+	ctx.begin_group("t13_2_graph")
+	var want := _graph_of(cfg)
+	var wn: Array = want.get("nodes", [])
+	var we: Array = want.get("edges", [])
+	ctx.check("数据对象图 3 节点 / 3 边", wn.size() == 3 and we.size() == 3,
+		"nodes=%d edges=%d" % [wn.size(), we.size()])
+	var addrs := {}
+	for raw in wn:
+		addrs[str((raw as Dictionary).get("obj_addr", ""))] = true
+	var endpoints_ok := true
+	var kinds_ok := true
+	for raw in we:
+		var e: Dictionary = raw
+		if not addrs.has(str(e.get("from", ""))):
+			endpoints_ok = false
+		if not addrs.has(str(e.get("to", ""))):
+			endpoints_ok = false
+		if not ["parent", "iface", "field"].has(str(e.get("kind", ""))):
+			kinds_ok = false
+	ctx.check("数据图边端点全在节点地址集", endpoints_ok, _edge_text(we))
+	ctx.check("数据图边 kind 全在枚举", kinds_ok, _edge_text(we))
+
+	# 下游真读：不是只有 ok:true，报告 actual.graph 必须带解析后的节点/边。
+	var r: Dictionary = Ch13Checks.run("object_ref", cfg, {"answers": _good(cfg)})
+	var c0 := _case(r["report"], "T13.2-1")
+	var ag: Dictionary = (c0.get("actual", {}) as Dictionary).get("graph", {})
+	ctx.check("T13.2-1 下游真读 report.actual.graph 含 3 节点/3 边",
+		(ag.get("nodes", []) as Array).size() == 3
+			and (ag.get("edges", []) as Array).size() == 3, str(ag))
+
+	# 负例①：边指向不存在的节点 → 3。
+	var g1: Dictionary = want.duplicate(true)
+	((g1["edges"] as Array)[0] as Dictionary)["to"] = "0x99"
+	var c1 := _graph_code(cfg, g1)
+	print("RED-PROBE CH13 T13.2-1 边端点不存在(to=0x99) -> code=%d" % c1)
+	ctx.eq("T13.2-1 边指向不存在节点判红 E_UNCONNECTED(3)", c1, GateResult.E_UNCONNECTED)
+
+	# 负例②：kind 写错 → 7。
+	var g2: Dictionary = want.duplicate(true)
+	((g2["edges"] as Array)[1] as Dictionary)["kind"] = "implement"
+	var c2 := _graph_code(cfg, g2)
+	print("RED-PROBE CH13 T13.2-1 边 kind 写错(iface→implement) -> code=%d" % c2)
+	ctx.eq("T13.2-1 边 kind 写错判红 E_TABLE_CELL(7)", c2, GateResult.E_TABLE_CELL)
+
+	# 负例③：有向边 from/to 颠倒 → 10（端点都在、kind 也对，所以不是 3/7）。
+	var g3: Dictionary = want.duplicate(true)
+	var e3: Dictionary = (g3["edges"] as Array)[0]
+	var tmp := str(e3.get("from", ""))
+	e3["from"] = str(e3.get("to", ""))
+	e3["to"] = tmp
+	var c3 := _graph_code(cfg, g3)
+	print("RED-PROBE CH13 T13.2-1 有向边 from/to 颠倒 -> code=%d" % c3)
+	ctx.eq("T13.2-1 有向边方向颠倒判红 E_OUTPUT_MISMATCH(10)", c3, GateResult.E_OUTPUT_MISMATCH)
+
+	# 规模上限：超限判红，不截断（节点 65 > 64、边 129 > 128）。
+	var big_nodes := {"nodes": [], "edges": []}
+	for i in 65:
+		(big_nodes["nodes"] as Array).append(
+			{"obj_addr": "0x%02x" % (i + 1), "type": "N", "fields": []})
+	var c4 := _graph_code(cfg, big_nodes)
+	print("RED-PROBE CH13 T13.2-1 节点 65 > 上限 64 -> code=%d" % c4)
+	ctx.eq("T13.2-1 节点超上限判红 E_TABLE_CELL(7)", c4, GateResult.E_TABLE_CELL)
+
+	var big_edges: Dictionary = want.duplicate(true)
+	for i in 126:
+		(big_edges["edges"] as Array).append(
+			{"kind": "parent", "from": "0x48", "to": "0x40", "field": ""})
+	var c5 := _graph_code(cfg, big_edges)
+	print("RED-PROBE CH13 T13.2-1 边 129 > 上限 128 -> code=%d" % c5)
+	ctx.eq("T13.2-1 边超上限判红 E_TABLE_CELL(7)", c5, GateResult.E_TABLE_CELL)
+
+func _graph_of(cfg: Dictionary) -> Dictionary:
+	var g: Dictionary = _gate(cfg, "T13.2-1")
+	return (g.get("graph", {}) as Dictionary).duplicate(true)
+
+func _graph_code(cfg: Dictionary, graph: Dictionary) -> int:
+	var a := _good(cfg)
+	(a["T13.2-1"] as Dictionary)["graph"] = graph
+	var r: Dictionary = Ch13Checks.run("object_ref", cfg, {"answers": a})
+	return _code(r["report"], "T13.2-1")
+
+func _case(report: GateReport, cid: String) -> Dictionary:
+	for c in report.cases:
+		if str(c.get("id", "")) == cid:
+			return c
+	return {}
+
+func _edge_text(edges: Array) -> String:
+	var out := []
+	for raw in edges:
+		var e: Dictionary = raw
+		out.append("%s:%s->%s" % [str(e.get("kind", "")), str(e.get("from", "")),
+			str(e.get("to", ""))])
+	return str(out)
