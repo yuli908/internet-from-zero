@@ -117,16 +117,18 @@ func validate() -> Array:
 						errs.append("题目 %s 的干扰项 kind 非法：%s" % [tag, kind])
 					if why.is_empty():
 						errs.append("题目 %s 的干扰项 why 为空" % tag)
-					if not (n.get("index", null) is int):
-						errs.append("题目 %s 的干扰项 index 必须是 int" % tag)
+					var idx_v: Variant = n.get("index", null)
+					if not (idx_v is int or idx_v is float):
+						errs.append("题目 %s 的干扰项 index 必须是整数下标" % tag)
 						continue
-					var idx := int(n["index"])
+					var idx := int(idx_v)
 					if covered.has(idx):
 						errs.append("题目 %s 的干扰项 index %d 重复" % [tag, idx])
 					covered[idx] = true
 					if it.has("answer") and idx == int(it.get("answer", -1)):
 						errs.append("题目 %s 把正确项 %d 标成了干扰项" % [tag, idx])
-				if it.has("answer") and (it["answer"] is int):
+				var ans_is_num := it.has("answer") and (it["answer"] is int or it["answer"] is float)
+				if ans_is_num:
 					for oi in opts.size():
 						if oi != int(it["answer"]) and not covered.has(oi):
 							errs.append("题目 %s 的干扰项 index %d 没有来源标注" % [tag, oi])
