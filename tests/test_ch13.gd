@@ -15,11 +15,12 @@ const ALLOWED_KINDS := ["table", "coverage", "port_map", "page_map", "checksum",
 	"derived_number", "handshake_fsm", "timeout_idle", "skip_layer", "quiz"]
 
 const Ch13Checks = preload("res://src/core/ch13_checks.gd")
+const ObjectGraph = preload("res://src/core/object_graph.gd")
 const BytecodeTrace = preload("res://src/core/bytecode_trace.gd")
 
-const EXPECT := 68
-const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t13_1_real": 3, "t13_2_graph": 9, "negative": 8}
-const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（13.1 行映射落地后 bytecode_vm 为 4）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（含 T13.1-1 实跑作答）", "t13_1_real": "T13.1-1 行映射/覆盖/输出由 bytecode_trace 实跑导出并与数据期望逐项一致", "t13_2_graph": "13.2 对象图：数据图自洽、下游真读 report.actual.graph、端点缺失/kind 错/方向颠倒/节点超限/边超限 五条负例实测", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/行映射改坏/映射项删除 均精确判红"}
+const EXPECT := 70
+const EXPECT_GROUPS := {"loadable": 1, "sections_present": 3, "section_count": 3, "order": 3, "text_nonempty": 3, "text_cap": 3, "screen_sum": 3, "last_after": 3, "practice": 3, "gate_count": 3, "p1_field": 3, "gate_ids": 3, "gate_kinds": 3, "gate_codes": 3, "denominator": 3, "pending_total": 1, "total_sections": 1, "positive": 3, "t13_1_real": 3, "t13_2_graph": 11, "negative": 8}
+const GROUP_DESCRIPTIONS := {"loadable": "ch13_labs 数据文件可读", "sections_present": "每 lab 必有非空 sections", "section_count": "每 lab 段数为 5", "order": "每 lab 内 order 连续 1..5", "text_nonempty": "每段 text 非空", "text_cap": "每段 ≤150 字（去半角空格）", "screen_sum": "同一 after 档同屏合计 ≤260", "last_after": "末段 after=3", "practice": "每节实践表 4 行且字段齐全", "gate_count": "每节 4 条 gate", "p1_field": "每节有 P1 文本与 p1_gates", "gate_ids": "gate id 按 T13.x-n 定稿", "gate_kinds": "只用既有 kind（table/skip_layer/derived_number/quiz）", "gate_codes": "失败码在白名单 3/5/7/8/9/10/13/14/15/27，且无 26/28", "denominator": "进分母 gate 数按 deferred_gates 现算（13.1 行映射落地后 bytecode_vm 为 4）", "pending_total": "全章 pending 条数=0，且进分母计数=12", "total_sections": "全篇段数 15", "positive": "3 节好答案全绿（含 T13.1-1 实跑作答）", "t13_1_real": "T13.1-1 行映射/覆盖/输出由 bytecode_trace 实跑导出并与数据期望逐项一致", "t13_2_graph": "13.2 对象图：数据图自洽、下游真读 report.actual.graph、端点缺失/kind 错/方向颠倒/节点超限/边超限五条负例实测、合法大图 60/120 不误红、上限余量 ≥20 倍", "negative": "错值/缺件/负例未复现/复算错/quiz 错/缺 rows/行映射改坏/映射项删除 均精确判红"}
 
 func run(ctx: TestContext) -> void:
 	var cfg_all: Dictionary = TestUtil.read_json("res://data/labs/ch13_labs.json")
@@ -402,6 +403,26 @@ func _t13_2_graph(ctx: TestContext, cfg: Dictionary) -> void:
 	var c3 := _graph_code(cfg, g3)
 	print("RED-PROBE CH13 T13.2-1 有向边 from/to 颠倒 -> code=%d" % c3)
 	ctx.eq("T13.2-1 有向边方向颠倒判红 E_OUTPUT_MISMATCH(10)", c3, GateResult.E_OUTPUT_MISMATCH)
+
+	# 合法大图不误红：60 节点 / 120 边（含 field 边）应通过；上限对当前 3 节点仍有 ≥20 倍余量。
+	var big := {"nodes": [], "edges": []}
+	for i in 60:
+		(big["nodes"] as Array).append({"obj_addr": "0x%02x" % (i + 1), "type": "N",
+			"fields": [{"name": "ref", "offset": 2}]})
+	for i in 60:
+		var nxt := "0x%02x" % (((i + 1) % 60) + 1)
+		(big["edges"] as Array).append({"kind": "field", "from": "0x%02x" % (i + 1),
+			"to": nxt, "field": "ref"})
+		(big["edges"] as Array).append({"kind": "iface", "from": "0x%02x" % (i + 1),
+			"to": nxt, "field": ""})
+	var gok: Dictionary = ObjectGraph.validate(big, big)
+	print("GREEN-PROBE CH13 T13.2-1 合法大图 60 节点/120 边 -> ok=%s code=%d"
+		% [str(gok.get("ok", false)), int(gok.get("code", -1))])
+	ctx.check("T13.2-1 合法大图 60 节点/120 边通过（不误红）",
+		bool(gok.get("ok", false)), str(gok.get("detail", "")))
+	ctx.check("T13.2-1 上限余量 ≥20 倍（64/3 与 128/3）",
+		ObjectGraph.MAX_NODES >= 3 * 20 and ObjectGraph.MAX_EDGES >= 3 * 20,
+		"nodes=%d edges=%d" % [ObjectGraph.MAX_NODES, ObjectGraph.MAX_EDGES])
 
 	# 规模上限：超限判红，不截断（节点 65 > 64、边 129 > 128）。
 	var big_nodes := {"nodes": [], "edges": []}
