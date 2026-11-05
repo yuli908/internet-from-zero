@@ -1,0 +1,151 @@
+{
+  "version": 2,
+  "id": "ch10",
+  "number": 10,
+  "title": "第十章 · 花钱买可靠",
+  "subtitle": "序号重排、ACK 重传、滑动窗口与可靠通道",
+  "source": "docs/curriculum/21-ch10-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH10-RELIABLE"
+  },
+  "next_chapter": "ch11",
+  "labs": [
+    {
+      "id": "seq_reorder",
+      "order": 1,
+      "title": "序号与重排 · 到达不等于按序",
+      "subtitle": "序号与乱序重排",
+      "data_key": "seq_reorder",
+      "requires": [],
+      "objective": "obj_seq_reorder",
+      "knowledge": "KN-SEQ-01",
+      "milestone": "CH10-1",
+      "knowledge_cards": [
+        "KN-SEQ-01"
+      ],
+      "skill_node": "SK-SEQ",
+      "gate_ids": [
+        "T10.1-1",
+        "T10.1-2",
+        "T10.1-3",
+        "T10.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "ack_retransmit",
+      "order": 2,
+      "title": "ACK 与重传 · 同号补发",
+      "subtitle": "确认、超时与同号重发",
+      "data_key": "ack_retransmit",
+      "requires": [
+        "seq_reorder"
+      ],
+      "objective": "obj_ack_retransmit",
+      "knowledge": "KN-ACK-01",
+      "milestone": "CH10-2",
+      "knowledge_cards": [
+        "KN-ACK-01"
+      ],
+      "skill_node": "SK-ACK",
+      "gate_ids": [
+        "T10.2-1",
+        "T10.2-2",
+        "T10.2-3",
+        "T10.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "sliding_window",
+      "order": 3,
+      "title": "滑动窗口 · 用缓冲换吞吐",
+      "subtitle": "窗口、缓冲与吞吐",
+      "data_key": "sliding_window",
+      "requires": [
+        "ack_retransmit"
+      ],
+      "objective": "obj_sliding_window",
+      "knowledge": "KN-WIN-01",
+      "milestone": "CH10-3",
+      "knowledge_cards": [
+        "KN-WIN-01"
+      ],
+      "skill_node": "SK-WINDOW",
+      "gate_ids": [
+        "T10.3-1",
+        "T10.3-2",
+        "T10.3-3",
+        "T10.3-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "reliable_channel",
+      "order": 4,
+      "title": "可靠通道 · 1 KB 全对",
+      "subtitle": "1 KB 全对送达",
+      "data_key": "reliable_channel",
+      "requires": [
+        "sliding_window"
+      ],
+      "objective": "obj_reliable_channel",
+      "knowledge": "KN-REL-01",
+      "milestone": "CH10-4",
+      "knowledge_cards": [
+        "KN-REL-01"
+      ],
+      "skill_node": "SK-RELIABLE",
+      "gate_ids": [
+        "T10.4-1",
+        "T10.4-2",
+        "T10.4-3",
+        "T10.4-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_seq_reorder",
+      "title": "接出重排缓冲，注入 30% 丢包与乱序输入",
+      "lab": "seq_reorder",
+      "knowledge": "KN-SEQ-01"
+    },
+    {
+      "id": "obj_ack_retransmit",
+      "title": "跑正常 ACK，再关确认观察一次超时重传",
+      "lab": "ack_retransmit",
+      "knowledge": "KN-ACK-01"
+    },
+    {
+      "id": "obj_sliding_window",
+      "title": "窗口 1→4 同配置两跑，测吞吐与重传率",
+      "lab": "sliding_window",
+      "knowledge": "KN-WIN-01"
+    },
+    {
+      "id": "obj_reliable_channel",
+      "title": "30% 丢包下完整传 1 KB，调参并记录",
+      "lab": "reliable_channel",
+      "knowledge": "KN-REL-01"
+    }
+  ]
+}

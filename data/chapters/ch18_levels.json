@@ -1,0 +1,151 @@
+{
+  "version": 2,
+  "id": "ch18",
+  "number": 18,
+  "title": "第十八章 · 让篡改有代价",
+  "subtitle": "对称密钥、非对称交换、哈希证书与中间人",
+  "source": "docs/curriculum/29-ch18-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH18-CRYPTO"
+  },
+  "next_chapter": "ch19",
+  "labs": [
+    {
+      "id": "xor_cipher",
+      "order": 1,
+      "title": "对称与密钥分发 · 一把钥匙，加解密同一把",
+      "subtitle": "一把钥匙加解同一把",
+      "data_key": "xor_cipher",
+      "requires": [],
+      "objective": "obj_xor_cipher",
+      "knowledge": "KN-XOR-01",
+      "milestone": "CH18-1",
+      "knowledge_cards": [
+        "KN-XOR-01"
+      ],
+      "skill_node": "SK-XOR",
+      "gate_ids": [
+        "T18.1-1",
+        "T18.1-2",
+        "T18.1-3",
+        "T18.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "key_exchange",
+      "order": 2,
+      "title": "非对称 · 两把钥匙，只换会话密钥",
+      "subtitle": "两把钥匙换会话密钥",
+      "data_key": "key_exchange",
+      "requires": [
+        "xor_cipher"
+      ],
+      "objective": "obj_key_exchange",
+      "knowledge": "KN-KEYEX-01",
+      "milestone": "CH18-2",
+      "knowledge_cards": [
+        "KN-KEYEX-01"
+      ],
+      "skill_node": "SK-KEYEX",
+      "gate_ids": [
+        "T18.2-1",
+        "T18.2-2",
+        "T18.2-3",
+        "T18.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "hash_cert",
+      "order": 3,
+      "title": "哈希与证书 · 改 1 bit 就得大改",
+      "subtitle": "改 1 bit 大改",
+      "data_key": "hash_cert",
+      "requires": [
+        "key_exchange"
+      ],
+      "objective": "obj_hash_cert",
+      "knowledge": "KN-HASH-01",
+      "milestone": "CH18-3",
+      "knowledge_cards": [
+        "KN-HASH-01"
+      ],
+      "skill_node": "SK-HASH",
+      "gate_ids": [
+        "T18.3-1",
+        "T18.3-2",
+        "T18.3-3",
+        "T18.3-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "mitm_lab",
+      "order": 4,
+      "title": "中间人 · 验不过就拒绝",
+      "subtitle": "验不过就拒绝",
+      "data_key": "mitm_lab",
+      "requires": [
+        "hash_cert"
+      ],
+      "objective": "obj_mitm_lab",
+      "knowledge": "KN-MITM-01",
+      "milestone": "CH18-4",
+      "knowledge_cards": [
+        "KN-MITM-01"
+      ],
+      "skill_node": "SK-MITM",
+      "gate_ids": [
+        "T18.4-1",
+        "T18.4-2",
+        "T18.4-3",
+        "T18.4-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_xor_cipher",
+      "title": "写异或流加密，用同密钥、错密钥、无密钥各解一次，导出三次结果",
+      "lab": "xor_cipher",
+      "knowledge": "KN-XOR-01"
+    },
+    {
+      "id": "obj_key_exchange",
+      "title": "交换公钥、解出会话密钥，导出两端指纹比对",
+      "lab": "key_exchange",
+      "knowledge": "KN-KEYEX-01"
+    },
+    {
+      "id": "obj_hash_cert",
+      "title": "改 1 bit 看摘要变化，再逐级验一条证书链",
+      "lab": "hash_cert",
+      "knowledge": "KN-HASH-01"
+    },
+    {
+      "id": "obj_mitm_lab",
+      "title": "重放中间人剧本，关/开证书验证各跑一遍，比对拒绝原因",
+      "lab": "mitm_lab",
+      "knowledge": "KN-MITM-01"
+    }
+  ]
+}

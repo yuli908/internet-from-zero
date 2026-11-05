@@ -1,0 +1,184 @@
+{
+  "version": 2,
+  "id": "ch09",
+  "number": 9,
+  "title": "第九章 · 下一步交给谁",
+  "subtitle": "编址、ARP、交换机、路由与环路",
+  "source": "docs/curriculum/20-ch09-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH09-ROUTE"
+  },
+  "next_chapter": "ch10",
+  "labs": [
+    {
+      "id": "addressing",
+      "order": 1,
+      "title": "编址 · 名字不能重",
+      "subtitle": "4+4 地址与子网划分",
+      "data_key": "addressing",
+      "requires": [],
+      "objective": "obj_addressing",
+      "knowledge": "KN-ADDR-09",
+      "milestone": "CH09-1",
+      "knowledge_cards": [
+        "KN-ADDR-09"
+      ],
+      "skill_node": "SK-ADDRESSING",
+      "gate_ids": [
+        "T9.1-1",
+        "T9.1-2",
+        "T9.1-3",
+        "T9.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "arp",
+      "order": 2,
+      "title": "ARP · 问一次，用一段时间",
+      "subtitle": "广播问、单播答与缓存",
+      "data_key": "arp",
+      "requires": [
+        "addressing"
+      ],
+      "objective": "obj_arp",
+      "knowledge": "KN-ARP-01",
+      "milestone": "CH09-2",
+      "knowledge_cards": [
+        "KN-ARP-01"
+      ],
+      "skill_node": "SK-ARP",
+      "gate_ids": [
+        "T9.1a-1",
+        "T9.1a-2",
+        "T9.1a-3",
+        "T9.1a-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "switch",
+      "order": 3,
+      "title": "交换机 · 表是学出来的",
+      "subtitle": "源地址学习与泛洪",
+      "data_key": "switch",
+      "requires": [
+        "arp"
+      ],
+      "objective": "obj_switch",
+      "knowledge": "KN-SWITCH-01",
+      "milestone": "CH09-3",
+      "knowledge_cards": [
+        "KN-SWITCH-01"
+      ],
+      "skill_node": "SK-SWITCH",
+      "gate_ids": [
+        "T9.2-1",
+        "T9.2-2",
+        "T9.2-3",
+        "T9.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "router",
+      "order": 4,
+      "title": "路由 · 只知道下一步",
+      "subtitle": "下一跳、TTL 与成圈",
+      "data_key": "router",
+      "requires": [
+        "switch"
+      ],
+      "objective": "obj_router",
+      "knowledge": "KN-ROUTE-01",
+      "milestone": "CH09-4",
+      "knowledge_cards": [
+        "KN-ROUTE-01"
+      ],
+      "skill_node": "SK-ROUTER",
+      "gate_ids": [
+        "T9.3-1",
+        "T9.3-2",
+        "T9.3-3",
+        "T9.3-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "loop_recovery",
+      "order": 5,
+      "title": "环路 · 风暴与备份",
+      "subtitle": "风暴、阻断与备路恢复",
+      "data_key": "loop_recovery",
+      "requires": [
+        "router"
+      ],
+      "objective": "obj_loop_recovery",
+      "knowledge": "KN-LOOP-01",
+      "milestone": "CH09-5",
+      "knowledge_cards": [
+        "KN-LOOP-01"
+      ],
+      "skill_node": "SK-LOOP",
+      "gate_ids": [
+        "T9.4-1",
+        "T9.4-2",
+        "T9.4-3",
+        "T9.4-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_addressing",
+      "title": "给 4 个节点写 4+4 地址、划 2 张子网，并制造一次重地址交表",
+      "lab": "addressing",
+      "knowledge": "KN-ADDR-09"
+    },
+    {
+      "id": "obj_arp",
+      "title": "发一次解析并连发两次，抓两帧并验证缓存命中",
+      "lab": "arp",
+      "knowledge": "KN-ARP-01"
+    },
+    {
+      "id": "obj_switch",
+      "title": "4 口各接一节点，首帧泛洪，应答后学表，同拓扑跑两遍",
+      "lab": "switch",
+      "knowledge": "KN-SWITCH-01"
+    },
+    {
+      "id": "obj_router",
+      "title": "手填路由表，走通两子网并逐跳看 TTL",
+      "lab": "router",
+      "knowledge": "KN-ROUTE-01"
+    },
+    {
+      "id": "obj_loop_recovery",
+      "title": "造环、复现风暴、阻断并恢复，写出环位置与停用口",
+      "lab": "loop_recovery",
+      "knowledge": "KN-LOOP-01"
+    }
+  ]
+}

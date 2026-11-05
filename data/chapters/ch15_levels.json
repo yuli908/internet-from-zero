@@ -1,0 +1,151 @@
+{
+  "version": 2,
+  "id": "ch15",
+  "number": 15,
+  "title": "第十五章 · 一半是别人写的",
+  "subtitle": "库与 ABI、socket、版本兼容与 DNS",
+  "source": "docs/curriculum/26-ch15-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH15-API"
+  },
+  "next_chapter": "ch16",
+  "labs": [
+    {
+      "id": "library_abi",
+      "order": 1,
+      "title": "库与 ABI · 调用先对齐约定",
+      "subtitle": "调用先对齐约定",
+      "data_key": "library_abi",
+      "requires": [],
+      "objective": "obj_library_abi",
+      "knowledge": "KN-ABI-01",
+      "milestone": "CH15-1",
+      "knowledge_cards": [
+        "KN-ABI-01"
+      ],
+      "skill_node": "SK-ABI",
+      "gate_ids": [
+        "T15.1-1",
+        "T15.1-2",
+        "T15.1-3",
+        "T15.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "socket_api",
+      "order": 2,
+      "title": "socket · 网络折成一个句柄",
+      "subtitle": "网络折成句柄",
+      "data_key": "socket_api",
+      "requires": [
+        "library_abi"
+      ],
+      "objective": "obj_socket_api",
+      "knowledge": "KN-SOCK-01",
+      "milestone": "CH15-2",
+      "knowledge_cards": [
+        "KN-SOCK-01"
+      ],
+      "skill_node": "SK-SOCKET",
+      "gate_ids": [
+        "T15.2-1",
+        "T15.2-2",
+        "T15.2-3",
+        "T15.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "version_compat",
+      "order": 3,
+      "title": "版本兼容 · 改接口不能悄悄坏",
+      "subtitle": "改接口不能悄悄坏",
+      "data_key": "version_compat",
+      "requires": [
+        "socket_api"
+      ],
+      "objective": "obj_version_compat",
+      "knowledge": "KN-VER-01",
+      "milestone": "CH15-3",
+      "knowledge_cards": [
+        "KN-VER-01"
+      ],
+      "skill_node": "SK-VERSION",
+      "gate_ids": [
+        "T15.3-1",
+        "T15.3-2",
+        "T15.3-3",
+        "T15.3-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "dns_resolve",
+      "order": 4,
+      "title": "DNS · 名字换地址，缓存有寿命",
+      "subtitle": "名字换地址",
+      "data_key": "dns_resolve",
+      "requires": [
+        "version_compat"
+      ],
+      "objective": "obj_dns_resolve",
+      "knowledge": "KN-DNS-01",
+      "milestone": "CH15-4",
+      "knowledge_cards": [
+        "KN-DNS-01"
+      ],
+      "skill_node": "SK-DNS",
+      "gate_ids": [
+        "T15.4-1",
+        "T15.4-2",
+        "T15.4-3",
+        "T15.4-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_library_abi",
+      "title": "写两个程序调同一个库函数，逐字段对照符号表与传参/返回",
+      "lab": "library_abi",
+      "knowledge": "KN-ABI-01"
+    },
+    {
+      "id": "obj_socket_api",
+      "title": "两机各跑一个程序，一行文本经 send/recv 原样送达并抓包",
+      "lab": "socket_api",
+      "knowledge": "KN-SOCK-01"
+    },
+    {
+      "id": "obj_version_compat",
+      "title": "改库函数参数并升主版本，跑旧程序，读兼容错误",
+      "lab": "version_compat",
+      "knowledge": "KN-VER-01"
+    },
+    {
+      "id": "obj_dns_resolve",
+      "title": "查 A/AAAA/CNAME 三类记录，观察缓存命中与 TTL 到期重查",
+      "lab": "dns_resolve",
+      "knowledge": "KN-DNS-01"
+    }
+  ]
+}

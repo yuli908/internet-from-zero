@@ -1,0 +1,118 @@
+{
+  "version": 2,
+  "id": "ch13",
+  "number": 13,
+  "title": "第十三章 · 一次编写到处运行",
+  "subtitle": "字节码 VM、对象引用与垃圾回收",
+  "source": "docs/curriculum/24-ch13-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH13-JAVA"
+  },
+  "next_chapter": "ch14",
+  "labs": [
+    {
+      "id": "bytecode_vm",
+      "order": 1,
+      "title": "字节码 VM · 一条指令一步，栈顶看得见",
+      "subtitle": "栈顶一步一指令",
+      "data_key": "bytecode_vm",
+      "requires": [],
+      "objective": "obj_bytecode_vm",
+      "knowledge": "KN-BC-01",
+      "milestone": "CH13-1",
+      "knowledge_cards": [
+        "KN-BC-01"
+      ],
+      "skill_node": "SK-BYTECODE",
+      "gate_ids": [
+        "T13.1-1",
+        "T13.1-2",
+        "T13.1-3",
+        "T13.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "object_ref",
+      "order": 2,
+      "title": "对象与引用 · 起始地址就是身份",
+      "subtitle": "起始地址即身份",
+      "data_key": "object_ref",
+      "requires": [
+        "bytecode_vm"
+      ],
+      "objective": "obj_object_ref",
+      "knowledge": "KN-OBJ-01",
+      "milestone": "CH13-2",
+      "knowledge_cards": [
+        "KN-OBJ-01"
+      ],
+      "skill_node": "SK-OBJECT",
+      "gate_ids": [
+        "T13.2-1",
+        "T13.2-2",
+        "T13.2-3",
+        "T13.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "gc_reclaim",
+      "order": 3,
+      "title": "垃圾回收 · 没人指就回收",
+      "subtitle": "没人指就回收",
+      "data_key": "gc_reclaim",
+      "requires": [
+        "object_ref"
+      ],
+      "objective": "obj_gc_reclaim",
+      "knowledge": "KN-GC-01",
+      "milestone": "CH13-3",
+      "knowledge_cards": [
+        "KN-GC-01"
+      ],
+      "skill_node": "SK-GC",
+      "gate_ids": [
+        "T13.3-1",
+        "T13.3-2",
+        "T13.3-3",
+        "T13.3-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_bytecode_vm",
+      "title": "手写一段字节码并单步跑通，再逐行对照源码与栈快照",
+      "lab": "bytecode_vm",
+      "knowledge": "KN-BC-01"
+    },
+    {
+      "id": "obj_object_ref",
+      "title": "建两个对象（含继承），画对象图并逐字段读偏移与值",
+      "lab": "object_ref",
+      "knowledge": "KN-OBJ-01"
+    },
+    {
+      "id": "obj_gc_reclaim",
+      "title": "建 4 个对象、断一条边，看哪些被回收、堆占用怎么变",
+      "lab": "gc_reclaim",
+      "knowledge": "KN-GC-01"
+    }
+  ]
+}

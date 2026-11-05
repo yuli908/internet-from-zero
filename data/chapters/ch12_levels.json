@@ -1,0 +1,184 @@
+{
+  "version": 2,
+  "id": "ch12",
+  "number": 12,
+  "title": "第十二章 · 地址算术",
+  "subtitle": "表达式编译、指针数组、栈帧、递归与字符串",
+  "source": "docs/curriculum/23-ch12-lecture-copy.md",
+  "start_gold_mode": "carry",
+  "start_gold": 0,
+  "start_items": {},
+  "complete_reward": {
+    "gold": 25,
+    "xp": 50,
+    "badge": "CH12-C"
+  },
+  "next_chapter": "ch13",
+  "labs": [
+    {
+      "id": "expr_compile",
+      "order": 1,
+      "title": "表达式→指令 · 先建树，再摊成指令",
+      "subtitle": "AST 摊成指令",
+      "data_key": "expr_compile",
+      "requires": [],
+      "objective": "obj_expr_compile",
+      "knowledge": "KN-EXPR-01",
+      "milestone": "CH12-1",
+      "knowledge_cards": [
+        "KN-EXPR-01"
+      ],
+      "skill_node": "SK-COMPILE",
+      "gate_ids": [
+        "T12.1-1",
+        "T12.1-2",
+        "T12.1-3",
+        "T12.1-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "pointer_array",
+      "order": 2,
+      "title": "指针与数组 · 地址加偏移",
+      "subtitle": "地址加偏移",
+      "data_key": "pointer_array",
+      "requires": [
+        "expr_compile"
+      ],
+      "objective": "obj_pointer_array",
+      "knowledge": "KN-PTR-01",
+      "milestone": "CH12-2",
+      "knowledge_cards": [
+        "KN-PTR-01"
+      ],
+      "skill_node": "SK-POINTER",
+      "gate_ids": [
+        "T12.2-1",
+        "T12.2-2",
+        "T12.2-3",
+        "T12.2-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "stack_frame",
+      "order": 3,
+      "title": "栈帧 · 一次调用压一层",
+      "subtitle": "调用压一层",
+      "data_key": "stack_frame",
+      "requires": [
+        "pointer_array"
+      ],
+      "objective": "obj_stack_frame",
+      "knowledge": "KN-FRAME-01",
+      "milestone": "CH12-3",
+      "knowledge_cards": [
+        "KN-FRAME-01"
+      ],
+      "skill_node": "SK-FRAME-12",
+      "gate_ids": [
+        "T12.3-1",
+        "T12.3-2",
+        "T12.3-3",
+        "T12.3-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "recursion_baseline",
+      "order": 4,
+      "title": "阶乘与斐波那契 · 深度看得见",
+      "subtitle": "阶乘与斐波那契",
+      "data_key": "recursion_baseline",
+      "requires": [
+        "stack_frame"
+      ],
+      "objective": "obj_recursion_baseline",
+      "knowledge": "KN-RECUR-01",
+      "milestone": "CH12-4",
+      "knowledge_cards": [
+        "KN-RECUR-01"
+      ],
+      "skill_node": "SK-RECUR",
+      "gate_ids": [
+        "T12.4-1",
+        "T12.4-2",
+        "T12.4-3",
+        "T12.4-4"
+      ],
+      "reward": {
+        "gold": 30,
+        "xp": 16
+      }
+    },
+    {
+      "id": "string_reverse",
+      "order": 5,
+      "title": "字符串反转 · 按字节搬",
+      "subtitle": "按字节搬",
+      "data_key": "string_reverse",
+      "requires": [
+        "recursion_baseline"
+      ],
+      "objective": "obj_string_reverse",
+      "knowledge": "KN-STR-01",
+      "milestone": "CH12-5",
+      "knowledge_cards": [
+        "KN-STR-01"
+      ],
+      "skill_node": "SK-STRING",
+      "gate_ids": [
+        "T12.5-1",
+        "T12.5-2",
+        "T12.5-3",
+        "T12.5-4"
+      ],
+      "reward": {
+        "gold": 35,
+        "xp": 18
+      }
+    }
+  ],
+  "objectives": [
+    {
+      "id": "obj_expr_compile",
+      "title": "写 3 个表达式，编译后逐节点对照 AST 与指令，再运行核对结果",
+      "lab": "expr_compile",
+      "knowledge": "KN-EXPR-01"
+    },
+    {
+      "id": "obj_pointer_array",
+      "title": "用指针交换两变量，用两种写法遍历数组，再故意越界一次",
+      "lab": "pointer_array",
+      "knowledge": "KN-PTR-01"
+    },
+    {
+      "id": "obj_stack_frame",
+      "title": "写一个带参数与局部变量的函数，调用前后逐字段读内存面板",
+      "lab": "stack_frame",
+      "knowledge": "KN-FRAME-01"
+    },
+    {
+      "id": "obj_recursion_baseline",
+      "title": "写两个递归程序，按 n 组各跑一遍，记结果与最大栈深度",
+      "lab": "recursion_baseline",
+      "knowledge": "KN-RECUR-01"
+    },
+    {
+      "id": "obj_string_reverse",
+      "title": "用指针或下标按字节反转，跑 ASCII / 中文 / 空串 3 组",
+      "lab": "string_reverse",
+      "knowledge": "KN-STR-01"
+    }
+  ]
+}
