@@ -153,9 +153,20 @@ jobs:
       - name: 全量测试（tests/run_tests.gd）
         shell: powershell
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -Godot "$env:GODOT_BIN"
-          # 原样透传退出码（1..9 各自对应一种红，见 scripts/run_tests.ps1 头部说明）
-          exit $LASTEXITCODE
+          $ErrorActionPreference = "Continue"
+          New-Item -ItemType Directory -Force -Path artifacts\logs | Out-Null
+          $stepLog = "artifacts\logs\tests-step.log"
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_tests.ps1 -Godot "$env:GODOT_BIN" -TimeoutSec 600 2>&1 | Tee-Object -FilePath $stepLog
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            Write-Host "::group::测试失败摘要（exit=$code）"
+            Get-Content $stepLog | Select-String -Pattern "\[run_tests\] FAIL|RESULT:|SUITE_TOTAL|=== FAILED|^  FAIL " | Select-Object -Last 12 | ForEach-Object { Write-Host $_.Line }
+            Write-Host "::endgroup::"
+            $why = (Get-Content $stepLog | Select-String -Pattern "\[run_tests\] FAIL" | Select-Object -Last 1).Line
+            if ([string]::IsNullOrWhiteSpace($why)) { $why = (Get-Content $stepLog | Select-Object -Last 5) -join " | " }
+            Write-Host "::error::全量测试失败（exit=$code）：$why"
+            exit $code
+          }
 
       - name: 汇总日志
         if: always()
