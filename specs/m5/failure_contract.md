@@ -336,3 +336,47 @@ V_low  = Vdd · Ron / (R_L + Ron)
 
 **扩容规则（一句话）**：后续章节若自然需要超过 32 段，由制作人（内容侧）与维护者在 `docs/design/19-interface-extension-proposal.md §2.9` 提出上限变更，**同一次提交**里改 `sim_sampling.gd` 的 `MAX_STAGES`、`test_ch19.gd` 的满规模/超限用例、本节与 §2.9 的余量说明，并附该章真实最长链与余量证明；**禁止**只改代码常量或只改数据、禁止在数据里逐条放行、禁止静默截断。
 
+## 14. 17.1 消息字段边界的失败码（2026-11-05 追加）
+
+> 判据落点：`src/core/msg_fields.gd`，由 `net_lab_kit` 的 `table` 分支在逐格比对**之前**调用（`gate_cases[].fields`）。
+> 真值由 `msg_fields.gd::evaluate` 按 §2.3 判定顺序现算，期望表只做第二道对照。
+> 判定顺序固定为 **type → len 16 位 → len ≤ 256 B → 负载字节数 == len → ts 24 位**（首错即止，不可由数据翻转）。
+> **不为消息字段新开失败码**——复用白名单里的 7 / 10。
+
+| 情形 | code | `detail` 措辞（点名） | 为什么用这个码 |
+|---|---|---|---|
+| 提交行 `accepted`/`reason` 与现算值不符（含把 `len=65536` 判成 `too_long` 的顺序错） | 7 `E_TABLE_CELL` | 「第 N 行（s5_len_field_overflow）首错即止：应为 accepted=false reason=bad_length（len_out_of_field），写 accepted=false reason=too_long」 | 单行判定结果错，是单元格级语义错误 |
+| 期望表自身与公式不符（数据一边写「首错即止」一边把矛盾行标绿） | 7 `E_TABLE_CELL` | 「期望表第 N 行（…）与边界公式不符：应为 reason=…，写 reason=…」 | 防数据自相矛盾；先校验判据再校验提交 |
+| `keys` 内原始字段（`msg`/`type`/`len`/`payload_bytes`/`payload_hex`/`ts`）与期望行不符 | 7 `E_TABLE_CELL` | 「第 N 行字段 payload_bytes 与期望不符：应为 4，交 5」 | 四字段逐字段核对（payload 是独立一列，不是只核 type/len/ts） |
+| 位宽口径错：`bits` 三项相加 ≠ `header_bytes × 8`，或 `payload_bits` 被写死 | 7 `E_TABLE_CELL` | 「位宽与头长对不上：三项相加 48 bit，头 7 B（应为 56 bit）」 | 位宽是结构契约，按表格式错误处理 |
+| `meta` 五项（含 `field_width_ok`）与期望不符 | 10 `E_OUTPUT_MISMATCH` | 「meta.field_width_ok 不符：应为 true，交 false」 | 声明与判据不符，属输出不符而非单格排版 |
+
+**拒绝原因枚举**（语义值，不是字段名）：`too_long`（> 256 B 协议上限）、`bad_length`（16 位装不下 / 负载字节数 ≠ len / 负载缺席）、`bad_type`（type 不在 `{1,2,3}`）、`bad_ts`（24 位装不下）；accepted 行 reason 为 `""`。`reason` 出现 `"len"` 这类字段名即判红。
+
+**实测**（`tests/test_ch17.gd`，日志 `RED-PROBE`）：四类原因各一条负例命中并判红——`bad_type`→7、`too_long`→7、`bad_length`→7、`bad_ts`→7；`payload_bytes` 改写（S1 的 5 → 应为 6）→7；首错即止探针把 S5 写成 `too_long` →7 且 detail 含 `len_out_of_field`（证明判定顺序靠前的 16 位检查先开口）。
+
+## 15. F1 出网的失败码与环境边界（2026-11-05 追加）
+
+> 判据落点：`src/core/outbound_link.gd`，由 `net_lab_kit` 的 `table` 分支在 `gate_cases[].outbound` 存在时调用。
+> 真值只来自 `src/sim/world_port.gd::deliver` 的**真实 loopback TCP**（`listen(127.0.0.1:7777)` → `connect` → `put_data` → `take_connection` → `get_data`），不在引擎里模拟字节。
+> 每行记两个读取点：`sent_hex`（发送侧写进 socket 的 buffer）与 `local_bytes`（服务端从 socket 读到的字节），两者必须逐字节相同——「打印两次」不算。
+> **不为出网新开失败码**——复用白名单里的 3 / 7 / 9 / 10 / 13。
+
+| 情形 | code | `detail` 措辞（点名） | 为什么用这个码 |
+|---|---|---|---|
+| 网桥未建成（listen/connect/put_data 失败、回环超时）或提交里没有 `rows` | 3 `E_UNCONNECTED` | 「listen 127.0.0.1:7777 失败 err=…（端口被占用或权限问题，需用户侧处理）」/「出网证据未提交：没有 rows」 | 与"未接线"同源：真实链路上没有可判的收发 |
+| `meta.transport`/`meta.host`/`meta.port` 与本次真实监听不符 | 7 `E_TABLE_CELL` | 「端口不符：本次真实监听端口是 7777，交 7788」 | 拓扑声明错，属结构错误 |
+| `run` 顺序颠倒 | 10 `E_OUTPUT_MISMATCH` | 「输出顺序颠倒：第 1 行应为 run=before，交 after」 | 形状合法但输出次序与真值相反 |
+| `sent_hex` 与真实捕获不符 | 10 `E_OUTPUT_MISMATCH` | 「发送侧字节与真实捕获不符：交 68_69，真 68_65_6c_6c_6f」 | 字节内容错，非排版错 |
+| `local_bytes` 被改写（含校验和对不上） | 10 `E_OUTPUT_MISMATCH` | 「本机读到的字节被改写：交 …（sum16=0x…），真实捕获 …（sum16=0x…）」 | 终端侧读到的不是同一份流 |
+| `sent_hex` ≠ `local_bytes`（两个读取点不是同一份字节） | 10 `E_OUTPUT_MISMATCH` | 「两个读取点不是同一份字节：发送 … ≠ 收 …」 | 出网的核心承诺是「同一份字节在两处被读到」 |
+| 两次输出同字节（没有跟着输入走） | 10 `E_OUTPUT_MISMATCH` | 「两遍输出同字节：说明没有跟着输入走」 | 同一份字节重复，不能指认两个读取点 |
+| `deliver_us` 不在 1..50000 us | 9 `E_DELAY_MISMATCH` | 「第 N 行 deliver_us=…，超出 1..50000 us」 | 时延越限，沿用时延码 |
+| 提交行数与本次真实 `runs` 不符 | 13 `E_COVERAGE` | 「行数不符：交 1 行，本次真实收发 2 行」 | 覆盖不全，不静默截断 |
+
+**环境边界（先说清不是什么）**：这是本机回环的真实 socket 收发（fd、调用顺序、收发字节都真），**不是 pcap 报文头**，也不抓 `SYN/FIN` 标志位；只 bind `127.0.0.1`，不碰公网网卡。
+
+**是否需要用户操作**：当前**不需要**——7777 本机实测可连续三次 listen 成功，且 Windows 防火墙不拦 loopback，无需管理员、无需放行端口。若 7777 被别的进程占用，`listen` 返回 3 并在 detail 说明，需用户侧让出端口；**判据代码不会自行改系统设置或换端口**。
+
+**实测**（`tests/test_final.gd`，日志 `RED-PROBE`）：字节改写 →10（detail 带 sum16）、输出顺序颠倒 →10、端口写错 →7；真实两遍收发（`hi` / `hello, world`）→ 绿，两个读取点 `sent_hex`/`local_bytes` 逐字节相同。
+

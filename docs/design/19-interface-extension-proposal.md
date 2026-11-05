@@ -205,26 +205,33 @@ RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=7
 - **影响面**：`table` kind 不改、失败码不发新的；`T16.3-1` 原为 ready，进分母与 pending 数不变（CH16 仍 15 进分母、1 pending）。
 - **估时**：3 人日（原估）。
 
-### 2.7 17.1 消息字段（`T17.1-1`，当前 pending）
+### 2.7 17.1 消息字段（`T17.1-1`，已实施 2026-11-05）
 
 - **课文原话**：「需技术侧扩接口：消息字段与超长拒绝判据（`{type, len, payload, ts, rejected_reason}`） / 最小替代：只认四字段可解析、超长被拒且原因可读。」
-- **现在缺什么**：数据侧定了「头 6 B + 上限 256 B」，但没有逐字段位宽、时间戳精度、拒绝原因枚举；pending 就卡在这。
-- **要的字段**：
+- **定稿来源**：内容侧 `D:\ai lm\ifz_content_inbox\17.1-message-fields.md`（头 6 B = type 1 + len 2 + ts 3；负载 0..256 B 可变；四种拒绝原因）。
+- **要的字段**（bit 口径，负载按字节数）：
 
 ```json
 {
-  "field_width": {"type": 1, "len": 2, "ts": 3},
+  "field_width": {"bits": {"type": 8, "len": 16, "ts": 24}, "payload_bits": "0..256 B 可变", "header_bytes": 6},
   "limits": {"max_payload": 256, "ts_resolution_ms": 1},
   "messages": [
-    {"type": 1, "len": 6, "payload_hex": "68692c20", "ts": 1001, "accepted": true, "reason": ""},
-    {"type": 1, "len": 300, "payload_hex": "", "ts": 1002, "accepted": false, "reason": "len"}
+    {"msg": "s1_text", "type": 1, "len": 6, "payload_bytes": 6, "payload_hex": "e4bda3e5a5bd", "ts": 1001, "accepted": true, "reason": ""},
+    {"msg": "s4_over_by_one", "type": 1, "len": 257, "payload_bytes": 257, "ts": 1004, "accepted": false, "reason": "too_long"}
   ],
-  "reason_enum": ["len", "type", "ts"]
+  "reason_enum": ["", "too_long", "bad_length", "bad_type", "bad_ts"]
 }
 ```
 
-- **实现侧**：位宽与拒绝枚举由数据侧定稿；序列化/解析与拒绝路径由仿真核心实现。
-- **影响面**：T17.1-1 解除 pending；17.1 C 的 6 B 头与 256 B 上限不变。
+> 更正（2026-11-05，实现侧）：本文件此前的示例把 `len=6` 配成 4 字节 `payload_hex="68692c20"` 却标 `accepted:true`，自相矛盾；已按上述内容侧定稿改为 6 字节负载（`e4bda3e5a5bd` = 「你好」），位宽同时从字节改成 bit。原 `reason:"len"` 是字段名不是原因，一并改为语义值。
+
+- **实现落点**（已落地）：
+  - 真值：`src/core/msg_fields.gd::evaluate` 按「type 合法 → len 16 位装得下 → len ≤ 256 → 负载字节数等于 len → ts 24 位装得下」从左到右**首错即止**；`expect_rows` 只做第二道对照。
+  - 判据挂点：`src/core/net_lab_kit.gd::_table` 在逐格比对**之前**调用（cfg 有 `fields` 时），位宽顺序错先报语义，不被普通填错 7 吞掉。
+  - 读点：好答案由 `MsgFields.evaluate` 现算 `accepted/reason`，测试再核 8 行、`payload_bytes` 列与四类 reason 分布。
+  - 失败码：3 未交 rows / 7 字段或 reason 不符（含首错顺序）/ 10 meta 不符 / 13 行数不符。
+- **影响面**：T17.1-1 解除 pending（ch17 4 条全进分母）；17.1 C 的 6 B 头与 256 B 上限不变。
+- **8.1 状态**：`ch08_labs.json` 里没有 `field_spec` 数据，T8.1-3 是**真缺数据**（不是只没转正）；故 17.1 措辞改为「沿用 8.1 的分层与封装顺序」，不声称沿用其字段位宽。
 - **估时**：5 人日。
 
 ### 2.8 18.4 剧本开关（`T18.4-1`）
@@ -287,25 +294,33 @@ RED-PROBE CH16 T16.3-1 第 1/2 行 client_seq 绑错请求 -> code=7
 - **影响面**：T19.3-1 的「误差 ≤1 LSB」转机判；19.2 的功耗预算可复用同一导出格式。
 - **估时**：8 人日。
 
-### 2.10 F1 出网（`F1-1`，当前 pending）
+### 2.10 F1 出网（`F1-1`，已实施 2026-11-05）
 
 - **课文原话**：「需技术侧扩接口：出网判据（`{local_bytes[], before, after, port}`） / 最小替代：本机终端必须真的收到两行，且改输入后第二行随之变化。」
-- **现在缺什么**：只有两行文本与一个时延；端口、本机字节、两次运行的独立性不可指认，固定文案也能过。
-- **要的字段**：
+- **落地形态**：**本机 loopback 真 TCP**（`127.0.0.1:7777`），不是引擎内模拟、不是打印两次。
+- **要的字段**（两行就是两次真实运行，不是固定文案）：
 
 ```json
 {
-  "port": 7777,
-  "runs": [
-    {"input": "hi, human", "local_bytes": ["68 69 2c 20 68 75 6d 61 6e"], "deliver_ms": 20},
-    {"input": "hello, world", "local_bytes": ["68 65 6c 6c 6f ..."], "deliver_ms": 25}
+  "outbound": {"host": "127.0.0.1", "port": 7777,
+    "runs": [{"run": "before", "input": "hi, human"},
+             {"run": "after", "input": "hello, world"}]},
+  "rows": [
+    {"run": "before", "input": "hi, human",  "sent_hex": "68692c2068756d616e", "local_bytes": "68692c2068756d616e", "deliver_ms": 1},
+    {"run": "after",  "input": "hello, world", "sent_hex": "68656c6c6f2c20776f726c64", "local_bytes": "68656c6c6f2c20776f726c64", "deliver_ms": 1}
   ],
-  "bridge": {"kind": "world_port", "wired": true}
+  "meta": {"transport": "tcp-loopback", "host": "127.0.0.1", "port": 7777,
+           "pid": 54316, "captured_at": "2026-11-05T20:xx:xx"}
 }
 ```
 
-- **实现侧**：World Port 桥接与字节抓取在仿真核心；终端显示在 UI。
-- **影响面**：F1-1 解除 pending；终章 F2/F3 复用同一「真实字节」产出口径。
+- **实现落点**：
+  - **真实收发**：`src/sim/world_port.gd::deliver(cfg)` 现跑 `TCPServer.listen(7777, "127.0.0.1")` → 客户端 `connect` → `put_data` → 服务端 `take_connection` → `get_data`；每行记两个读取点：`sent_hex`（发送侧写出的字节）与 `local_bytes`（本机终端读到的字节）。二者逐字节相同才叫「同一份字节在两个位置被读到」。
+  - **判据**：`src/core/outbound_link.gd`，由 `net_lab_kit` 的 `table` 分支在 `gate_cases[].outbound` 存在时调用（该门不读 `expect_rows`）；端口必须等于本次真实监听端口，不假设。
+  - **失败码**：3 未接线/未交 rows/端口起不来；7 端口或拓扑不符；10 本机字节被改写（校验和/逐字节对不上）、两次输出顺序颠倒、两个读取点不是同一份字节、输出不随输入变；9 往返时延越限；13 行数不符。详见 `specs/m5/failure_contract.md §15`。
+  - **环境边界**：只监听 `127.0.0.1`，不需要管理员、Npcap 或防火墙放行；若 7777 被其他进程占用，返回 3 并说明「需用户让端口」，实现侧不改任何系统设置。
+  - **实测**：两条负例均判红（字节改写 10、顺序颠倒 10），端口写错 7；好答案两次运行各自 `sent_hex == local_bytes` 且随输入变化。
+- **影响面**：F1-1 解除 pending（final 9 条全进分母）；F2/F3 复用同一「真实字节」产出口径。
 - **估时**：6 人日。
 
 ### 2.11 14.2 类型标签导出（`T14.2-1`，已实施 2026-11-05）

@@ -746,7 +746,7 @@ CH08（3 节 `protocol_editor` / `handshake` / `capture`，各 5 段、共 12 �
 
 恒等式（脚本每次运行末尾自动验算，不闭合就以退出码 1 结束）：
 
-`334 gate = 313 进分母 + 17 pending + 3 节级 deferred + 1 required=false`
+`334 gate = 316 进分母 + 14 pending + 3 节级 deferred + 1 required=false`
 
 - `labs` = 文件内 `labs` 键的条目数；
 - `段` = 各 lab `sections` 长度之和；
@@ -776,13 +776,13 @@ ch11                        4          16           16         20          20   
 ch12                        5          20           20         25          25        1            0         0       19
 ch13                        3          12           12         15          15        0            0         0       12
 ch14                        3          12           12         15          15        0            0         0       12
-ch15                        4          16           16         20          20        1            0         0       15
+ch15                        4          16           16         20          20        0            0         0       16
 ch16                        4          16           16         20          20        1            0         0       15
-ch17                        3          12           12         15          15        1            0         0       11
+ch17                        3          12           12         15          15        0            0         0       12
 ch18                        4          16           16         20          20        1            0         0       15
 ch19                        5          20           20         25          25        1            0         0       19
-final                       3           9            0          9           0        1            0         0        8
-TOTAL                      84         334          325        420         411       17            3         1      313
+final                       3           9            0          9           0        0            0         0        9
+TOTAL                      84         334          325        420         411       14            3         1      316
 
 章节 final：无 levels 声明（data/chapters/final_levels.json 不存在），该章无声明、跳过（不参与 gates/segs 比对）
 完整性：gate 数据 334 / levels 声明 325（已声明 lab 81/84）；segs 数据 420 / levels 声明 411
@@ -851,15 +851,15 @@ RED-PROBE CH15 T15.3-1 emit 行 reason 改错(type_changed→ret_changed) -> cod
 | CH12 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `09e08d4` |
 | CH13 | 3 | 15 | 12 | 0 | 12 | 2026-11-05 | `5369bae` |
 | CH14 | 3 | 15 | 12 | 0 | 12 | 2026-11-05 | `2b4ebb9` |
-| CH15 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `0183c8d` |
+| CH15 | 4 | 20 | 16 | 0 | 16 | 2026-11-05 | `0183c8d` / 15.2 转正 |
 | CH16 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `6c1b051` |
-| CH17 | 3 | 15 | 12 | 1 | 11 | 2026-11-05 | `080b693` |
+| CH17 | 3 | 15 | 12 | 0 | 12 | 2026-11-05 | `080b693` / 17.1 转正 |
 | CH18 | 4 | 20 | 16 | 1 | 15 | 2026-11-05 | `04f2483` |
 | CH19 | 5 | 25 | 20 | 1 | 19 | 2026-11-05 | `5164c4c` |
-| 终章 | 3 | 9 | 9 | 1 | 8 | 2026-11-05 | `f4452d9` |
-| **合计** | **84** | **420** | **334** | **17** | **313** | — | — |
+| 终章 | 3 | 9 | 9 | 0 | 9 | 2026-11-05 | `f4452d9` / F1 转正 |
+| **合计** | **84** | **420** | **334** | **14** | **316** | — | — |
 
-交叉校验：`test_gate_result` 的 `EXPECT = 315` 是**该套件自身 15 个分组的检查数**，与"进分母 gate 数"无关（此前一版把它误写成"与脚本合计一致"，已更正）。进分母数只能以 10.1 的脚本读数为准：**313**。
+交叉校验：`test_gate_result` 的 `EXPECT = 315` 是**该套件自身 15 个分组的检查数**，与"进分母 gate 数"无关（此前一版把它误写成"与脚本合计一致"，已更正）。进分母数只能以 10.1 的脚本读数为准：**316**。
 
 ### 10.2b 与上一版（`19 pending / 315 进分母`）的逐项对照
 
@@ -871,24 +871,25 @@ RED-PROBE CH15 T15.3-1 emit 行 reason 改错(type_changed→ret_changed) -> cod
 | CH14 pending / 进分母 | 1 / 11 | 0 / 12 | 本会话 `2b4ebb9`：`T14.2-1` 逐值标签导出转正 |
 | 全书 pending | 19 | 17 | 上两项各 −1 |
 | 全书进分母 | 315 | 313 | CH13 +1、CH14 +1、CH05 −1、**CH02 −3** |
+| 全书 pending / 进分母（本轮） | 17 / 313 | 14 / 316 | 15.2、17.1、F1 各转正一条：pending −1、进分母 +1 |
 | gate / 段 / lab | 334 / 420 / 84 | 334 / 420 / 84 | 无变化 |
 
 ### 10.3 全量检查（2026-11-05 复跑，原文）
 
 ```
-SUITE_TOTAL expected=7376 actual=7376
-RESULT: 7378 checks, 0 failures
+SUITE_TOTAL expected=7431 actual=7431
+RESULT: 7433 checks, 0 failures
 ```
 
-60 个套件；`SUITE_TOTAL` 只统计套件自身（7376），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
+60 个套件；`SUITE_TOTAL` 只统计套件自身（7431），`RESULT` 多出的 2 条是打印之后才跑的两道自检：
 `[guard] 自测：故意中断的 suite 被判红` 与 `[guard] 防线自检探针存在`（`tests/run_tests.gd` §runner 尾部）。
-（上一版为 7366 / 7368；+10 全部来自 `test_ch15`：`t15_3_real` 3 条 + 新负例 7 条，见 §10.5。）
+（本轮相对上一版文字读数 7376 / 7378 为 +55：`test_ch17` 55→75（+20，17.1 的 12 条真判据 + 7 条负例）、`test_final` 54→63（+9，F1 的 9 条）；其余 +26 是上一版读数未随 `test_ch15` 79→90（+11）、`test_ch16` 71→78（+7）、`test_ch14` +5、`test_ch19` +3 更新造成的欠记，以本轮实测为准。）
 
 ### 10.4 口径错因（两版差异必须点名，不允许"以最新版为准"）
 
 - **581 段 / 340 gate 那一版是错的**，错在把课件稿里尚未落库的内容当成已落库计入：`docs/curriculum/*.md` 里的 JSON 块合计 **78 lab / 386 段 / 312 gate**，`data/labs` 合计 **84 lab / 420 段 / 334 gate**，两组数各自、以及相加（806 段 / 646 gate）都得不到 581 / 340，即该版在仓库里**无任何可复现来源**。
 - **415 段 / 335 gate 那一版也是错的**，错在 20 行表上手工逐行加总（段少 5、gate 多 1），不是脚本读数。
-- 唯一有效值：**84 lab / 420 段 / 334 gate / 17 pending / 313 进分母**，与 `SUITE_TOTAL 7376` / `RESULT 7378` 同时在库。恒等式 **334 = 313 + 17 + 3 节级 deferred + 1 required=false** 由 `tools/lab_account.py` 每次运行自动验算；本轮对 20 个 lab 文件 + 20 个 levels 文件整扫，313 为按 `deferred_gates` 逐节算出的读数（4 条明列不计见 §10.1b）。
+- 唯一有效值：**84 lab / 420 段 / 334 gate / 14 pending / 316 进分母**，与 `SUITE_TOTAL 7431` / `RESULT 7433` 同时在库。恒等式 **334 = 316 + 14 + 3 节级 deferred + 1 required=false** 由 `tools/lab_account.py` 每次运行自动验算；本轮对 20 个 lab 文件 + 20 个 levels 文件整扫，316 为按 `deferred_gates` 逐节算出的读数（4 条明列不计见 §10.1b）。
 
 ### 10.5 套件期望数变化溯源（CH15 / CH16 / CH17）
 
@@ -898,12 +899,15 @@ RESULT: 7378 checks, 0 failures
 - `test_ch16`：`6c1b051` 时 `EXPECT = 69`（positive 4 / negative 6）→ `4fc45ec` 后 **71**（positive 5 / negative 7，+2 为 `delay` 上限正负探针）→ 本会话 **78**（positive 5 / t16_3_real 3 / negative 11）。
   +3 = `t16_3_real` 三条真判据（逐行对数据、时间戳来自时钟事件、时延逐条由 got−sent 且非固定常数）；
   +4 = 四条新负例（时延改固定 12→9、`got_at` 抄 `sent_at`→9、`req_id` 绑错→7、`client_seq` 绑错→7）。
-- `test_ch17`：库里只有 `080b693` 一版，**55**（positive 3 / negative 7）；提交前的估算值 54（= 15×3+9）从未入库。
-  从 54 到 55 的 +1 就是第 7 条负例「`T17.3-1` 第 1 向时延 90 超过上限 50 -> code=9」，与 CH16 同一条发射路径。
+- `test_ch17`：`080b693` 时 **55**（positive 3 / negative 7）→ 本轮 **75**（positive 3 / t17_1_fields 12 / negative 15）。
+  +20 = 17.1 的 12 条真判据（行数/唯一键/现算 accepted/reason 枚举/S2·S3 闭区间/S4/S7/S5/S8/位宽一致/meta 五项/reason 分布 3·1·2·1·1）+ 7 条负例（S1 误拒、S4 `reason="len"`、S5 首错顺序、S7 判绿、S8 判绿、S3 off-by-one、S1 `payload_bytes` 漏核），`pending_total` 分母 1→12。
+  （`080b693` 那次「从 54 到 55 的 +1 是第 7 条时延负例」的记载保留，属于上一版口径。）
+- `test_final`：`f4452d9` 时 **54**（positive 3 / negative 6）→ 本轮 **63**（positive 3 / f1_outbound_real 9 / negative 6）。
+  +9 = F1 的 9 条真判据（桥成功、两行、两读取点同字节、随输入变并可解码回原文、拓扑端口、时延 1..50000 us、字节改写→10、顺序颠倒→10、端口写错→7），`pending_total` 分母 1→9。
 
 ### 10.6 未写入的承诺
 
-`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**8 项已实施**（§2.1 13.1、§2.2 13.2、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3、§2.8 18.4、§2.9 19.3；其中 15.2 由本会话用本机 loopback 真实捕获转正（Python socket，客户端 fd=332、send/recv 同一 12 B，原始 10 条调用与 `bytes_hex` 冻结在 `socket_api.capture`；ch15 进分母 15→16、全章 pending 1→0，见 §2.5 实现落点）；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表，并把 15.3 的 `diff_sig` 接线为 `compat_report`——`T15.3-1` 六行现算、五类 reason 各一条负例，见 §10.1c；13.2 由本会话落成对象图，边语义见 §2.2，`T13.2-1` 现读 `{nodes, edges}` 并给三条负例/两道规模上限实测，见 `8e6164c`/`f8068e0`；18.4 由本会话落成剧本开关与证书结果可指认：`T18.4-1` 表行加 `switch/cert_verify/result/reason/chain[]`，判据 `src/core/cert_script.gd` 在逐格比对前校验两遍相反剧本，失败码只用 3/7/10，下游读 `report.cases[].actual.rows`，见 §2.8 实现落点；19.3 由本会话落成五段采样链路：`T19.3-1` 不再读 `expect_rows`，真值来自 `src/sim/sim_sampling.gd::trace` 真跑链，逐段 `{stage,node,in_raw,out_raw,code,sample_ms}` + `meta`，四条负例实测 10/7/13/10，上限 32 段（当前 5 段，6.4×），满规模 32/32 绿，见 §2.9 实现落点）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。§2.4 里仍未落的是调用点 `call_sites`（`pc/argc`）与 `order`/`from` 三列——提案字段未齐，不代表 15.1/15.3 判据是布尔位。其余 **2 项未批准、未实施**（§2.7 17.1、§2.10 F1）。
+`docs/design/19-interface-extension-proposal.md`：原文 **10 项**字段级接口扩展（表格行号 17–26），合计 42 人日。当前状态：**10 项已实施**（§2.1 13.1、§2.2 13.2、§2.3 14.1、§2.4 15.1、§2.5 15.2、§2.6 16.3、§2.7 17.1、§2.8 18.4、§2.9 19.3、§2.10 F1；其中 15.2 由本会话用本机 loopback 真实捕获转正（Python socket，客户端 fd=332、send/recv 同一 12 B，原始 10 条调用与 `bytes_hex` 冻结在 `socket_api.capture`；ch15 进分母 15→16、全章 pending 1→0，见 §2.5 实现落点）；16.3 由本会话落成逐请求事件时钟时延；15.1 由本会话落成符号签名表，并把 15.3 的 `diff_sig` 接线为 `compat_report`——`T15.3-1` 六行现算、五类 reason 各一条负例，见 §10.1c；13.2 由本会话落成对象图，边语义见 §2.2，`T13.2-1` 现读 `{nodes, edges}` 并给三条负例/两道规模上限实测，见 `8e6164c`/`f8068e0`；18.4 由本会话落成剧本开关与证书结果可指认：`T18.4-1` 表行加 `switch/cert_verify/result/reason/chain[]`，判据 `src/core/cert_script.gd` 在逐格比对前校验两遍相反剧本，失败码只用 3/7/10，下游读 `report.cases[].actual.rows`，见 §2.8 实现落点；19.3 由本会话落成五段采样链路：`T19.3-1` 不再读 `expect_rows`，真值来自 `src/sim/sim_sampling.gd::trace` 真跑链，逐段 `{stage,node,in_raw,out_raw,code,sample_ms}` + `meta`，四条负例实测 10/7/13/10，上限 32 段（当前 5 段，6.4×），满规模 32/32 绿，见 §2.9 实现落点）；**另补录第 11 项 §2.11（14.2 逐值标签导出）并已实施**（`2b4ebb9`）。§2.4 里仍未落的是调用点 `call_sites`（`pc/argc`）与 `order`/`from` 三列——提案字段未齐，不代表 15.1/15.3 判据是布尔位。**§2.7 17.1** 由本轮落成消息字段边界：`T17.1-1` 8 行、`keys` 含独立 `payload_bytes`/`payload_hex` 列（四字段真的核四列），`accepted/reason` 由 `src/core/msg_fields.gd::evaluate` 按 type→len 16 位→256 B 上限→负载字节数→ts 24 位首错即止现算，四类原因（`bad_type`/`too_long`/`bad_length`/`bad_ts`）各一条负例命中，另补 S5「16 位溢出 vs 超上限」首错顺序负例（实测 detail 含 `len_out_of_field`）；ch17 进分母 11→12、pending 1→0。**§2.10 F1** 由本轮落成本机 loopback 真 TCP 出网：`src/sim/world_port.gd::deliver` 真跑 `listen(127.0.0.1:7777)`/`connect`/`put_data`/`take_connection`/`get_data`，另把 `F1-1` 落成 9 条判据——同一份字节在 `sent_hex`（发送侧 buffer）与 `local_bytes`（服务端读到）两个读取点逐字节相同，负例覆盖字节改写（sum16 对不上→10）、输出顺序颠倒（→10）、端口写错（→7）；终章进分母 8→9、pending 1→0。**全书 10 项已全部实施，无未批准项**。
 这 10 项对应 CH13–CH19 与终章里"课文要求玩家能指认、数据侧却只有布尔位/汇总数"的 gate：**课文里有这些要求，判据目前只是布尔位**。任一项落地必须同时给单测（越限/缺失各一例）、一条 `RED-PROBE ... -> code=N` 实测原文，并同步删除对应章降级清单里的该条。
 
 ### 10.7 仍缺四样
