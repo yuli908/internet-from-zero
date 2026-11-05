@@ -1744,6 +1744,7 @@
 - data/labs/ch14_labs.json :: version
 - data/labs/ch15_labs.json :: labs
 - data/labs/ch15_labs.json :: labs.*.body
+- data/labs/ch15_labs.json :: labs.*.case_sources
 - data/labs/ch15_labs.json :: labs.*.gate_cases
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].codes
 - data/labs/ch15_labs.json :: labs.*.gate_cases[].expect_meta
